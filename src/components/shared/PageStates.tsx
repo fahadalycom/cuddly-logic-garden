@@ -1,30 +1,40 @@
-import { Loader2 } from "lucide-react";
+import { Loader2, Inbox, AlertCircle } from "lucide-react";
 
 export function LoadingState({ message = "Loading..." }: { message?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-12">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      <p className="mt-2 text-sm text-muted-foreground">{message}</p>
+    <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
+      <div className="relative">
+        <div className="h-12 w-12 rounded-2xl gradient-primary flex items-center justify-center glow-primary">
+          <Loader2 className="h-6 w-6 animate-spin text-white" />
+        </div>
+      </div>
+      <p className="mt-4 text-sm text-muted-foreground/60">{message}</p>
     </div>
   );
 }
 
 export function EmptyState({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      <h3 className="text-lg font-medium text-foreground">{title}</h3>
-      {description && <p className="mt-1 text-sm text-muted-foreground max-w-md">{description}</p>}
-      {action && <div className="mt-4">{action}</div>}
+    <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
+      <div className="h-16 w-16 rounded-2xl bg-card/60 border border-border/30 flex items-center justify-center mb-5">
+        <Inbox className="h-7 w-7 text-muted-foreground/30" />
+      </div>
+      <h3 className="text-base font-semibold text-foreground/80">{title}</h3>
+      {description && <p className="mt-1.5 text-sm text-muted-foreground/50 max-w-sm">{description}</p>}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }
 
 export function ErrorState({ message = "Something went wrong", onRetry }: { message?: string; onRetry?: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      <p className="text-sm text-destructive">{message}</p>
+    <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
+      <div className="h-16 w-16 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center mb-5">
+        <AlertCircle className="h-7 w-7 text-destructive/60" />
+      </div>
+      <p className="text-sm text-foreground/60">{message}</p>
       {onRetry && (
-        <button onClick={onRetry} className="mt-2 text-sm text-primary underline">
+        <button onClick={onRetry} className="mt-3 text-sm text-primary hover:text-primary/80 font-medium transition-colors">
           Try again
         </button>
       )}
