@@ -51,8 +51,8 @@ export default function SettingsPage() {
     fetchData();
   };
 
-  const updateVariant = async (id: string, field: string, value: any) => {
-    await supabase.from("product_variants").update({ [field]: value }).eq("id", id);
+  const updateVariant = async (id: string, field: "sharing_standard" | "max_discount_percent" | "max_discount_fixed", value: number) => {
+    await supabase.from("product_variants").update({ [field]: value } as any).eq("id", id);
     toast.success("Updated");
     fetchData();
   };
