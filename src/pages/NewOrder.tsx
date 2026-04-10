@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useClipboard } from "@/hooks/useClipboard";
 import { formatCurrency } from "@/lib/template-engine";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { LoadingState } from "@/components/shared/PageStates";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { ShoppingCart, User, Package, Receipt, Copy, ArrowRight } from "lucide-react";
 import type { Product, ProductVariant, ProductDuration } from "@/types/database";
 
 export default function NewOrderPage() {
@@ -49,67 +49,33 @@ export default function NewOrderPage() {
 
   const generatePreInvoice = () => {
     const lines = [
-      `📋 *Pre-Invoice*`,
-      ``,
-      `👤 Client: ${clientName}`,
-      `📱 Phone: ${clientPhone}`,
-      ``,
-      `🛒 *Order Details:*`,
+      `📋 *Pre-Invoice*`, ``, `👤 Client: ${clientName}`, `📱 Phone: ${clientPhone}`, ``, `🛒 *Order Details:*`,
       `• Product: ${product?.name}`,
       variant ? `• Plan: ${variant.name}` : null,
       duration ? `• Duration: ${duration.duration_value} ${duration.duration_type}(s)` : null,
       `• Price: ${formatCurrency(unitPrice * multiplier)}`,
       effectiveDiscount > 0 ? `• Discount: -${formatCurrency(effectiveDiscount)}` : null,
-      ``,
-      `💰 *Total Due: ${formatCurrency(lineTotal)}*`,
-      ``,
-      `Please confirm to proceed with payment.`,
+      ``, `💰 *Total Due: ${formatCurrency(lineTotal)}*`, ``, `Please confirm to proceed with payment.`,
     ].filter(Boolean).join("\n");
     copy(lines, "Pre-invoice");
   };
 
   const createOrder = async () => {
-    if (!product || !clientName || !clientPhone) {
-      toast.error("Please fill all required fields");
-      return;
-    }
-
+    if (!product || !clientName || !clientPhone) { toast.error("Please fill all required fields"); return; }
     let { data: client } = await supabase.from("clients").select("id").eq("phone", clientPhone).single();
     if (!client) {
       const { data: newClient, error } = await supabase.from("clients").insert({ name: clientName, phone: clientPhone, whatsapp_number: clientPhone }).select("id").single();
       if (error) { toast.error(error.message); return; }
       client = newClient;
     }
-
     const { data: order, error: orderErr } = await supabase.from("orders").insert({
-      client_id: client!.id,
-      created_by: user!.id,
-      status: "pending_payment",
-      total_amount: lineTotal,
-      discount_amount: effectiveDiscount,
-      remaining_due: lineTotal,
-      notes,
+      client_id: client!.id, created_by: user!.id, status: "pending_payment", total_amount: lineTotal, discount_amount: effectiveDiscount, remaining_due: lineTotal, notes,
     }).select("id").single();
-
     if (orderErr) { toast.error(orderErr.message); return; }
-
     await supabase.from("order_items").insert({
-      order_id: order!.id,
-      product_id: product.id,
-      variant_id: variant?.id || null,
-      duration_type: duration?.duration_type || null,
-      duration_value: duration?.duration_value || 1,
-      unit_price: unitPrice,
-      discount: effectiveDiscount,
-      line_total: lineTotal,
+      order_id: order!.id, product_id: product.id, variant_id: variant?.id || null, duration_type: duration?.duration_type || null, duration_value: duration?.duration_value || 1, unit_price: unitPrice, discount: effectiveDiscount, line_total: lineTotal,
     });
-
-    await supabase.from("order_status_history").insert({
-      order_id: order!.id,
-      to_status: "pending_payment",
-      changed_by: user!.id,
-    });
-
+    await supabase.from("order_status_history").insert({ order_id: order!.id, to_status: "pending_payment", changed_by: user!.id });
     toast.success("Order created!");
     generatePreInvoice();
     navigate("/orders");
@@ -118,71 +84,103 @@ export default function NewOrderPage() {
   if (loading) return <LoadingState />;
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <h1 className="text-2xl font-bold">New Order</h1>
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div className="page-header">
+        <h1 className="page-title flex items-center gap-2"><ShoppingCart className="h-6 w-6 text-primary" />New Order</h1>
+        <p className="page-subtitle">Create a new order and generate pre-invoice</p>
+      </div>
 
-      <Card>
-        <CardHeader><CardTitle>Client Information</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          <div><Label>Client Name *</Label><Input value={clientName} onChange={(e) => setClientName(e.target.value)} /></div>
-          <div><Label>Phone / WhatsApp *</Label><Input value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} /></div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle>Product Selection</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
+      {/* Client Info */}
+      <div className="premium-card !p-6 space-y-4">
+        <div className="flex items-center gap-2 mb-2">
+          <User className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Client Information</h3>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label>Product *</Label>
-            <Select value={selectedProduct} onValueChange={(v) => { setSelectedProduct(v); setSelectedVariant(""); setSelectedDuration(""); }}>
-              <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
-              <SelectContent>
-                {products.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} — {formatCurrency(Number(p.base_price))}</SelectItem>)}
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Client Name *</Label>
+            <Input value={clientName} onChange={(e) => setClientName(e.target.value)} className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl" />
+          </div>
+          <div>
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Phone / WhatsApp *</Label>
+            <Input value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl" />
+          </div>
+        </div>
+      </div>
+
+      {/* Product Selection */}
+      <div className="premium-card !p-6 space-y-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Package className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Product Selection</h3>
+        </div>
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Product *</Label>
+          <Select value={selectedProduct} onValueChange={(v) => { setSelectedProduct(v); setSelectedVariant(""); setSelectedDuration(""); }}>
+            <SelectTrigger className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl"><SelectValue placeholder="Select product" /></SelectTrigger>
+            <SelectContent className="glass-strong rounded-xl border-border/30">
+              {products.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} — {formatCurrency(Number(p.base_price))}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        {product?.product_variants && product.product_variants.length > 0 && (
+          <div>
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Plan / Variant</Label>
+            <Select value={selectedVariant} onValueChange={setSelectedVariant}>
+              <SelectTrigger className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl"><SelectValue placeholder="Select plan" /></SelectTrigger>
+              <SelectContent className="glass-strong rounded-xl border-border/30">
+                {product.product_variants.map((v) => <SelectItem key={v.id} value={v.id}>{v.name} — {formatCurrency(Number(v.price))}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          {product?.product_variants && product.product_variants.length > 0 && (
-            <div>
-              <Label>Plan / Variant</Label>
-              <Select value={selectedVariant} onValueChange={setSelectedVariant}>
-                <SelectTrigger><SelectValue placeholder="Select plan" /></SelectTrigger>
-                <SelectContent>
-                  {product.product_variants.map((v) => <SelectItem key={v.id} value={v.id}>{v.name} — {formatCurrency(Number(v.price))}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          {product?.product_durations && product.product_durations.length > 0 && (
-            <div>
-              <Label>Duration</Label>
-              <Select value={selectedDuration} onValueChange={setSelectedDuration}>
-                <SelectTrigger><SelectValue placeholder="Select duration" /></SelectTrigger>
-                <SelectContent>
-                  {product.product_durations.map((d) => <SelectItem key={d.id} value={d.id}>{d.duration_value} {d.duration_type}(s) — ×{Number(d.price_multiplier)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+        )}
+        {product?.product_durations && product.product_durations.length > 0 && (
           <div>
-            <Label>Discount {maxDiscount > 0 && `(max: ${formatCurrency(maxDiscount)})`}</Label>
-            <Input type="number" value={discount} onChange={(e) => setDiscount(Number(e.target.value))} />
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Duration</Label>
+            <Select value={selectedDuration} onValueChange={setSelectedDuration}>
+              <SelectTrigger className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl"><SelectValue placeholder="Select duration" /></SelectTrigger>
+              <SelectContent className="glass-strong rounded-xl border-border/30">
+                {product.product_durations.map((d) => <SelectItem key={d.id} value={d.id}>{d.duration_value} {d.duration_type}(s) — ×{Number(d.price_multiplier)}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
-          <div><Label>Notes</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
-        </CardContent>
-      </Card>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Discount {maxDiscount > 0 && `(max: ${formatCurrency(maxDiscount)})`}</Label>
+            <Input type="number" value={discount} onChange={(e) => setDiscount(Number(e.target.value))} className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl" />
+          </div>
+        </div>
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Notes</Label>
+          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl" />
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader><CardTitle>Order Summary</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex justify-between"><span>Subtotal:</span><span>{formatCurrency(unitPrice * multiplier)}</span></div>
-          {effectiveDiscount > 0 && <div className="flex justify-between text-destructive"><span>Discount:</span><span>-{formatCurrency(effectiveDiscount)}</span></div>}
-          <div className="flex justify-between font-bold text-lg border-t pt-2"><span>Total Due:</span><span>{formatCurrency(lineTotal)}</span></div>
-        </CardContent>
-      </Card>
+      {/* Summary */}
+      <div className="premium-card !p-6 space-y-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Receipt className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Order Summary</h3>
+        </div>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span className="mono font-medium text-foreground">{formatCurrency(unitPrice * multiplier)}</span></div>
+          {effectiveDiscount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Discount</span><span className="mono font-medium text-red-400">-{formatCurrency(effectiveDiscount)}</span></div>}
+          <div className="flex justify-between font-bold text-lg border-t border-border/20 pt-3 mt-3">
+            <span>Total Due</span>
+            <span className="mono text-gradient">{formatCurrency(lineTotal)}</span>
+          </div>
+        </div>
+      </div>
 
-      <div className="flex gap-2">
-        <Button onClick={generatePreInvoice} variant="outline" disabled={!product}>Copy Pre-Invoice</Button>
-        <Button onClick={createOrder} disabled={!product || !clientName || !clientPhone}>Create Order</Button>
+      {/* Actions */}
+      <div className="flex gap-3">
+        <Button onClick={generatePreInvoice} variant="outline" disabled={!product} className="flex-1 rounded-xl border-border/20 bg-card/40 hover:bg-card/60 h-11">
+          <Copy className="h-4 w-4 mr-2" /> Copy Pre-Invoice
+        </Button>
+        <Button onClick={createOrder} disabled={!product || !clientName || !clientPhone} className="flex-1 rounded-xl gradient-primary text-white border-0 h-11 shadow-lg shadow-primary/20">
+          Create Order <ArrowRight className="h-4 w-4 ml-2" />
+        </Button>
       </div>
     </div>
   );
