@@ -70,26 +70,24 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-10">
-      {/* Hero Header */}
       <div className="relative overflow-hidden rounded-3xl gradient-primary p-8 md:p-10 glow-primary">
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
         <div className="absolute -top-20 -right-20 w-60 h-60 rounded-full bg-white/5 blur-3xl" />
         <div className="absolute -bottom-20 -left-20 w-40 h-40 rounded-full bg-white/5 blur-3xl" />
         <div className="relative">
           <div className="flex items-center gap-2 mb-2">
-            <Zap className="h-5 w-5 text-white/80" />
-            <span className="text-xs font-semibold text-white/60 uppercase tracking-[0.2em]">Dashboard</span>
+            <Zap className="h-5 w-5 text-white/90" />
+            <span className="text-xs font-semibold text-white/75 uppercase tracking-[0.2em]">Dashboard</span>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
             {greeting}, {profile?.full_name?.split(' ')[0]}
           </h1>
-          <p className="text-white/50 text-sm mt-2 max-w-md">
+          <p className="text-white/72 text-sm mt-2 max-w-md">
             Here's your business overview. Track orders, manage clients, and monitor your subscription inventory.
           </p>
         </div>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 stagger-children">
         {statConfig.map((card) => (
           <div key={card.title} className="premium-card group cursor-default">
@@ -110,9 +108,8 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Quick Actions */}
       <div>
-        <h2 className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-[0.2em] mb-4">Quick Actions</h2>
+        <h2 className="text-xs font-semibold text-muted-foreground/75 uppercase tracking-[0.2em] mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { label: "New Order", icon: ShoppingCart, href: "/orders/new", color: "text-blue-400" },
@@ -127,9 +124,9 @@ export default function DashboardPage() {
             >
               <div className="flex items-center gap-3">
                 <action.icon className={`h-5 w-5 ${action.color} transition-transform duration-300 group-hover:scale-110`} />
-                <span className="text-sm font-medium text-foreground/70 group-hover:text-foreground transition-colors">{action.label}</span>
+                <span className="text-sm font-medium text-foreground/85 group-hover:text-foreground transition-colors">{action.label}</span>
               </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 group-hover:translate-x-0.5 transition-all duration-300" />
+              <ChevronRight className="h-4 w-4 text-muted-foreground/55 group-hover:text-muted-foreground/80 group-hover:translate-x-0.5 transition-all duration-300" />
             </button>
           ))}
         </div>

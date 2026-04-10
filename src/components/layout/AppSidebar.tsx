@@ -70,7 +70,7 @@ export function AppSidebar() {
             </div>
             <div>
               <p className="text-[13px] font-bold text-sidebar-accent-foreground tracking-tight leading-none">AI Sub Manager</p>
-              <p className="text-[10px] font-medium text-sidebar-foreground/40 uppercase tracking-[0.2em] mt-1">Management Suite</p>
+              <p className="text-[10px] font-medium text-sidebar-foreground/55 uppercase tracking-[0.2em] mt-1">Management Suite</p>
             </div>
           </div>
         ) : (
@@ -89,7 +89,7 @@ export function AppSidebar() {
 
           return (
             <SidebarGroup key={group.label} className="mb-2">
-              <SidebarGroupLabel className="text-[10px] uppercase tracking-[0.2em] font-semibold text-sidebar-foreground/40 px-3 mb-1.5">
+              <SidebarGroupLabel className="text-[10px] uppercase tracking-[0.2em] font-semibold text-sidebar-foreground/55 px-3 mb-1.5">
                 {group.label}
               </SidebarGroupLabel>
               <SidebarGroupContent>
@@ -101,13 +101,13 @@ export function AppSidebar() {
                         <SidebarMenuButton asChild isActive={isActive}>
                           <NavLink
                             to={item.url}
-                            className="group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] text-sidebar-foreground/80 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/40 transition-all duration-200"
+                            className="group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] text-sidebar-foreground/90 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/40 transition-all duration-200"
                             activeClassName="bg-sidebar-accent/60 text-sidebar-accent-foreground font-medium shadow-sm"
                           >
                             {isActive && (
                               <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full gradient-primary" />
                             )}
-                            <item.icon className={`h-[18px] w-[18px] flex-shrink-0 transition-colors duration-200 ${isActive ? 'text-primary' : 'text-sidebar-foreground/60 group-hover:text-sidebar-foreground/90'}`} />
+                            <item.icon className={`h-[18px] w-[18px] flex-shrink-0 transition-colors duration-200 ${isActive ? 'text-primary' : 'text-sidebar-foreground/72 group-hover:text-sidebar-foreground'}`} />
                             {!collapsed && <span>{item.title}</span>}
                           </NavLink>
                         </SidebarMenuButton>
@@ -131,14 +131,14 @@ export function AppSidebar() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[12px] font-semibold text-sidebar-accent-foreground truncate leading-none">{profile.full_name}</p>
-              <p className="text-[10px] text-sidebar-foreground/50 truncate mt-1">{profile.email}</p>
+              <p className="text-[10px] text-sidebar-foreground/65 truncate mt-1">{profile.email}</p>
             </div>
           </div>
         )}
         <Button
           variant="ghost"
           size={collapsed ? "icon" : "sm"}
-          className="w-full text-sidebar-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all duration-200"
+          className="w-full text-sidebar-foreground/65 hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all duration-200"
           onClick={signOut}
         >
           <LogOut className="h-4 w-4" />
