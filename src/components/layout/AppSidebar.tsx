@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Package, ShoppingCart, CreditCard, Database, Users, RefreshCw,
-  MessageSquare, BarChart3, Settings, LogOut, ChevronDown, Truck, CheckCircle,
-  Clock, Shield, FileText, UserCog, MessageCircle, Archive
+  MessageSquare, BarChart3, Settings, LogOut, Truck, CheckCircle,
+  Clock, Shield, FileText, UserCog, MessageCircle, Archive, Sparkles
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -12,7 +12,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface NavItem {
   title: string;
@@ -96,26 +95,26 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-4">
+      <SidebarHeader className="p-4 border-b border-sidebar-border/50">
         {!collapsed && (
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">AI</span>
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl gradient-primary flex items-center justify-center glow-primary">
+              <Sparkles className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-sidebar-foreground">AI Sub Manager</p>
-              <p className="text-xs text-sidebar-foreground/60">Management System</p>
+              <p className="text-sm font-bold text-sidebar-foreground tracking-tight">AI Sub Manager</p>
+              <p className="text-[10px] font-medium text-sidebar-foreground/40 uppercase tracking-widest">Pro Suite</p>
             </div>
           </div>
         )}
         {collapsed && (
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center mx-auto">
-            <span className="text-primary-foreground font-bold text-sm">AI</span>
+          <div className="h-9 w-9 rounded-xl gradient-primary flex items-center justify-center mx-auto glow-primary">
+            <Sparkles className="h-5 w-5 text-primary-foreground" />
           </div>
         )}
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="px-2 py-2">
         {navGroups.map((group) => {
           const visibleItems = group.items.filter(
             (item) => !item.module || hasPermission(item.module, "can_view")
@@ -124,19 +123,31 @@ export function AppSidebar() {
 
           return (
             <SidebarGroup key={group.label}>
-              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+              <SidebarGroupLabel className="text-[10px] uppercase tracking-widest font-semibold text-sidebar-foreground/30 px-3 mb-1">
+                {group.label}
+              </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {visibleItems.map((item) => (
-                    <SidebarMenuItem key={item.url}>
-                      <SidebarMenuButton asChild isActive={location.pathname === item.url || location.pathname.startsWith(item.url + "/")}>
-                        <NavLink to={item.url} className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
-                          <item.icon className="h-4 w-4" />
-                          {!collapsed && <span>{item.title}</span>}
-                        </NavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
+                  {visibleItems.map((item) => {
+                    const isActive = location.pathname === item.url || location.pathname.startsWith(item.url + "/");
+                    return (
+                      <SidebarMenuItem key={item.url}>
+                        <SidebarMenuButton asChild isActive={isActive}>
+                          <NavLink
+                            to={item.url}
+                            className="group relative rounded-lg px-3 py-2 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all duration-200"
+                            activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                          >
+                            {isActive && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary" />
+                            )}
+                            <item.icon className={`h-4 w-4 ${isActive ? 'text-primary' : 'text-sidebar-foreground/50 group-hover:text-sidebar-foreground/80'}`} />
+                            {!collapsed && <span className="text-sm">{item.title}</span>}
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -144,21 +155,26 @@ export function AppSidebar() {
         })}
       </SidebarContent>
 
-      <SidebarFooter className="p-4">
+      <SidebarFooter className="p-4 border-t border-sidebar-border/50">
         {!collapsed && profile && (
-          <div className="flex items-center gap-2 mb-2">
-            <div className="h-8 w-8 rounded-full bg-sidebar-accent flex items-center justify-center">
-              <span className="text-xs font-medium text-sidebar-accent-foreground">
+          <div className="flex items-center gap-3 mb-3 p-2 rounded-lg bg-sidebar-accent/30">
+            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center">
+              <span className="text-xs font-bold text-primary">
                 {profile.full_name?.charAt(0)?.toUpperCase() || "?"}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-sidebar-foreground truncate">{profile.full_name}</p>
-              <p className="text-xs text-sidebar-foreground/60 truncate">{profile.email}</p>
+              <p className="text-xs font-semibold text-sidebar-foreground truncate">{profile.full_name}</p>
+              <p className="text-[10px] text-sidebar-foreground/40 truncate">{profile.email}</p>
             </div>
           </div>
         )}
-        <Button variant="ghost" size={collapsed ? "icon" : "sm"} className="w-full text-sidebar-foreground/60 hover:text-sidebar-foreground" onClick={signOut}>
+        <Button
+          variant="ghost"
+          size={collapsed ? "icon" : "sm"}
+          className="w-full text-sidebar-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
+          onClick={signOut}
+        >
           <LogOut className="h-4 w-4" />
           {!collapsed && <span className="ml-2">Sign Out</span>}
         </Button>
