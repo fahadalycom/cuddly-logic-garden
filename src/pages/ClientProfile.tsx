@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,10 +9,12 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { LoadingState } from "@/components/shared/PageStates";
 import { formatCurrency } from "@/lib/template-engine";
 import { toast } from "sonner";
+import { ArrowLeft, Phone, Mail, Calendar, FileText, RefreshCw, StickyNote, Send } from "lucide-react";
 import type { Client, Order, Subscription, ClientNote } from "@/types/database";
 
 export default function ClientProfilePage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -48,43 +49,102 @@ export default function ClientProfilePage() {
   };
 
   if (loading) return <LoadingState />;
-  if (!client) return <p>Client not found</p>;
+  if (!client) return <div className="text-center py-20 text-muted-foreground">Client not found</div>;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-bold">{client.name}</h1>
-        <StatusBadge status={client.trust_tag} />
-      </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Phone</CardTitle></CardHeader><CardContent>{client.phone || "—"}</CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Email</CardTitle></CardHeader><CardContent>{client.email || "—"}</CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Since</CardTitle></CardHeader><CardContent>{new Date(client.created_at).toLocaleDateString()}</CardContent></Card>
+    <div className="space-y-6 max-w-4xl mx-auto">
+      {/* Back & Header */}
+      <div>
+        <Button variant="ghost" size="sm" className="text-muted-foreground/50 hover:text-foreground mb-3 -ml-2 rounded-lg" onClick={() => navigate("/clients")}>
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back to Clients
+        </Button>
+        <div className="flex items-center gap-4">
+          <div className="h-14 w-14 rounded-2xl gradient-primary flex items-center justify-center text-xl font-bold text-white shadow-lg glow-primary">
+            {client.name.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">{client.name}</h1>
+              <StatusBadge status={client.trust_tag} />
+            </div>
+            <p className="text-sm text-muted-foreground/60 mt-0.5">Client since {new Date(client.created_at).toLocaleDateString()}</p>
+          </div>
+        </div>
       </div>
 
-      <Tabs defaultValue="orders">
-        <TabsList><TabsTrigger value="orders">Orders ({orders.length})</TabsTrigger><TabsTrigger value="subscriptions">Subscriptions ({subscriptions.length})</TabsTrigger><TabsTrigger value="notes">Notes ({notes.length})</TabsTrigger></TabsList>
-        <TabsContent value="orders" className="space-y-2">
-          {orders.map((o) => (
-            <Card key={o.id} className="p-4 flex items-center justify-between">
-              <div><span className="font-mono text-xs">{o.id.slice(0, 8)}</span> · {formatCurrency(Number(o.total_amount))}</div>
+      {/* Info Cards */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        {[
+          { icon: Phone, label: "Phone", value: client.phone || "—" },
+          { icon: Mail, label: "Email", value: client.email || "—" },
+          { icon: Calendar, label: "Since", value: new Date(client.created_at).toLocaleDateString() },
+        ].map((item) => (
+          <div key={item.label} className="premium-card !p-4 flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-primary/8 flex items-center justify-center">
+              <item.icon className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/50 font-semibold">{item.label}</p>
+              <p className="text-sm font-medium text-foreground mono">{item.value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="orders" className="space-y-4">
+        <TabsList className="bg-card/40 border border-border/20 rounded-xl p-1 h-auto">
+          <TabsTrigger value="orders" className="rounded-lg text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+            <FileText className="h-3.5 w-3.5 mr-1.5" />Orders ({orders.length})
+          </TabsTrigger>
+          <TabsTrigger value="subscriptions" className="rounded-lg text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />Subs ({subscriptions.length})
+          </TabsTrigger>
+          <TabsTrigger value="notes" className="rounded-lg text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+            <StickyNote className="h-3.5 w-3.5 mr-1.5" />Notes ({notes.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="orders" className="space-y-2 stagger-children">
+          {orders.length === 0 ? <p className="text-sm text-muted-foreground/50 text-center py-8">No orders yet</p> : orders.map((o) => (
+            <div key={o.id} className="premium-card !p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="mono text-xs text-muted-foreground">{o.id.slice(0, 8)}</span>
+                <span className="text-sm font-medium">{formatCurrency(Number(o.total_amount))}</span>
+              </div>
               <StatusBadge status={o.status} />
-            </Card>
+            </div>
           ))}
         </TabsContent>
-        <TabsContent value="subscriptions" className="space-y-2">
-          {subscriptions.map((s) => (
-            <Card key={s.id} className="p-4 flex items-center justify-between">
-              <div>{s.start_date} → {s.end_date}</div>
+
+        <TabsContent value="subscriptions" className="space-y-2 stagger-children">
+          {subscriptions.length === 0 ? <p className="text-sm text-muted-foreground/50 text-center py-8">No subscriptions</p> : subscriptions.map((s) => (
+            <div key={s.id} className="premium-card !p-4 flex items-center justify-between">
+              <div className="text-sm">
+                <span className="text-muted-foreground">{s.start_date}</span>
+                <span className="mx-2 text-muted-foreground/30">→</span>
+                <span className="text-muted-foreground">{s.end_date}</span>
+              </div>
               <StatusBadge status={s.status} />
-            </Card>
+            </div>
           ))}
         </TabsContent>
-        <TabsContent value="notes" className="space-y-3">
-          <div className="flex gap-2"><Textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Add a note..." className="flex-1" /><Button onClick={addNote}>Add</Button></div>
-          {notes.map((n) => (
-            <Card key={n.id} className="p-3"><p className="text-sm">{n.content}</p><p className="text-xs text-muted-foreground mt-1">{new Date(n.created_at).toLocaleString()}</p></Card>
-          ))}
+
+        <TabsContent value="notes" className="space-y-4">
+          <div className="flex gap-3">
+            <Textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Add a note..." className="flex-1 bg-secondary/30 border-border/30 rounded-xl min-h-[80px]" />
+            <Button onClick={addNote} className="rounded-xl gradient-primary text-white border-0 self-end h-10 px-4">
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="space-y-2 stagger-children">
+            {notes.map((n) => (
+              <div key={n.id} className="premium-card !p-4">
+                <p className="text-sm text-foreground/80 leading-relaxed">{n.content}</p>
+                <p className="text-[10px] text-muted-foreground/40 mt-2 mono">{new Date(n.created_at).toLocaleString()}</p>
+              </div>
+            ))}
+          </div>
         </TabsContent>
       </Tabs>
     </div>
