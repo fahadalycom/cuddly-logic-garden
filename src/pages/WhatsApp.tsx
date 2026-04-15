@@ -30,6 +30,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 export default function WhatsAppPage() {
   const { user, isAdmin } = useAuth();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const { notify, soundEnabled, notifEnabled, toggleSound, toggleNotif, requestPermission, permission } = useNotifications();
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<any | null>(null);
