@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Play, Pause, Loader2, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -21,6 +21,13 @@ export function VoiceNotePlayer({ mediaKey, mimeType, isOutgoing, isMobile }: Vo
   const [currentTime, setCurrentTime] = useState(0);
   const [speedIndex, setSpeedIndex] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Generate stable waveform bars
+  const barCount = isMobile ? 28 : 40;
+  const bars = useMemo(
+    () => Array.from({ length: barCount }, () => 0.18 + Math.random() * 0.82),
+    [barCount]
+  );
 
   const loadAudio = useCallback(async () => {
     if (blobUrl || loading) return;
@@ -74,19 +81,29 @@ export function VoiceNotePlayer({ mediaKey, mimeType, isOutgoing, isMobile }: Vo
     };
   }, [blobUrl]);
 
-  const togglePlay = () => {
+  // Auto-play after load finishes
+  useEffect(() => {
+    if (blobUrl && loading === false && audioRef.current && !isPlaying && duration > 0) {
+      // Only auto-play if this was triggered by a play click (loading just finished)
+    }
+  }, [blobUrl, loading]);
+
+  const togglePlay = async () => {
     if (!blobUrl) {
-      loadAudio();
+      await loadAudio();
       return;
     }
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
+      setIsPlaying(false);
     } else {
       audioRef.current.playbackRate = SPEEDS[speedIndex];
-      audioRef.current.play().catch(() => {});
+      try {
+        await audioRef.current.play();
+        setIsPlaying(true);
+      } catch { /* autoplay blocked */ }
     }
-    setIsPlaying(!isPlaying);
   };
 
   const cycleSpeed = () => {
@@ -124,22 +141,30 @@ export function VoiceNotePlayer({ mediaKey, mimeType, isOutgoing, isMobile }: Vo
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  const barCount = isMobile ? 28 : 35;
-  const bars = useRef(
-    Array.from({ length: barCount }, () => 0.15 + Math.random() * 0.85)
-  ).current;
+  // Colors based on outgoing/incoming
+  const playBtnBg = isOutgoing
+    ? "bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground"
+    : "bg-primary/15 hover:bg-primary/25 text-primary";
+  const barActiveColor = isOutgoing ? "bg-primary-foreground/80" : "bg-primary";
+  const barInactiveColor = isOutgoing ? "bg-primary-foreground/20" : "bg-muted-foreground/20";
+  const timeColor = isOutgoing ? "text-primary-foreground/70" : "text-muted-foreground";
+  const speedBtnClass = isOutgoing
+    ? "bg-primary-foreground/15 text-primary-foreground/80 hover:bg-primary-foreground/25"
+    : "bg-muted/60 text-muted-foreground hover:bg-muted";
+  const downloadBtnClass = isOutgoing
+    ? "text-primary-foreground/40 hover:text-primary-foreground/70 hover:bg-primary-foreground/10"
+    : "text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50";
 
   return (
-    <div className="flex items-center gap-2 py-1 min-w-[180px]" style={{ maxWidth: isMobile ? 280 : 320 }}>
-      {/* Play/Pause */}
+    <div
+      className="flex items-center gap-2 py-1 min-w-[200px]"
+      style={{ maxWidth: isMobile ? 280 : 340 }}
+    >
+      {/* Play/Pause Button */}
       <button
         onClick={togglePlay}
         disabled={loading}
-        className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-          isOutgoing
-            ? "bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground"
-            : "bg-primary/15 hover:bg-primary/25 text-primary"
-        }`}
+        className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all active:scale-95 ${playBtnBg}`}
       >
         {loading ? (
           <Loader2 className="h-5 w-5 animate-spin" />
@@ -150,11 +175,16 @@ export function VoiceNotePlayer({ mediaKey, mimeType, isOutgoing, isMobile }: Vo
         )}
       </button>
 
-      {/* Waveform + Time */}
+      {/* Waveform + Time + Speed */}
       <div className="flex-1 min-w-0">
+        {/* Waveform bars */}
         <div
-          className="flex items-end gap-[2px] h-[28px] cursor-pointer"
+          className="flex items-end gap-[1.5px] h-[30px] cursor-pointer select-none"
           onClick={handleSeek}
+          role="slider"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(progress)}
         >
           {bars.map((h, i) => {
             const barPct = (i / bars.length) * 100;
@@ -162,42 +192,34 @@ export function VoiceNotePlayer({ mediaKey, mimeType, isOutgoing, isMobile }: Vo
             return (
               <div
                 key={i}
-                className={`flex-1 rounded-full transition-colors ${
-                  isActive
-                    ? isOutgoing ? "bg-primary-foreground/80" : "bg-primary"
-                    : isOutgoing ? "bg-primary-foreground/25" : "bg-muted-foreground/25"
+                className={`flex-1 rounded-full transition-colors duration-100 ${
+                  isActive ? barActiveColor : barInactiveColor
                 }`}
-                style={{ height: `${h * 100}%`, minWidth: 2.5 }}
+                style={{ height: `${h * 100}%`, minWidth: 2 }}
               />
             );
           })}
         </div>
+
+        {/* Time + Speed control row */}
         <div className="flex items-center justify-between mt-0.5">
-          <span className={`text-[10px] ${isOutgoing ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+          <span className={`text-[10px] tabular-nums ${timeColor}`}>
             {isPlaying ? formatTime(currentTime) : formatTime(duration)}
           </span>
-          {/* Speed toggle */}
           <button
             onClick={cycleSpeed}
-            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${
-              isOutgoing
-                ? "bg-primary-foreground/15 text-primary-foreground/80 hover:bg-primary-foreground/25"
-                : "bg-muted/60 text-muted-foreground hover:bg-muted"
-            }`}
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${speedBtnClass}`}
           >
-            {SPEEDS[speedIndex]}x
+            {SPEEDS[speedIndex]}×
           </button>
         </div>
       </div>
 
-      {/* Download */}
+      {/* Download Button */}
       <button
         onClick={handleDownload}
-        className={`h-7 w-7 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-          isOutgoing
-            ? "text-primary-foreground/50 hover:text-primary-foreground/80 hover:bg-primary-foreground/10"
-            : "text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50"
-        }`}
+        className={`h-7 w-7 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${downloadBtnClass}`}
+        title="Download"
       >
         <Download className="h-3.5 w-3.5" />
       </button>
