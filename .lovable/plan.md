@@ -1,82 +1,57 @@
 
-# Fix voice note delivery + WhatsApp-style player
 
-## What I found
-- The transport path is mostly working: recent backend logs show media upload + message send succeeding.
-- The likely failure is **audio compatibility**, not basic sending:
-  - the recorder prefers `audio/ogg;codecs=opus`, but if the browser cannot produce that natively it falls back to another format
-  - the current code then **uploads those raw bytes while labeling them as OGG/OPUS**
-  - that means WhatsApp can receive a file that claims to be `.ogg` even when the actual bytes are WebM/another codec, which is the classic reason voice notes appear locally but do not arrive/play correctly on the recipient side
-- The current player also needs UX fixes:
-  - no speed toggle
-  - download action is not clearly separate from play
-  - metadata for outgoing voice notes is not being preserved strongly enough
+# Fix WhatsApp System — Complete Diagnosis & Plan
 
-## Implementation plan
-1. **Fix the recording pipeline**
-   - Replace the “rename mime type and send” approach with a **real voice-note normalization flow**
-   - Record audio, then ensure the final file is truly:
-     - container: `.ogg`
-     - codec: `opus`
-   - Use:
-     - native OGG/OPUS when the browser supports it
-     - a browser-side WASM/polyfill encoder fallback when it does not
-   - Before upload, validate the produced blob and stop with a toast error if conversion/validation fails
+## Root Causes Found
 
-2. **Keep the existing storage architecture, but store proper metadata**
-   - Continue saving non-text media in Cloudflare R2
-   - Save the R2 key in `wa_messages.media_url`
-   - Also pass/store:
-     - `media_mime_type`
-     - `media_filename`
-   - This will let the UI distinguish true voice notes from generic audio files and keep downloads accurate
+### 1. Expired WhatsApp Token (Primary blocker)
+Edge function logs show:
+```text
+WhatsApp API error: {"error":{"message":"Error validating access token: Session has expired on Wednesday, 15-Apr-26 04:00:00 PDT."}}
+```
+This is why **nothing** delivers — not text, not voice, not media. Messages get saved to the database (207 response) but never reach the recipient.
 
-3. **Send voice notes through WhatsApp correctly**
-   - Keep the direct media upload flow in `whatsapp-send`
-   - Upload the validated OGG/OPUS file from R2 to WhatsApp Media API
-   - Send it as `type: "audio"` using the uploaded media ID
-   - Remove any fake mime assumptions and derive the outgoing upload from the actual stored file metadata
+### 2. No Optimistic UI Updates (Messages "disappear")
+When you send a message, the UI does NOT immediately show it. It relies 100% on the Supabase realtime subscription to detect the new database row. If realtime has any delay or hiccup, the message appears to vanish. The input clears but no bubble shows.
 
-4. **Make failures explicit**
-   - If recording conversion fails, show a clear error and do not send
-   - If the uploaded R2 file is not valid OGG/OPUS, stop before WhatsApp send
-   - Return clearer backend errors so the frontend can show “voice note failed” instead of silently appearing successful
+### 3. Voice Note Conversion Fragility
+FFmpeg WASM loads ~5MB of assets from CDN, requires `SharedArrayBuffer` (blocked by many CORS policies), and can silently hang. When it fails, the voice note never sends.
 
-5. **Upgrade the voice-note UI to feel like WhatsApp**
-   - Update `VoiceNotePlayer` so:
-     - play/pause is only for playback
-     - waveform/progress stays in the center
-     - **download becomes a separate button** on the message
-     - speed toggle cycles like WhatsApp: `1x → 1.5x → 2x`
-   - Keep lazy loading + cache behavior:
-     - audio loads only on play/load/download
-     - cached blob is reused for playback and download
-   - Preserve progress display during playback
+## Implementation Plan
 
-6. **Tighten the send contract between frontend and backend**
-   - Extend the send flow so the frontend passes media metadata with voice notes
-   - Update message insertion so outgoing audio messages store filename/mime consistently
-   - This avoids mismatches between what the UI shows and what WhatsApp actually receives
+### Step 1: Update the expired WhatsApp token
+- Use the `add_secret` tool to request a fresh `META_WHATSAPP_TOKEN` from you
+- This alone will restore all send/receive functionality
 
-## Files to update
-- `src/components/whatsapp/ChatWindow.tsx`
-- `src/components/whatsapp/VoiceNotePlayer.tsx`
-- `src/pages/WhatsApp.tsx`
-- `supabase/functions/whatsapp-send/index.ts`
-- possibly `package.json` for an OGG/OPUS encoder/polyfill dependency
+### Step 2: Add optimistic message rendering
+- When `handleSend` is called, immediately add the message to the local `messages` state with a temporary ID and `sending` status
+- Show a spinner/clock icon on the bubble while sending
+- When the edge function responds, update the message with real data from the response
+- If it fails, mark the bubble as "failed" with a retry option
+- This prevents the "disappearing message" problem entirely
 
-## Technical details
-- Root fix: **do not fake `audio/ogg;codecs=opus` on non-OGG recordings**
-- Final outbound voice-note file must be a real **OGG container with OPUS codec**
-- No database migration is strictly required because `wa_messages` already has:
-  - `media_filename`
-  - `media_mime_type`
-- I’ll reuse the current lazy-loading/media-cache pattern so storage reads stay optimized
+### Step 3: Simplify voice note handling
+- Skip FFmpeg conversion entirely when the browser already records in a WhatsApp-compatible format (`audio/ogg;codecs=opus`)
+- Only attempt conversion for browsers that don't support OGG natively (Safari → WebM)
+- For the fallback, send WebM directly — WhatsApp Cloud API accepts `audio/webm` too (it converts server-side)
+- Remove the fragile FFmpeg WASM dependency
 
-## Expected result
-After implementation:
-- recorded voice notes will be converted/validated before send
-- recipients will receive them properly in WhatsApp
-- playback in the app will feel more like WhatsApp
-- speed control will work
-- download will be a separate action instead of sharing the play control
+### Step 4: Harden realtime subscriptions
+- Add error handling to the realtime channel subscriptions
+- Deduplicate messages (realtime INSERT may arrive after the optimistic message is already shown)
+- Auto-reconnect on subscription drops
+
+## Files to Update
+- `src/pages/WhatsApp.tsx` — optimistic updates in `handleSendMessage`, dedupe in realtime handler
+- `src/components/whatsapp/ChatWindow.tsx` — show sending/failed states on bubbles, simplify voice recording
+- `src/lib/voice-note.ts` — simplify to skip conversion when possible, fall back to raw format
+- `supabase/functions/whatsapp-send/index.ts` — minor: accept `audio/webm` cleanly
+- Secret update: `META_WHATSAPP_TOKEN`
+
+## Expected Result
+- Messages appear instantly in UI when sent (optimistic)
+- Messages deliver to WhatsApp recipients (fresh token)
+- Voice notes record and send reliably without FFmpeg hangs
+- Failed sends show clearly with retry option
+- Realtime sync stays stable
+
