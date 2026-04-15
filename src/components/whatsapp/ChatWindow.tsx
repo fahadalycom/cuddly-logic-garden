@@ -226,10 +226,15 @@ export function ChatWindow({
     if (!input.trim() || sending) return;
     const msg = input.trim();
     setSending(true);
-    setInput("");
-    await onSend(msg);
-    setSending(false);
-    inputRef.current?.focus();
+    try {
+      await onSend(msg);
+      setInput("");
+    } catch {
+      // Keep input as draft on failure
+    } finally {
+      setSending(false);
+      inputRef.current?.focus();
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -241,8 +246,13 @@ export function ChatWindow({
     try {
       const arrayBuffer = await (file as Blob).arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
+      // Chunked base64 encoding (8KB chunks) to avoid call stack overflow on large files
+      const chunkSize = 8192;
       let binary = "";
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+        const chunk = bytes.subarray(offset, offset + chunkSize);
+        binary += String.fromCharCode(...chunk);
+      }
       const base64 = btoa(binary);
 
       let mediaType = "document";

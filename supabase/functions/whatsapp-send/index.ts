@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req) => {
@@ -49,9 +49,7 @@ serve(async (req) => {
     };
 
     if (media_type && media_type !== "text" && media_url) {
-      // media_url is an R2 key — construct proxy URL for Meta to fetch
       const proxyUrl = `${supabaseUrl}/functions/v1/whatsapp-media?key=${encodeURIComponent(media_url)}`;
-
       messagePayload.type = media_type;
       messagePayload[media_type] = { link: proxyUrl };
       if (content) messagePayload[media_type].caption = content;
@@ -61,31 +59,36 @@ serve(async (req) => {
     }
 
     // Send via Meta API
-    const waResponse = await fetch(
-      `https://graph.facebook.com/v19.0/${phoneId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(messagePayload),
+    let waMessageId: string | null = null;
+    let deliveryFailed = false;
+
+    try {
+      const waResponse = await fetch(
+        `https://graph.facebook.com/v19.0/${phoneId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(messagePayload),
+        }
+      );
+
+      const waResult = await waResponse.json();
+
+      if (!waResponse.ok) {
+        console.error("WhatsApp API error:", waResult);
+        deliveryFailed = true;
+      } else {
+        waMessageId = waResult.messages?.[0]?.id || null;
       }
-    );
-
-    const waResult = await waResponse.json();
-
-    if (!waResponse.ok) {
-      console.error("WhatsApp API error:", waResult);
-      return new Response(JSON.stringify({ error: "Failed to send message", details: waResult }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    } catch (apiErr) {
+      console.error("WhatsApp API fetch error:", apiErr);
+      deliveryFailed = true;
     }
 
-    const waMessageId = waResult.messages?.[0]?.id;
-
-    // Store sent message — media_url is the R2 key
+    // Always store sent message in DB regardless of delivery status
     const { data: storedMessage } = await supabase.from("wa_messages").insert({
       conversation_id,
       sender_type: "agent",
@@ -122,6 +125,17 @@ serve(async (req) => {
           .update({ messages_sent_today: count, last_reset_date: today })
           .eq("id", agentConfig.id);
       }
+    }
+
+    if (deliveryFailed) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: "Message saved but WhatsApp delivery failed. Check META_WHATSAPP_TOKEN.", 
+        message: storedMessage 
+      }), {
+        status: 207,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(JSON.stringify({ success: true, message: storedMessage }), {
