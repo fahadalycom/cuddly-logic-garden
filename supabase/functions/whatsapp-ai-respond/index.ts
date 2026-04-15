@@ -1,0 +1,199 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  if (!lovableApiKey) {
+    return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  try {
+    const { conversation_id, message_content, customer_phone } = await req.json();
+
+    // Get all products with variants for context
+    const { data: products } = await supabase
+      .from("products")
+      .select("id, name, base_price, description, category, product_variants(name, price)")
+      .eq("is_active", true);
+
+    const productList = (products || [])
+      .map((p: any) => {
+        let info = `- ${p.name} (${p.category || "General"}): $${p.base_price}`;
+        if (p.product_variants?.length) {
+          info += "\n  Variants: " + p.product_variants.map((v: any) => `${v.name}: $${v.price}`).join(", ");
+        }
+        return info;
+      })
+      .join("\n");
+
+    // Get message templates for context
+    const { data: templates } = await supabase
+      .from("message_templates")
+      .select("name, body, category")
+      .eq("is_active", true);
+
+    const templateList = (templates || [])
+      .map((t: any) => `[${t.category}] ${t.name}: ${t.body.substring(0, 100)}`)
+      .join("\n");
+
+    const systemPrompt = `You are an AI assistant for a software subscription business. Your job is to analyze customer WhatsApp messages and determine if you can auto-respond.
+
+PRODUCTS AVAILABLE:
+${productList}
+
+RESPONSE TEMPLATES:
+${templateList}
+
+RULES:
+1. If the customer is asking about a product price, find the matching product (handle variations like "GPT" = "ChatGPT Plus", "Netflix" etc.)
+2. Rate your confidence: "high" (exact match, clear intent), "medium" (probable match, slightly ambiguous), "low" (unclear, complex query)
+3. For high confidence: provide the auto-reply text
+4. For medium: provide a suggested reply for the agent to review
+5. For low: respond with null (let human handle)
+
+Respond ONLY in this JSON format:
+{
+  "confidence": "high" | "medium" | "low",
+  "detected_intent": "string describing what customer wants",
+  "matched_product_name": "product name or null",
+  "matched_product_id": "product uuid or null",
+  "suggested_response": "the reply text or null"
+}`;
+
+    // Call Lovable AI
+    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Customer message: "${message_content}"` },
+        ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "analyze_message",
+              description: "Analyze customer message and return structured response",
+              parameters: {
+                type: "object",
+                properties: {
+                  confidence: { type: "string", enum: ["high", "medium", "low"] },
+                  detected_intent: { type: "string" },
+                  matched_product_name: { type: "string", nullable: true },
+                  matched_product_id: { type: "string", nullable: true },
+                  suggested_response: { type: "string", nullable: true },
+                },
+                required: ["confidence", "detected_intent"],
+              },
+            },
+          },
+        ],
+        tool_choice: { type: "function", function: { name: "analyze_message" } },
+      }),
+    });
+
+    if (!aiResponse.ok) {
+      const errText = await aiResponse.text();
+      console.error("AI Gateway error:", aiResponse.status, errText);
+      return new Response(JSON.stringify({ error: "AI analysis failed" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const aiResult = await aiResponse.json();
+    const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
+    
+    if (!toolCall) {
+      return new Response(JSON.stringify({ status: "no_analysis" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const analysis = JSON.parse(toolCall.function.arguments);
+    
+    // Log the AI response
+    const { data: logEntry } = await supabase.from("wa_auto_response_log").insert({
+      conversation_id,
+      detected_intent: analysis.detected_intent,
+      matched_product_id: analysis.matched_product_id || null,
+      confidence: analysis.confidence,
+      suggested_response: analysis.suggested_response,
+      was_sent: analysis.confidence === "high",
+    }).select().single();
+
+    // If high confidence, auto-send
+    if (analysis.confidence === "high" && analysis.suggested_response) {
+      const token = Deno.env.get("META_WHATSAPP_TOKEN")!;
+      const phoneId = Deno.env.get("META_WHATSAPP_PHONE_ID")!;
+
+      const sendResp = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to: customer_phone,
+          type: "text",
+          text: { body: analysis.suggested_response },
+        }),
+      });
+
+      const sendResult = await sendResp.json();
+
+      if (sendResp.ok) {
+        // Store AI message
+        await supabase.from("wa_messages").insert({
+          conversation_id,
+          sender_type: "ai",
+          content: analysis.suggested_response,
+          is_ai_generated: true,
+          whatsapp_message_id: sendResult.messages?.[0]?.id,
+          is_read: true,
+        });
+
+        // Update conversation
+        await supabase
+          .from("wa_conversations")
+          .update({
+            last_message_preview: analysis.suggested_response,
+            last_message_at: new Date().toISOString(),
+          })
+          .eq("id", conversation_id);
+      }
+    }
+
+    return new Response(JSON.stringify({ status: "ok", analysis }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("AI respond error:", error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
