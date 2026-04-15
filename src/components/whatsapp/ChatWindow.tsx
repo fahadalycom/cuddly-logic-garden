@@ -215,6 +215,7 @@ export function ChatWindow({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingTimeRef = useRef(0);
   const [fileAccept, setFileAccept] = useState("*/*");
 
   useEffect(() => { scrollToBottom(); }, [messages]);
