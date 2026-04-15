@@ -578,8 +578,8 @@ export function ChatWindow({
     return (
       <div className="flex h-full max-h-full flex-col overflow-hidden overscroll-none bg-background">
         {/* ── HEADER ── */}
-        <div className="flex-shrink-0 px-1 flex items-center justify-between border-b border-border bg-card/95 backdrop-blur-md z-20"
-          style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))', paddingBottom: '0.5rem' }}>
+        <div className="flex-shrink-0 px-1 flex items-center justify-between border-b border-border bg-gradient-to-r from-card/95 to-card/90 backdrop-blur-md z-20"
+          style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))', paddingBottom: '0.5rem', borderBottom: '1px solid hsl(var(--border))' }}>
           <div className="flex items-center gap-1 min-w-0 flex-1">
             {onBack && (
               <button className="h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted transition-colors" onClick={onBack}>
@@ -587,8 +587,8 @@ export function ChatWindow({
               </button>
             )}
             <div className="relative flex-shrink-0">
-              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-                <span className="text-sm font-bold text-primary-foreground">
+              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center ring-2 ring-emerald-500/20">
+                <span className="text-sm font-bold text-white">
                   {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
                 </span>
               </div>
