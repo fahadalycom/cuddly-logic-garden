@@ -616,7 +616,7 @@ export function ChatWindow({
 
       {/* AI Suggestions */}
       {aiSuggestions.length > 0 && (
-        <div className={`${isMobile ? "px-3 py-2" : "px-5 py-3"} bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-amber-500/15`}>
+        <div className={`flex-shrink-0 ${isMobile ? "px-3 py-2" : "px-5 py-3"} bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-amber-500/15`}>
           <div className="flex items-center gap-2 mb-1.5">
             <div className="h-5 w-5 rounded-full bg-amber-500/15 flex items-center justify-center"><Sparkles className="h-3 w-3 text-amber-500" /></div>
             <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">AI</span>
