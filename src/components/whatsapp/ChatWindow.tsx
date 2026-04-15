@@ -732,6 +732,8 @@ export function ChatWindow({
             </div>
           ) : (
             <div className="flex items-end gap-1">
+              <EmojiPicker onSelect={(emoji) => setInput(prev => prev + emoji)} isMobile />
+
               <DropdownMenu open={showAttachMenu} onOpenChange={setShowAttachMenu}>
                 <DropdownMenuTrigger asChild>
                   <button className="h-11 w-11 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted transition-colors" disabled={uploading}>
@@ -739,10 +741,18 @@ export function ChatWindow({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-52" side="top">
-                  <DropdownMenuItem onClick={() => openFilePicker("image/*")} className="py-3"><ImageIcon className="h-4 w-4 mr-2 text-blue-500" /> Photo</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => openFilePicker("video/*")} className="py-3"><Video className="h-4 w-4 mr-2 text-purple-500" /> Video</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => openFilePicker("audio/*")} className="py-3"><Mic className="h-4 w-4 mr-2 text-orange-500" /> Audio</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")} className="py-3"><FileText className="h-4 w-4 mr-2 text-emerald-500" /> Document</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openFilePicker("image/*")} className="py-3">
+                    <div className="h-7 w-7 rounded-full bg-blue-500/10 flex items-center justify-center mr-2"><ImageIcon className="h-3.5 w-3.5 text-blue-500" /></div> Photo
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openFilePicker("video/*")} className="py-3">
+                    <div className="h-7 w-7 rounded-full bg-purple-500/10 flex items-center justify-center mr-2"><Video className="h-3.5 w-3.5 text-purple-500" /></div> Video
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openFilePicker("audio/*")} className="py-3">
+                    <div className="h-7 w-7 rounded-full bg-orange-500/10 flex items-center justify-center mr-2"><Mic className="h-3.5 w-3.5 text-orange-500" /></div> Audio
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")} className="py-3">
+                    <div className="h-7 w-7 rounded-full bg-emerald-500/10 flex items-center justify-center mr-2"><FileText className="h-3.5 w-3.5 text-emerald-500" /></div> Document
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="py-3" onClick={() => {
                     setShowAttachMenu(false);
@@ -750,9 +760,16 @@ export function ChatWindow({
                     inp.type = "file"; inp.accept = "image/*"; inp.capture = "environment";
                     inp.onchange = (e) => { const file = (e.target as HTMLInputElement).files?.[0]; if (file) uploadAndSend(file, file.name, file.type); };
                     inp.click();
-                  }}><Camera className="h-4 w-4 mr-2 text-pink-500" /> Camera</DropdownMenuItem>
+                  }}>
+                    <div className="h-7 w-7 rounded-full bg-pink-500/10 flex items-center justify-center mr-2"><Camera className="h-3.5 w-3.5 text-pink-500" /></div> Camera
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              <button className="h-11 w-11 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted transition-colors"
+                onClick={() => setShowTemplates(true)}>
+                <FileText className="h-[20px] w-[20px] text-muted-foreground" />
+              </button>
 
               <div className="flex-1 relative">
                 <Textarea
@@ -764,11 +781,16 @@ export function ChatWindow({
                   rows={1}
                   className="min-h-[44px] max-h-[100px] text-[15px] py-2.5 px-4 resize-none rounded-full bg-muted/30 border-transparent focus:border-primary/30 focus:bg-background transition-colors"
                 />
+                {input.length > 500 && (
+                  <span className={`absolute bottom-1 right-3 text-[9px] tabular-nums ${input.length > 900 ? "text-destructive" : "text-muted-foreground"}`}>
+                    {input.length}/1000
+                  </span>
+                )}
               </div>
 
               {input.trim() ? (
                 <button
-                  className="h-11 w-11 flex-shrink-0 rounded-full bg-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform"
+                  className="h-11 w-11 flex-shrink-0 rounded-full bg-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform wa-send-bounce"
                   onClick={handleSend} disabled={sending}>
                   <Send className={`h-5 w-5 text-primary-foreground ${sending ? "animate-pulse" : ""}`} />
                 </button>
