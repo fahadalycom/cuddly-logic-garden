@@ -10,10 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Send, Paperclip, MoreVertical, CheckCircle, UserPlus, Bot,
   Image as ImageIcon, Video, FileText, Mic, Sparkles, X, Check, CheckCheck,
-  Phone, ExternalLink, Copy, Clock, Search,
+  Phone, ExternalLink, Copy, Clock, Search, Bell, BellOff, Volume2,
   ArrowDown, Shield, Zap, MessageSquare, Download, Loader2, Eye, File,
   ArrowLeft, Camera, StopCircle, Trash2, Reply, Smile, Info, CornerDownRight
 } from "lucide-react";
+import { useNotifications } from "@/hooks/useNotifications";
+import { Switch } from "@/components/ui/switch";
 import { format, isToday, isYesterday } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
