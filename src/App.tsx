@@ -63,8 +63,8 @@ const App = () => (
               <Route path="/settings/roles" element={<RolesPage />} />
               <Route path="/settings/templates" element={<TemplatesPage />} />
               <Route path="/settings/audit" element={<AuditLogsPage />} />
-              <Route path="/whatsapp" element={<WhatsAppPage />} />
             </Route>
+            <Route path="/whatsapp" element={<ProtectedRoute><WhatsAppPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
