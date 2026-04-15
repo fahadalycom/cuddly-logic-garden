@@ -119,7 +119,7 @@ function readVintRaw(data: Uint8Array, pos: number): { value: number; rawValue: 
   return { value, rawValue, length: len };
 }
 
-function readElementId(data: Uint8Array, pos: number): { id: number; length: number } | null {
+function readElementId(data: Uint8Array, pos: number): { id: number; rawValue: number; length: number } | null {
   return readVintRaw(data, pos);
 }
 
@@ -342,10 +342,10 @@ export async function normalizeVoiceNote(
     // Chrome records WebM/Opus — remux to OGG/Opus
     console.log(`[voice-note] Remuxing WebM→OGG (${rawBytes.length} bytes)`);
     try {
-      const oggBytes = remuxWebmToOgg(rawBytes);
+    const oggBytes = remuxWebmToOgg(rawBytes);
       console.log(`[voice-note] Remuxed to OGG (${oggBytes.length} bytes)`);
       return {
-        blob: new Blob([oggBytes], { type: OUTPUT_MIME }),
+        blob: new Blob([oggBytes.buffer as ArrayBuffer], { type: OUTPUT_MIME }),
         mimeType: OUTPUT_MIME,
         filename: `voice-${Date.now()}.ogg`,
       };
