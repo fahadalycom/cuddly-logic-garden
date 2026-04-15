@@ -49,8 +49,11 @@ serve(async (req) => {
     };
 
     if (media_type && media_type !== "text" && media_url) {
+      // media_url is an R2 key — construct proxy URL for Meta to fetch
+      const proxyUrl = `${supabaseUrl}/functions/v1/whatsapp-media?key=${encodeURIComponent(media_url)}`;
+
       messagePayload.type = media_type;
-      messagePayload[media_type] = { link: media_url };
+      messagePayload[media_type] = { link: proxyUrl };
       if (content) messagePayload[media_type].caption = content;
     } else {
       messagePayload.type = "text";
@@ -82,7 +85,7 @@ serve(async (req) => {
 
     const waMessageId = waResult.messages?.[0]?.id;
 
-    // Store sent message
+    // Store sent message — media_url is the R2 key
     const { data: storedMessage } = await supabase.from("wa_messages").insert({
       conversation_id,
       sender_type: "agent",
