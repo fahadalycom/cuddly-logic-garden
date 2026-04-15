@@ -301,6 +301,31 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
   );
 }
 
+function MobileNotifButton() {
+  const { soundEnabled, notifEnabled, toggleSound, toggleNotif } = useNotifications();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="h-10 w-10 rounded-full flex items-center justify-center active:bg-muted transition-colors">
+          {notifEnabled || soundEnabled ? <Bell className="h-[18px] w-[18px]" /> : <BellOff className="h-[18px] w-[18px] text-muted-foreground" />}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuLabel className="text-xs">Notifications</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <div className="px-2 py-1.5 flex items-center justify-between">
+          <span className="text-xs flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Push</span>
+          <Switch checked={notifEnabled} onCheckedChange={toggleNotif} className="scale-75" />
+        </div>
+        <div className="px-2 py-1.5 flex items-center justify-between">
+          <span className="text-xs flex items-center gap-1.5"><Volume2 className="h-3.5 w-3.5" /> Sound</span>
+          <Switch checked={soundEnabled} onCheckedChange={toggleSound} className="scale-75" />
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function ChatWindow({
   conversation, messages, templates, aiSuggestions,
   onSend, onResolve, onApproveAi, onRejectAi, isAdmin, staff, onAssign,
