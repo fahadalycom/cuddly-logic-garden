@@ -12,4 +12,5 @@ has_role() and is_staff() security definer functions for RLS.
 - [Roles & permissions](mem://features/roles) — 6 roles with module-level permissions table
 - [Order workflow](mem://features/order-flow) — draft→pending_payment→paid_unverified→paid_verified→to_deliver→delivered→cancelled
 - [Brand palette](mem://design/brand-palette) — ProAppz-inspired amber/orange dark theme with high text contrast
-- [WhatsApp system](mem://features/whatsapp-system) — Full WhatsApp with reply/reactions, tags, notes, search, notifications, voice notes, AI auto-response
+- [WhatsApp system](mem://features/whatsapp-system) — Full WhatsApp Business API with multi-agent chat, AI, queue, media, notifications, themes
+- [WhatsApp settings](mem://features/whatsapp-settings) — All WA features controllable from Settings page (API, AI, agents, notifications, themes)

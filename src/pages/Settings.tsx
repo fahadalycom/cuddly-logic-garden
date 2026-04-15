@@ -11,8 +11,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Settings, Plus, Trash2, Clock, Tag, Percent } from "lucide-react";
+import { Settings, Plus, Trash2, Clock, Tag, Percent, MessageSquare, Bot, Users, Bell, Palette, Globe } from "lucide-react";
+import { WhatsAppApiSettings } from "@/components/settings/WhatsAppApiSettings";
+import { WhatsAppAiSettings } from "@/components/settings/WhatsAppAiSettings";
+import { WhatsAppAgentSettings } from "@/components/settings/WhatsAppAgentSettings";
+import { WhatsAppNotificationSettings } from "@/components/settings/WhatsAppNotificationSettings";
+import { WhatsAppThemeSettings } from "@/components/settings/WhatsAppThemeSettings";
 import type { Product, ProductDuration, ProductVariant } from "@/types/database";
 
 export default function SettingsPage() {
@@ -63,16 +69,31 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div className="page-header">
         <h1 className="page-title flex items-center gap-2"><Settings className="h-6 w-6 text-primary" />Settings</h1>
-        <p className="page-subtitle">Configure product durations, sharing standards, and discount rules</p>
+        <p className="page-subtitle">Configure products, WhatsApp, AI, agents, notifications, and themes</p>
       </div>
 
       <Tabs defaultValue="durations" className="space-y-6">
-        <TabsList className="bg-card/50 border border-border/30 rounded-xl p-1">
-          <TabsTrigger value="durations" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary"><Clock className="h-3.5 w-3.5 mr-1.5" />Durations</TabsTrigger>
-          <TabsTrigger value="sharing" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary"><Tag className="h-3.5 w-3.5 mr-1.5" />Sharing</TabsTrigger>
-          <TabsTrigger value="discounts" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary"><Percent className="h-3.5 w-3.5 mr-1.5" />Discounts</TabsTrigger>
-        </TabsList>
+        <ScrollArea className="w-full">
+          <TabsList className="bg-card/50 border border-border/30 rounded-xl p-1 inline-flex w-auto">
+            {/* Product Settings */}
+            <TabsTrigger value="durations" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary text-xs"><Clock className="h-3.5 w-3.5 mr-1.5" />Durations</TabsTrigger>
+            <TabsTrigger value="sharing" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary text-xs"><Tag className="h-3.5 w-3.5 mr-1.5" />Sharing</TabsTrigger>
+            <TabsTrigger value="discounts" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary text-xs"><Percent className="h-3.5 w-3.5 mr-1.5" />Discounts</TabsTrigger>
+            {/* Separator */}
+            <div className="w-px h-5 bg-border/50 mx-1 self-center" />
+            {/* WhatsApp Settings */}
+            <TabsTrigger value="wa-api" className="rounded-lg data-[state=active]:bg-emerald-500/10 data-[state=active]:text-emerald-500 text-xs"><Globe className="h-3.5 w-3.5 mr-1.5" />WA API</TabsTrigger>
+            <TabsTrigger value="wa-ai" className="rounded-lg data-[state=active]:bg-emerald-500/10 data-[state=active]:text-emerald-500 text-xs"><Bot className="h-3.5 w-3.5 mr-1.5" />AI</TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="wa-agents" className="rounded-lg data-[state=active]:bg-emerald-500/10 data-[state=active]:text-emerald-500 text-xs"><Users className="h-3.5 w-3.5 mr-1.5" />Agents</TabsTrigger>
+            )}
+            <TabsTrigger value="wa-notifications" className="rounded-lg data-[state=active]:bg-emerald-500/10 data-[state=active]:text-emerald-500 text-xs"><Bell className="h-3.5 w-3.5 mr-1.5" />Alerts</TabsTrigger>
+            <TabsTrigger value="wa-theme" className="rounded-lg data-[state=active]:bg-emerald-500/10 data-[state=active]:text-emerald-500 text-xs"><Palette className="h-3.5 w-3.5 mr-1.5" />Theme</TabsTrigger>
+          </TabsList>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
 
+        {/* Product Duration Plans */}
         <TabsContent value="durations" className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Product Duration Plans</h2>
@@ -113,7 +134,6 @@ export default function SettingsPage() {
               </Dialog>
             )}
           </div>
-
           {products.map(product => (
             <div key={product.id} className="premium-card !p-5">
               <h3 className="font-semibold text-sm mb-3">{product.name}</h3>
@@ -141,6 +161,7 @@ export default function SettingsPage() {
           ))}
         </TabsContent>
 
+        {/* Sharing */}
         <TabsContent value="sharing" className="space-y-4">
           <h2 className="text-lg font-semibold">Sharing Standards per Variant</h2>
           <div className="premium-table">
@@ -172,6 +193,7 @@ export default function SettingsPage() {
           </div>
         </TabsContent>
 
+        {/* Discounts */}
         <TabsContent value="discounts" className="space-y-4">
           <h2 className="text-lg font-semibold">Discount Rules per Variant</h2>
           <div className="premium-table">
@@ -209,6 +231,13 @@ export default function SettingsPage() {
             </Table>
           </div>
         </TabsContent>
+
+        {/* WhatsApp Settings Tabs */}
+        <TabsContent value="wa-api"><WhatsAppApiSettings /></TabsContent>
+        <TabsContent value="wa-ai"><WhatsAppAiSettings /></TabsContent>
+        {isAdmin && <TabsContent value="wa-agents"><WhatsAppAgentSettings /></TabsContent>}
+        <TabsContent value="wa-notifications"><WhatsAppNotificationSettings /></TabsContent>
+        <TabsContent value="wa-theme"><WhatsAppThemeSettings /></TabsContent>
       </Tabs>
     </div>
   );
