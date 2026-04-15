@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -18,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   MessageSquare, Clock, Users, Zap, TrendingUp, Search, Bell, BellOff,
-  Volume2, VolumeX, Info, Settings2
+  Volume2, VolumeX, Info, Settings2, ArrowLeft, Home, MessageCircle, Headphones
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
