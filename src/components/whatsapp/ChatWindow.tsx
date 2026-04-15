@@ -335,7 +335,11 @@ export function ChatWindow({
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
       setRecordingTime(0);
-      recordingTimerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
+      recordingTimeRef.current = 0;
+      recordingTimerRef.current = setInterval(() => {
+        recordingTimeRef.current += 1;
+        setRecordingTime(t => t + 1);
+      }, 1000);
     } catch (err) {
       toast.error("Microphone access denied");
     }
