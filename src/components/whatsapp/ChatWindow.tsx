@@ -708,6 +708,12 @@ export function ChatWindow({
         {/* ── INPUT BAR ── */}
         <div className="flex-shrink-0 px-2 py-2 border-t border-border bg-card/95 backdrop-blur-md z-20"
           style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
+          {input.length > 0 && (
+            <div className="flex items-center gap-2 mb-1.5 px-3">
+              <div className="wa-typing-dots"><span /><span /><span /></div>
+              <span className="text-[10px] text-muted-foreground">typing...</span>
+            </div>
+          )}
           {uploading && (
             <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg bg-primary/5 border border-primary/20">
               <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
