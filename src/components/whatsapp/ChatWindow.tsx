@@ -242,12 +242,12 @@ export function ChatWindow({
   const handleSend = async () => {
     if (!input.trim() || sending) return;
     const msg = input.trim();
+    setInput("");
     setSending(true);
     try {
       await onSend(msg);
-      setInput("");
     } catch {
-      // Keep input as draft on failure
+      // Error handled in parent via optimistic UI
     } finally {
       setSending(false);
       inputRef.current?.focus();
