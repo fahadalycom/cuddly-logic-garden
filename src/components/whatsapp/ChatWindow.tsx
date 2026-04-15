@@ -145,11 +145,13 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
   onReact: (msgId: string, emoji: string) => void;
 }) {
   const [showReactions, setShowReactions] = useState(false);
+  const [showMobileActions, setShowMobileActions] = useState(false);
   const isCustomer = msg.sender_type === "customer";
   const isAi = msg.sender_type === "ai";
   const isSystem = msg.sender_type === "system";
   const isSending = msg._sending;
   const isFailed = msg._failed;
+  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   if (isSystem) {
     return (
@@ -161,16 +163,15 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
 
   const handleCopy = () => {
     if (msg.content) { navigator.clipboard.writeText(msg.content); toast.success("Copied"); }
+    setShowMobileActions(false);
   };
 
   const hasMedia = msg.media_url && msg.media_type !== "text";
   const isVoiceNote = msg.media_type === "audio";
-  const maxW = isMobile ? "max-w-[85%]" : "max-w-[70%]";
+  const maxW = isMobile ? "max-w-[82vw]" : "max-w-[70%]";
 
-  // Find replied message
   const repliedMsg = msg.reply_to_message_id ? allMessages.find(m => m.id === msg.reply_to_message_id) : null;
 
-  // Parse reactions
   const reactions: { emoji: string; count: number }[] = [];
   if (msg.reactions && Array.isArray(msg.reactions)) {
     const emojiCounts: Record<string, number> = {};
@@ -178,10 +179,17 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
     Object.entries(emojiCounts).forEach(([emoji, count]) => reactions.push({ emoji, count }));
   }
 
+  const handleTouchStart = () => {
+    if (!isMobile || isSending) return;
+    longPressRef.current = setTimeout(() => { setShowMobileActions(true); }, 400);
+  };
+  const handleTouchEnd = () => { if (longPressRef.current) clearTimeout(longPressRef.current); };
+
   return (
-    <div className={`flex ${isCustomer ? "justify-start" : "justify-end"} ${isGrouped ? "mt-0.5" : "mt-3"} group animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ${isSending ? "opacity-70" : ""}`}>
-      <div className={`relative ${maxW}`}>
-        {/* Replied message preview */}
+    <div className={`flex ${isCustomer ? "justify-start" : "justify-end"} ${isGrouped ? "mt-0.5" : isMobile ? "mt-2" : "mt-3"} group animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ${isSending ? "opacity-70" : ""}`}>
+      <div className={`relative ${maxW}`}
+        onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchCancel={handleTouchEnd}>
+
         {repliedMsg && (
           <div className={`mb-1 px-3 py-1.5 rounded-lg border-l-2 ${isCustomer ? "border-l-primary bg-muted/30" : "border-l-primary-foreground/30 bg-primary/20"} cursor-pointer`}>
             <p className="text-[10px] font-medium text-muted-foreground">{repliedMsg.sender_type === "customer" ? "Customer" : "You"}</p>
@@ -189,7 +197,7 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
           </div>
         )}
 
-        <div className={`rounded-2xl px-3.5 py-2 relative shadow-sm ${
+        <div className={`${isMobile ? "rounded-[18px] px-3 py-2" : "rounded-2xl px-3.5 py-2"} relative shadow-sm ${
           isFailed
             ? "bg-destructive/10 border border-destructive/30 text-foreground rounded-tr-sm"
             : isCustomer
@@ -209,7 +217,7 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
           ) : hasMedia ? (
             <LazyMedia mediaKey={msg.media_url} mediaType={msg.media_type} mimeType={msg.media_mime_type} filename={msg.media_filename} isMobile={isMobile} />
           ) : null}
-          {msg.content && !isVoiceNote && <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>}
+          {msg.content && !isVoiceNote && <p className={`${isMobile ? "text-[14px]" : "text-[13px]"} leading-relaxed whitespace-pre-wrap break-words`}>{msg.content}</p>}
           <div className="flex items-center justify-end gap-1 mt-0.5">
             {isFailed && <span className="text-[10px] text-destructive font-medium mr-1">Failed</span>}
             <span className={`text-[10px] ${isCustomer ? "text-muted-foreground" : "opacity-60"}`}>{format(new Date(msg.created_at), "HH:mm")}</span>
@@ -223,7 +231,6 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
           </div>
         </div>
 
-        {/* Reactions display */}
         {reactions.length > 0 && (
           <div className={`flex gap-0.5 mt-0.5 ${isCustomer ? "justify-start" : "justify-end"}`}>
             {reactions.map((r, i) => (
@@ -234,7 +241,7 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
           </div>
         )}
 
-        {/* Action buttons on hover */}
+        {/* Desktop hover actions */}
         {!isMobile && !isSending && (
           <div className={`absolute top-0 ${isCustomer ? "-right-20" : "-left-20"} hidden group-hover:flex gap-0.5 items-center`}>
             <button onClick={() => onReply(msg)} className="h-6 w-6 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted" title="Reply">
@@ -249,8 +256,35 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
           </div>
         )}
 
-        {/* Reactions picker */}
-        {showReactions && (
+        {/* Mobile long-press action sheet */}
+        {isMobile && showMobileActions && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setShowMobileActions(false)} />
+            <div className={`absolute z-50 ${isCustomer ? "left-0" : "right-0"} -top-14 animate-in fade-in scale-in-95 duration-150`}>
+              <div className="flex gap-1 bg-card border border-border rounded-2xl px-2 py-1.5 shadow-xl">
+                {QUICK_REACTIONS.map(emoji => (
+                  <button key={emoji} onClick={() => { onReact(msg.id, emoji); setShowMobileActions(false); }}
+                    className="h-9 w-9 rounded-full hover:bg-muted flex items-center justify-center text-lg active:scale-110 transition-transform">
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1 mt-1 bg-card border border-border rounded-xl px-1 py-1 shadow-xl">
+                <button onClick={() => { onReply(msg); setShowMobileActions(false); }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg active:bg-muted transition-colors flex-1">
+                  <Reply className="h-4 w-4 text-muted-foreground" /><span className="text-xs font-medium">Reply</span>
+                </button>
+                <button onClick={handleCopy}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg active:bg-muted transition-colors flex-1">
+                  <Copy className="h-4 w-4 text-muted-foreground" /><span className="text-xs font-medium">Copy</span>
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Desktop reactions picker */}
+        {!isMobile && showReactions && (
           <div className={`absolute ${isCustomer ? "left-0" : "right-0"} -top-10 flex gap-0.5 bg-card border border-border rounded-full px-2 py-1 shadow-lg z-10 animate-in fade-in scale-in-95 duration-150`}>
             {QUICK_REACTIONS.map(emoji => (
               <button key={emoji} onClick={() => { onReact(msg.id, emoji); setShowReactions(false); }}
