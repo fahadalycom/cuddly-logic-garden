@@ -342,8 +342,9 @@ export default function WhatsAppPage() {
     }
 
     return (
-      <div className="fixed inset-0 z-40 flex flex-col bg-background" style={{ height: '100dvh' }}>
-        <div className="flex-shrink-0 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 border-b border-border bg-card/95 backdrop-blur-md">
+      <div className="fixed inset-0 z-[100] flex flex-col bg-background" style={{ height: '100dvh' }}>
+        <div className="flex-shrink-0 px-4 border-b border-border bg-card/95 backdrop-blur-md"
+          style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' , paddingBottom: '0.5rem' }}>
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold">WhatsApp</h1>
             <div className="flex items-center gap-0.5">
