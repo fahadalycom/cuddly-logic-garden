@@ -131,10 +131,10 @@ function DateSeparator({ date }: { date: Date }) {
   let label: string;
   if (isToday(date)) label = "Today";
   else if (isYesterday(date)) label = "Yesterday";
-  else label = format(date, "EEEE, MMMM d, yyyy");
+  else label = format(date, "EEEE, MMM d, yyyy");
   return (
-    <div className="flex items-center justify-center py-3">
-      <span className="text-[10px] font-semibold text-muted-foreground bg-card/80 backdrop-blur-sm px-4 py-1.5 rounded-full shadow-sm border border-border/30">{label}</span>
+    <div className="flex items-center justify-center py-3 my-1">
+      <span className="wa-date-pill">{label}</span>
     </div>
   );
 }
@@ -159,8 +159,8 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
 
   if (isSystem) {
     return (
-      <div className="flex justify-center py-1.5">
-        <span className="text-[10px] text-muted-foreground bg-card/70 backdrop-blur-sm px-4 py-1 rounded-full border border-border/20 shadow-sm">{msg.content}</span>
+      <div className="flex justify-center py-2 my-1">
+        <span className="wa-date-pill text-[10px]">{msg.content}</span>
       </div>
     );
   }
@@ -172,7 +172,7 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
 
   const hasMedia = msg.media_url && msg.media_type !== "text";
   const isVoiceNote = msg.media_type === "audio";
-  const maxW = isMobile ? "max-w-[82vw]" : "max-w-[70%]";
+  const maxW = isMobile ? "max-w-[80%]" : "max-w-[70%]";
   const repliedMsg = msg.reply_to_message_id ? allMessages.find(m => m.id === msg.reply_to_message_id) : null;
 
   const reactions: { emoji: string; count: number }[] = [];
@@ -190,42 +190,53 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
 
   const showTail = !isGrouped;
 
+  // Bubble radius: rounded everywhere except tail corner
+  const bubbleRadius = isMobile
+    ? showTail
+      ? isCustomer ? "rounded-[18px] rounded-tl-[4px]" : "rounded-[18px] rounded-tr-[4px]"
+      : "rounded-[18px]"
+    : showTail
+      ? isCustomer ? "rounded-2xl rounded-tl-[4px]" : "rounded-2xl rounded-tr-[4px]"
+      : "rounded-2xl";
+
   return (
-    <div className={`flex ${isCustomer ? "justify-start" : "justify-end"} ${isGrouped ? "mt-[3px]" : isMobile ? "mt-2.5" : "mt-3"} group ${isSending ? "opacity-70" : ""}`}>
+    <div className={`flex ${isCustomer ? "justify-start" : "justify-end"} ${isGrouped ? "mt-[2px]" : isMobile ? "mt-2" : "mt-2.5"} group wa-msg-enter ${isSending ? "opacity-60" : ""}`}>
       <div className={`relative ${maxW}`}
         onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchCancel={handleTouchEnd}>
 
         {/* Reply quote */}
         {repliedMsg && (
-          <div className={`mb-1 rounded-xl overflow-hidden ${isCustomer ? "mr-4" : "ml-4"}`}>
-            <div className={`px-3 py-2 flex items-start gap-2 ${isCustomer ? "bg-muted/40 border-l-[3px] border-l-primary" : "bg-foreground/5 border-l-[3px] border-l-foreground/20"}`}>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-bold text-primary">{repliedMsg.sender_type === "customer" ? "Customer" : "You"}</p>
-                <p className="text-[11px] line-clamp-2 opacity-70 leading-tight mt-0.5">{repliedMsg.content || `[${repliedMsg.media_type}]`}</p>
-              </div>
+          <div className={`${isCustomer ? "mr-3" : "ml-3"} mb-0.5`}>
+            <div className={`wa-reply-bar ${isCustomer ? "wa-reply-bar-incoming" : "wa-reply-bar-outgoing"}`}>
+              <p className={`text-[10px] font-bold ${isCustomer ? "text-primary" : "text-white/80"}`}>
+                {repliedMsg.sender_type === "customer" ? "Customer" : "You"}
+              </p>
+              <p className={`text-[11px] line-clamp-1 mt-0.5 ${isCustomer ? "text-muted-foreground" : "text-white/60"}`}>
+                {repliedMsg.content || `[${repliedMsg.media_type}]`}
+              </p>
             </div>
           </div>
         )}
 
         {/* Bubble */}
-        <div className={`relative ${isMobile ? "rounded-[20px] px-3.5 py-2.5" : "rounded-2xl px-4 py-2.5"} ${
+        <div className={`relative ${isMobile ? "px-3 py-[7px]" : "px-3.5 py-2"} ${bubbleRadius} ${
           isEmojiOnly ? "wa-emoji-only" :
           isFailed
-            ? "bg-destructive/10 border border-destructive/30 text-foreground rounded-tr-md"
+            ? "bg-destructive/10 border border-destructive/30 text-foreground"
             : isCustomer
-            ? `wa-bubble-incoming ${showTail ? (isMobile ? "rounded-tl-md" : "rounded-tl-md") : ""}`
+            ? "wa-bubble-incoming"
             : isAi
-            ? `wa-bubble-ai ${showTail ? "rounded-tr-md" : ""}`
-            : `wa-bubble-outgoing ${showTail ? "rounded-tr-md" : ""}`
-        } ${showTail && isCustomer && !isEmojiOnly ? "wa-bubble-tail-left" : ""} ${showTail && !isCustomer && !isAi && !isEmojiOnly ? "wa-bubble-tail-right" : ""}`}>
+            ? "wa-bubble-ai"
+            : "wa-bubble-outgoing"
+        } ${showTail && isCustomer && !isEmojiOnly ? "wa-bubble-tail-left" : ""} ${showTail && !isCustomer && !isAi && !isEmojiOnly ? "wa-bubble-tail-right" : ""} ${isMobile ? "wa-bubble-mobile" : ""}`}>
           
           {/* AI label */}
           {isAi && !isGrouped && (
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <div className="h-[18px] w-[18px] rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
-                <Sparkles className="h-2.5 w-2.5 text-white" />
+            <div className="flex items-center gap-1.5 mb-1">
+              <div className="h-4 w-4 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                <Sparkles className="h-2 w-2 text-white" />
               </div>
-              <span className="text-[10px] font-bold text-amber-500 tracking-wide uppercase">AI Assistant</span>
+              <span className="text-[9px] font-bold text-amber-500 tracking-wider uppercase">AI</span>
             </div>
           )}
 
@@ -238,32 +249,34 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
 
           {/* Text content */}
           {msg.content && !isVoiceNote && (
-            <p className={`${isMobile ? "text-[14.5px]" : "text-[13.5px]"} leading-[1.45] whitespace-pre-wrap break-words`}>
+            <p className={`${isMobile ? "text-[15px] leading-[1.4]" : "text-[13.5px] leading-[1.45]"} whitespace-pre-wrap break-words`}>
               {msg.content}
             </p>
           )}
 
-          {/* Time + status */}
-          <div className="flex items-center justify-end gap-1.5 mt-1 -mb-0.5">
-            {isFailed && <span className="text-[9px] text-destructive font-bold mr-1">Failed</span>}
-            <span className={`text-[10px] ${isCustomer ? "text-muted-foreground/70" : "opacity-50"}`}>
-              {format(new Date(msg.created_at), "HH:mm")}
-            </span>
-            {!isCustomer && !isAi && (
-              isSending
-                ? <Clock className="h-3 w-3 opacity-40 animate-pulse" />
-                : isFailed
-                ? <X className="h-3 w-3 text-destructive" />
-                : <CheckCheck className={`h-3.5 w-3.5 ${msg.is_read ? "text-blue-400" : "opacity-40"}`} />
-            )}
-          </div>
+          {/* Time + status — inline float right for natural WhatsApp look */}
+          {!isEmojiOnly && (
+            <div className="flex items-center justify-end gap-1 mt-0.5 -mb-0.5 wa-msg-time select-none">
+              {isFailed && <span className="text-[9px] text-destructive font-bold mr-1">!</span>}
+              <span className={`text-[10px] ${isCustomer ? "text-muted-foreground/60" : "opacity-60"}`}>
+                {format(new Date(msg.created_at), "HH:mm")}
+              </span>
+              {!isCustomer && !isAi && (
+                isSending
+                  ? <Clock className="h-3 w-3 opacity-40 animate-pulse" />
+                  : isFailed
+                  ? <X className="h-3 w-3 text-destructive" />
+                  : <CheckCheck className={`h-3 w-3 ${msg.is_read ? "text-blue-400" : "opacity-40"}`} />
+              )}
+            </div>
+          )}
         </div>
 
         {/* Reactions */}
         {reactions.length > 0 && (
-          <div className={`flex gap-1 -mt-1.5 relative z-[1] ${isCustomer ? "justify-start ml-2" : "justify-end mr-2"}`}>
+          <div className={`flex gap-1 -mt-2 relative z-[1] ${isCustomer ? "justify-start ml-2" : "justify-end mr-2"}`}>
             {reactions.map((r, i) => (
-              <span key={i} className="text-xs bg-card border border-border/50 rounded-full px-2 py-0.5 shadow-sm cursor-pointer hover:shadow-md transition-all">
+              <span key={i} className="wa-reaction-badge">
                 {r.emoji} {r.count > 1 && <span className="text-[9px] text-muted-foreground ml-0.5">{r.count}</span>}
               </span>
             ))}
@@ -291,60 +304,53 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
         {/* Mobile long-press — bottom sheet overlay */}
         {isMobile && showMobileActions && (
           <>
-            <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-[2px]" onClick={() => setShowMobileActions(false)} />
+            <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-[3px]" onClick={() => setShowMobileActions(false)} />
             <div className="fixed inset-x-0 bottom-0 z-[61] wa-bottom-sheet">
-              <div className="bg-card border-t border-border/50 rounded-t-3xl shadow-2xl overflow-hidden"
-                style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+              <div className="bg-card rounded-t-[28px] shadow-2xl overflow-hidden"
+                style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
                 {/* Drag handle */}
-                <div className="flex justify-center pt-3 pb-2">
-                  <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
+                <div className="flex justify-center pt-3 pb-1.5">
+                  <div className="w-9 h-[3px] rounded-full bg-muted-foreground/15" />
+                </div>
+
+                {/* Message preview */}
+                <div className="px-5 pb-3">
+                  <div className={`${isCustomer ? "wa-bubble-incoming" : "wa-bubble-outgoing"} rounded-2xl px-3 py-2 max-w-[85%] ${isCustomer ? "" : "ml-auto"}`}>
+                    <p className="text-[13px] line-clamp-2 leading-snug">{msg.content || `[${msg.media_type}]`}</p>
+                  </div>
                 </div>
 
                 {/* Quick reactions */}
-                <div className="flex justify-center gap-2 px-6 pb-3">
+                <div className="flex justify-center gap-2.5 px-5 pb-4">
                   {QUICK_REACTIONS.map((emoji, i) => (
                     <button key={emoji} onClick={() => { onReact(msg.id, emoji); setShowMobileActions(false); }}
-                      className="h-12 w-12 rounded-2xl bg-muted/50 hover:bg-muted flex items-center justify-center text-2xl active:scale-110 transition-all"
+                      className="h-[52px] w-[52px] rounded-2xl bg-muted/40 hover:bg-muted flex items-center justify-center text-[26px] active:scale-110 transition-all"
                       style={{ animationDelay: `${i * 40}ms` }}>
                       {emoji}
                     </button>
                   ))}
                 </div>
 
-                <div className="h-px bg-border/50 mx-4" />
+                <div className="h-px bg-border/30 mx-5" />
 
                 {/* Action items */}
-                <div className="px-2 py-2">
-                  <button onClick={() => { onReply(msg); setShowMobileActions(false); }}
-                    className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl active:bg-muted/50 transition-colors">
-                    <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                      <Reply className="h-5 w-5 text-blue-500" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm font-medium">Reply</p>
-                      <p className="text-[11px] text-muted-foreground">Reply to this message</p>
-                    </div>
-                  </button>
-                  <button onClick={handleCopy}
-                    className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl active:bg-muted/50 transition-colors">
-                    <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                      <Copy className="h-5 w-5 text-emerald-500" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm font-medium">Copy</p>
-                      <p className="text-[11px] text-muted-foreground">Copy message text</p>
-                    </div>
-                  </button>
-                  <button onClick={() => { toast.info("Forward coming soon"); setShowMobileActions(false); }}
-                    className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl active:bg-muted/50 transition-colors">
-                    <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center">
-                      <Forward className="h-5 w-5 text-purple-500" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm font-medium">Forward</p>
-                      <p className="text-[11px] text-muted-foreground">Forward to another chat</p>
-                    </div>
-                  </button>
+                <div className="px-3 py-1.5">
+                  {[
+                    { action: () => { onReply(msg); setShowMobileActions(false); }, icon: Reply, color: "text-blue-500", bg: "bg-blue-500/10", label: "Reply", desc: "Reply to this message" },
+                    { action: handleCopy, icon: Copy, color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Copy", desc: "Copy message text" },
+                    { action: () => { toast.info("Forward coming soon"); setShowMobileActions(false); }, icon: Forward, color: "text-purple-500", bg: "bg-purple-500/10", label: "Forward", desc: "Forward to another chat" },
+                  ].map((item, i) => (
+                    <button key={i} onClick={item.action}
+                      className="w-full flex items-center gap-3.5 px-3 py-3 rounded-2xl active:bg-muted/40 transition-colors">
+                      <div className={`h-10 w-10 rounded-xl ${item.bg} flex items-center justify-center`}>
+                        <item.icon className={`h-[18px] w-[18px] ${item.color}`} />
+                      </div>
+                      <div className="text-left flex-1">
+                        <p className="text-[14px] font-medium">{item.label}</p>
+                        <p className="text-[11px] text-muted-foreground/70">{item.desc}</p>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -603,41 +609,38 @@ export function ChatWindow({
   if (isMobile) {
     return (
       <div className="flex h-full max-h-full flex-col overflow-hidden overscroll-none bg-background">
-        {/* ── PREMIUM HEADER ── */}
+        {/* ── HEADER ── */}
         <div className="flex-shrink-0 wa-mobile-header z-20"
-          style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))' }}>
-          <div className="flex items-center justify-between px-2 pb-2.5 pt-1">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              {onBack && (
-                <button className="h-9 w-9 flex-shrink-0 rounded-full flex items-center justify-center active:bg-foreground/5 transition-colors" onClick={onBack}>
-                  <ArrowLeft className="h-5 w-5" />
-                </button>
-              )}
-              <div className="relative flex-shrink-0" onClick={onOpenContactInfo}>
-                <div className="wa-avatar-ring">
-                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-md">
-                    <span className="text-sm font-bold text-white">
-                      {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
-                    </span>
-                  </div>
+          style={{ paddingTop: 'max(0.375rem, env(safe-area-inset-top, 0px))' }}>
+          <div className="flex items-center gap-1.5 px-1.5 pb-2 pt-0.5">
+            {onBack && (
+              <button className="h-9 w-9 flex-shrink-0 rounded-full flex items-center justify-center active:bg-foreground/5 transition-colors -ml-0.5" onClick={onBack}>
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+            )}
+            <div className="relative flex-shrink-0" onClick={onOpenContactInfo}>
+              <div className="wa-avatar-ring">
+                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center">
+                  <span className="text-xs font-bold text-white">
+                    {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
+                  </span>
                 </div>
+              </div>
+              {conversation.status === "active" && (
+                <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-[1.5px] border-card bg-emerald-500 wa-online-pulse" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1" onClick={onOpenContactInfo}>
+              <p className="text-[14px] font-semibold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
+              <div className="flex items-center gap-1.5 mt-px">
+                <StatusIcon className={`h-2.5 w-2.5 ${status.color}`} />
+                <span className={`text-[10px] font-medium ${status.color}`}>{status.label}</span>
                 {conversation.status === "active" && (
-                  <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-emerald-500 wa-online-pulse" />
+                  <span className="text-[10px] text-emerald-500/70">· online</span>
                 )}
               </div>
-              <div className="min-w-0 flex-1" onClick={onOpenContactInfo}>
-                <p className="text-[15px] font-bold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 border font-semibold ${status.bg} ${status.color}`}>
-                    <StatusIcon className="h-2.5 w-2.5 mr-0.5" />{status.label}
-                  </Badge>
-                  {conversation.status === "active" && (
-                    <span className="text-[10px] text-emerald-500 font-medium">online</span>
-                  )}
-                </div>
-              </div>
             </div>
-            <div className="flex items-center flex-shrink-0 gap-0.5 pr-0.5">
+            <div className="flex items-center flex-shrink-0 gap-0.5">
               <MobileNotifButton />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -645,27 +648,30 @@ export function ChatWindow({
                     <MoreVertical className="h-[18px] w-[18px]" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 rounded-xl">
-                  <DropdownMenuItem onClick={onOpenContactInfo} className="py-3 gap-3">
-                    <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center"><Info className="h-4 w-4 text-blue-500" /></div>
-                    <div><p className="text-sm font-medium">Contact Info</p><p className="text-[10px] text-muted-foreground">View details & history</p></div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onResolve} className="py-3 gap-3">
-                    <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center"><CheckCircle className="h-4 w-4 text-emerald-500" /></div>
-                    <div><p className="text-sm font-medium text-emerald-500">Mark Resolved</p><p className="text-[10px] text-muted-foreground">Close this conversation</p></div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={openWhatsApp} className="py-3 gap-3">
-                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center"><ExternalLink className="h-4 w-4 text-primary" /></div>
-                    <div><p className="text-sm font-medium">Open in WhatsApp</p><p className="text-[10px] text-muted-foreground">Open native app</p></div>
-                  </DropdownMenuItem>
+                <DropdownMenuContent align="end" className="w-56 rounded-2xl p-1.5">
+                  {[
+                    { action: onOpenContactInfo, icon: Info, color: "text-blue-500", bg: "bg-blue-500/10", label: "Contact Info", desc: "View details & history" },
+                    { action: onResolve, icon: CheckCircle, color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Mark Resolved", desc: "Close conversation" },
+                    { action: openWhatsApp, icon: ExternalLink, color: "text-primary", bg: "bg-primary/10", label: "Open in WhatsApp", desc: "Open native app" },
+                  ].map((item, i) => (
+                    <DropdownMenuItem key={i} onClick={item.action} className="py-2.5 gap-3 rounded-xl">
+                      <div className={`h-8 w-8 rounded-xl ${item.bg} flex items-center justify-center`}>
+                        <item.icon className={`h-4 w-4 ${item.color}`} />
+                      </div>
+                      <div>
+                        <p className={`text-[13px] font-medium ${i === 1 ? item.color : ""}`}>{item.label}</p>
+                        <p className="text-[10px] text-muted-foreground/70">{item.desc}</p>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
                   {isAdmin && staff.length > 0 && (
                     <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground px-3">Assign Agent</DropdownMenuLabel>
+                      <DropdownMenuSeparator className="my-1" />
+                      <DropdownMenuLabel className="text-[9px] uppercase tracking-widest text-muted-foreground/60 px-3 py-1">Assign Agent</DropdownMenuLabel>
                       {staff.map((s) => (
-                        <DropdownMenuItem key={s.id} onClick={() => onAssign(conversation.id, s.user_id)} className="py-2.5 gap-3">
-                          <div className="h-7 w-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">{s.full_name?.charAt(0)}</div>
-                          <span className="text-sm">{s.full_name}</span>
+                        <DropdownMenuItem key={s.id} onClick={() => onAssign(conversation.id, s.user_id)} className="py-2 gap-3 rounded-xl">
+                          <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">{s.full_name?.charAt(0)}</div>
+                          <span className="text-[13px]">{s.full_name}</span>
                         </DropdownMenuItem>
                       ))}
                     </>
@@ -678,7 +684,7 @@ export function ChatWindow({
 
         {/* ── MESSAGES ── */}
         <div ref={scrollRef} onScroll={handleScroll}
-          className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-3 py-2 z-0 wa-chat-bg relative"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-2.5 py-1.5 z-0 wa-chat-bg relative"
           style={{ WebkitOverflowScrolling: 'touch' }}>
           {messagesWithDates.map((item, i) => {
             if (item.type === "date" && item.date) return <DateSeparator key={`date-${i}`} date={item.date} />;
@@ -690,15 +696,17 @@ export function ChatWindow({
           })}
           {messages.length === 0 && (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center space-y-3">
+              <div className="text-center space-y-4 px-8">
                 <div className="relative mx-auto w-20 h-20">
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary/20 to-emerald-500/20 animate-pulse" />
-                  <div className="absolute inset-2 rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center">
-                    <MessageSquare className="h-7 w-7 text-muted-foreground/40" />
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary/15 to-emerald-500/15 animate-pulse" />
+                  <div className="absolute inset-2 rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center border border-border/20">
+                    <MessageSquare className="h-7 w-7 text-muted-foreground/30" />
                   </div>
                 </div>
-                <p className="text-sm font-semibold text-muted-foreground">No messages yet</p>
-                <p className="text-xs text-muted-foreground/50">Send a message to start the conversation</p>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">No messages yet</p>
+                  <p className="text-[12px] text-muted-foreground/50 mt-1">Send a message to start the conversation</p>
+                </div>
               </div>
             </div>
           )}
@@ -706,10 +714,10 @@ export function ChatWindow({
 
         {/* ── SCROLL TO BOTTOM FAB ── */}
         {showScrollDown && (
-          <div className="absolute z-20 bottom-[80px] right-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
-            <button className="h-10 w-10 rounded-full bg-card/90 backdrop-blur-md border border-border/50 shadow-xl flex items-center justify-center active:scale-90 transition-transform"
+          <div className="absolute z-20 bottom-[76px] right-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <button className="h-9 w-9 rounded-full bg-card/95 backdrop-blur-md border border-border/30 shadow-lg flex items-center justify-center active:scale-90 transition-transform"
               onClick={scrollToBottom}>
-              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </button>
           </div>
         )}
@@ -719,106 +727,102 @@ export function ChatWindow({
 
         {/* ── REPLY PREVIEW ── */}
         {replyTo && (
-          <div className="flex-shrink-0 px-3 py-2 border-t border-border/50 bg-card/80 backdrop-blur-md flex items-center gap-2.5 z-10 animate-in slide-in-from-bottom-2 duration-150">
-            <div className="w-1 h-10 rounded-full bg-gradient-to-b from-primary to-primary/50 flex-shrink-0" />
+          <div className="flex-shrink-0 px-3 py-2 border-t border-border/30 bg-card/90 backdrop-blur-md flex items-center gap-2 z-10 animate-in slide-in-from-bottom-2 duration-150">
+            <div className="w-[3px] h-9 rounded-full bg-gradient-to-b from-primary to-primary/40 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-bold text-primary">{replyTo.sender_type === "customer" ? "Customer" : "You"}</p>
+              <p className="text-[10px] font-bold text-primary">{replyTo.sender_type === "customer" ? "Customer" : "You"}</p>
               <p className="text-[12px] text-muted-foreground truncate">{replyTo.content || `[${replyTo.media_type}]`}</p>
             </div>
-            <button className="h-8 w-8 rounded-full flex items-center justify-center active:bg-muted flex-shrink-0" onClick={() => setReplyTo(null)}>
-              <X className="h-4 w-4 text-muted-foreground" />
+            <button className="h-7 w-7 rounded-full flex items-center justify-center active:bg-muted flex-shrink-0" onClick={() => setReplyTo(null)}>
+              <X className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
           </div>
         )}
 
         {/* ── SLASH COMMAND MENU ── */}
         {showSlashMenu && slashFiltered.length > 0 && (
-          <div className="flex-shrink-0 px-3 py-2 border-t border-border/50 bg-card/95 backdrop-blur-md max-h-44 overflow-y-auto z-10 animate-in slide-in-from-bottom-2 duration-150">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 px-1">Quick Replies</p>
+          <div className="flex-shrink-0 px-3 py-2 border-t border-border/30 bg-card/95 backdrop-blur-md max-h-40 overflow-y-auto z-10 animate-in slide-in-from-bottom-2 duration-150">
+            <p className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest mb-1.5 px-1">Quick Replies</p>
             {slashFiltered.slice(0, 4).map(t => (
               <button key={t.id} onClick={() => handleTemplateSelect(t)}
-                className="w-full text-left px-3 py-3 rounded-xl active:bg-accent/50 transition-colors flex items-start gap-2.5">
-                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <FileText className="h-4 w-4 text-primary" />
+                className="w-full text-left px-2.5 py-2.5 rounded-xl active:bg-accent/40 transition-colors flex items-start gap-2.5">
+                <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <FileText className="h-3.5 w-3.5 text-primary" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium">{t.name}</p>
-                  <p className="text-[11px] text-muted-foreground line-clamp-1">{t.body}</p>
+                  <p className="text-[13px] font-medium">{t.name}</p>
+                  <p className="text-[11px] text-muted-foreground/60 line-clamp-1">{t.body}</p>
                 </div>
               </button>
             ))}
           </div>
         )}
 
-        {/* ── INPUT BAR (Floating glassmorphism) ── */}
+        {/* ── INPUT BAR ── */}
         <div className="flex-shrink-0 wa-input-bar z-20"
-          style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
+          style={{ paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}>
           {uploading && (
-            <div className="flex items-center gap-2 mb-2 mx-2 px-3 py-2 rounded-xl bg-primary/5 border border-primary/20">
-              <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
-              <span className="text-xs text-primary font-medium">Uploading media...</span>
+            <div className="flex items-center gap-2 mb-1.5 mx-2 px-3 py-1.5 rounded-xl bg-primary/5 border border-primary/20">
+              <Loader2 className="h-3 w-3 text-primary animate-spin" />
+              <span className="text-[11px] text-primary font-medium">Uploading media...</span>
             </div>
           )}
           {isRecording ? (
-            <div className="flex items-center gap-2 px-2">
-              <button className="h-12 w-12 rounded-full flex items-center justify-center text-destructive active:bg-destructive/10 active:scale-90 transition-all" onClick={cancelRecording}>
-                <Trash2 className="h-5 w-5" />
+            <div className="flex items-center gap-1.5 px-2">
+              <button className="h-10 w-10 rounded-full flex items-center justify-center text-destructive active:bg-destructive/10 active:scale-90 transition-all" onClick={cancelRecording}>
+                <Trash2 className="h-[18px] w-[18px]" />
               </button>
-              <div className="flex-1 flex items-center gap-3 px-4 py-3 rounded-2xl bg-muted/30 border border-border/30">
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse shadow-sm shadow-red-500/50" />
-                  <span className="text-sm font-bold tabular-nums text-destructive min-w-[44px]">{formatRecordingTime(recordingTime)}</span>
+              <div className="flex-1 flex items-center gap-2.5 px-3 py-2.5 rounded-[22px] bg-muted/30 border border-border/20">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse shadow-sm shadow-red-500/50" />
+                  <span className="text-[13px] font-bold tabular-nums text-destructive min-w-[40px]">{formatRecordingTime(recordingTime)}</span>
                 </div>
-                <div className="flex items-center gap-[2px] flex-1 h-[28px]">
-                  {Array.from({ length: 24 }).map((_, i) => (
-                    <div key={i} className="flex-1 rounded-full bg-destructive/50"
+                <div className="flex items-center gap-[2px] flex-1 h-[22px]">
+                  {Array.from({ length: 20 }).map((_, i) => (
+                    <div key={i} className="flex-1 rounded-full bg-destructive/40"
                       style={{ height: `${20 + Math.random() * 80}%`, minWidth: 2, animation: `pulse ${0.3 + Math.random() * 0.7}s ease-in-out infinite alternate`, animationDelay: `${i * 0.05}s` }} />
                   ))}
                 </div>
-                <span className="text-[10px] text-muted-foreground">Slide to cancel</span>
               </div>
-              <button className="h-12 w-12 rounded-full wa-send-btn flex items-center justify-center active:scale-90 transition-transform" onClick={stopRecording}>
-                <Send className="h-5 w-5 text-primary-foreground" />
+              <button className="h-10 w-10 rounded-full wa-send-btn flex items-center justify-center active:scale-90 transition-transform" onClick={stopRecording}>
+                <Send className="h-4 w-4 text-primary-foreground" />
               </button>
             </div>
           ) : (
-            <div className="flex items-end gap-1.5 px-2">
-              {/* Icon toolbar */}
-              <div className="flex items-center gap-0.5 flex-shrink-0 pb-1">
+            <div className="flex items-end gap-1 px-1.5">
+              {/* Action buttons */}
+              <div className="flex items-center flex-shrink-0 pb-0.5">
                 <EmojiPicker onSelect={(emoji) => setInput(prev => prev + emoji)} isMobile />
                 <DropdownMenu open={showAttachMenu} onOpenChange={setShowAttachMenu}>
                   <DropdownMenuTrigger asChild>
-                    <button className="h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted/50 transition-colors" disabled={uploading}>
-                      <Paperclip className="h-5 w-5 text-muted-foreground" />
+                    <button className="h-9 w-9 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted/40 transition-colors" disabled={uploading}>
+                      <Paperclip className="h-[18px] w-[18px] text-muted-foreground" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-56 rounded-xl" side="top">
-                    <DropdownMenuItem onClick={() => openFilePicker("image/*")} className="py-3 gap-3">
-                      <div className="h-9 w-9 rounded-xl bg-blue-500/10 flex items-center justify-center"><ImageIcon className="h-4 w-4 text-blue-500" /></div>
-                      <div><p className="text-sm font-medium">Photo</p><p className="text-[10px] text-muted-foreground">Share an image</p></div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => openFilePicker("video/*")} className="py-3 gap-3">
-                      <div className="h-9 w-9 rounded-xl bg-purple-500/10 flex items-center justify-center"><Video className="h-4 w-4 text-purple-500" /></div>
-                      <div><p className="text-sm font-medium">Video</p><p className="text-[10px] text-muted-foreground">Share a video</p></div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => openFilePicker("audio/*")} className="py-3 gap-3">
-                      <div className="h-9 w-9 rounded-xl bg-orange-500/10 flex items-center justify-center"><Mic className="h-4 w-4 text-orange-500" /></div>
-                      <div><p className="text-sm font-medium">Audio</p><p className="text-[10px] text-muted-foreground">Share an audio file</p></div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")} className="py-3 gap-3">
-                      <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center"><FileText className="h-4 w-4 text-emerald-500" /></div>
-                      <div><p className="text-sm font-medium">Document</p><p className="text-[10px] text-muted-foreground">Share a file</p></div>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="py-3 gap-3" onClick={() => {
+                  <DropdownMenuContent align="start" className="w-52 rounded-2xl p-1.5" side="top">
+                    {[
+                      { accept: "image/*", icon: ImageIcon, color: "text-blue-500", bg: "bg-blue-500/10", label: "Photo" },
+                      { accept: "video/*", icon: Video, color: "text-purple-500", bg: "bg-purple-500/10", label: "Video" },
+                      { accept: "audio/*", icon: Mic, color: "text-orange-500", bg: "bg-orange-500/10", label: "Audio" },
+                      { accept: ".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv", icon: FileText, color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Document" },
+                    ].map((item, i) => (
+                      <DropdownMenuItem key={i} onClick={() => openFilePicker(item.accept)} className="py-2.5 gap-2.5 rounded-xl">
+                        <div className={`h-8 w-8 rounded-lg ${item.bg} flex items-center justify-center`}>
+                          <item.icon className={`h-4 w-4 ${item.color}`} />
+                        </div>
+                        <span className="text-[13px] font-medium">{item.label}</span>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator className="my-1" />
+                    <DropdownMenuItem className="py-2.5 gap-2.5 rounded-xl" onClick={() => {
                       setShowAttachMenu(false);
                       const inp = document.createElement("input");
                       inp.type = "file"; inp.accept = "image/*"; inp.capture = "environment";
                       inp.onchange = (e) => { const file = (e.target as HTMLInputElement).files?.[0]; if (file) uploadAndSend(file, file.name, file.type); };
                       inp.click();
                     }}>
-                      <div className="h-9 w-9 rounded-xl bg-pink-500/10 flex items-center justify-center"><Camera className="h-4 w-4 text-pink-500" /></div>
-                      <div><p className="text-sm font-medium">Camera</p><p className="text-[10px] text-muted-foreground">Take a photo</p></div>
+                      <div className="h-8 w-8 rounded-lg bg-pink-500/10 flex items-center justify-center"><Camera className="h-4 w-4 text-pink-500" /></div>
+                      <span className="text-[13px] font-medium">Camera</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -833,28 +837,28 @@ export function ChatWindow({
                   onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
                   rows={1}
-                  className="wa-chat-input min-h-[44px] max-h-[110px] text-[15px] py-2.5 px-4 resize-none rounded-2xl"
+                  className="wa-input-floating min-h-[40px] max-h-[100px] text-[15px] py-2 px-3.5 resize-none rounded-[22px]"
                 />
                 {input.length > 500 && (
-                  <span className={`absolute bottom-1.5 right-3 text-[9px] tabular-nums font-medium ${input.length > 900 ? "text-destructive" : "text-muted-foreground/60"}`}>
+                  <span className={`absolute bottom-1 right-3 text-[8px] tabular-nums font-medium ${input.length > 900 ? "text-destructive" : "text-muted-foreground/50"}`}>
                     {input.length}/1000
                   </span>
                 )}
               </div>
 
               {/* Send / Mic */}
-              <div className="pb-1">
+              <div className="pb-0.5">
                 {input.trim() ? (
                   <button
-                    className="h-11 w-11 flex-shrink-0 rounded-full wa-send-btn flex items-center justify-center active:scale-90 transition-transform"
+                    className="h-10 w-10 flex-shrink-0 rounded-full wa-send-btn flex items-center justify-center active:scale-90 transition-transform"
                     onClick={handleSend} disabled={sending}>
-                    <Send className={`h-5 w-5 text-primary-foreground ${sending ? "animate-pulse" : ""}`} />
+                    <Send className={`h-[18px] w-[18px] text-primary-foreground ${sending ? "animate-pulse" : ""}`} />
                   </button>
                 ) : (
                   <button
-                    className="h-11 w-11 flex-shrink-0 rounded-full flex items-center justify-center text-primary active:bg-primary/10 active:scale-90 transition-all"
+                    className="h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center text-primary active:bg-primary/10 active:scale-90 transition-all"
                     onClick={startRecording}>
-                    <Mic className="h-5 w-5" />
+                    <Mic className="h-[18px] w-[18px]" />
                   </button>
                 )}
               </div>
@@ -864,33 +868,33 @@ export function ChatWindow({
 
         {/* Templates Bottom Sheet */}
         <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
-          <DialogContent className="max-w-[95vw] rounded-3xl border-border/30 shadow-2xl">
+          <DialogContent className="max-w-[92vw] rounded-[24px] border-border/20 shadow-2xl">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center"><FileText className="h-5 w-5 text-primary" /></div>
+              <DialogTitle className="flex items-center gap-2.5 text-[15px]">
+                <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center"><FileText className="h-4 w-4 text-primary" /></div>
                 Templates
               </DialogTitle>
             </DialogHeader>
-            <div className="relative mb-3">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search templates..." value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)} className="pl-10 h-11 text-sm rounded-xl" />
+            <div className="relative mb-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
+              <Input placeholder="Search..." value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)} className="pl-9 h-10 text-[13px] rounded-xl bg-muted/30 border-0" />
             </div>
-            <ScrollArea className="max-h-[50vh]">
-              <div className="space-y-2">
+            <ScrollArea className="max-h-[45vh]">
+              <div className="space-y-1.5">
                 {filteredTemplates.map((t) => (
                   <button key={t.id} onClick={() => handleTemplateSelect(t)}
-                    className="w-full text-left p-3.5 rounded-xl border border-border/40 active:bg-primary/5 active:border-primary/30 transition-all">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-semibold">{t.name}</span>
-                      <Badge variant="outline" className="text-[9px] rounded-lg">{t.category}</Badge>
+                    className="w-full text-left p-3 rounded-xl border border-border/30 active:bg-primary/5 active:border-primary/20 transition-all">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[13px] font-semibold">{t.name}</span>
+                      <Badge variant="outline" className="text-[8px] rounded-md px-1.5 h-4 border-border/40">{t.category}</Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{t.body}</p>
+                    <p className="text-[11px] text-muted-foreground/70 line-clamp-2 leading-relaxed">{t.body}</p>
                   </button>
                 ))}
                 {filteredTemplates.length === 0 && (
-                  <div className="text-center py-10">
-                    <FileText className="h-10 w-10 mx-auto text-muted-foreground/20 mb-3" />
-                    <p className="text-sm text-muted-foreground">No templates found</p>
+                  <div className="text-center py-8">
+                    <FileText className="h-8 w-8 mx-auto text-muted-foreground/15 mb-2" />
+                    <p className="text-[12px] text-muted-foreground/50">No templates found</p>
                   </div>
                 )}
               </div>

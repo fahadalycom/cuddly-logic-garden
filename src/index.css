@@ -307,28 +307,28 @@
   content: '';
   position: absolute;
   inset: 0;
-  opacity: 0.015;
+  opacity: 0.012;
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.3'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
   pointer-events: none;
 }
 
 /* ── Mobile header ── */
 .wa-mobile-header {
-  background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.95) 100%);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-bottom: 1px solid hsl(var(--border) / 0.5);
-  box-shadow: 0 1px 3px hsl(0 0% 0% / 0.05), 0 4px 12px hsl(0 0% 0% / 0.03);
+  background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.97) 100%);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border-bottom: 1px solid hsl(var(--border) / 0.3);
+  box-shadow: 0 1px 2px hsl(0 0% 0% / 0.04), 0 2px 8px hsl(0 0% 0% / 0.02);
 }
 
 /* ── Header action buttons ── */
 .wa-header-btn {
   @apply h-9 w-9 rounded-full flex items-center justify-center transition-all;
-  background: hsl(var(--muted) / 0.3);
+  background: hsl(var(--muted) / 0.25);
 }
 .wa-header-btn:active {
   @apply scale-90;
-  background: hsl(var(--muted) / 0.6);
+  background: hsl(var(--muted) / 0.5);
 }
 
 /* ── Avatar gradient ring ── */
@@ -348,11 +348,11 @@
 
 /* ── Input bar ── */
 .wa-input-bar {
-  background: hsl(var(--card) / 0.9);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-top: 1px solid hsl(var(--border) / 0.4);
-  padding-top: 0.5rem;
+  background: hsl(var(--card) / 0.92);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border-top: 1px solid hsl(var(--border) / 0.3);
+  padding-top: 0.375rem;
 }
 
 /* ── Chat input ── */
@@ -402,23 +402,43 @@
 
 /* ── Bubble styles ── */
 .wa-bubble-incoming {
-  @apply bg-card border border-border/40 shadow-sm;
+  @apply bg-card border border-border/30;
+  box-shadow: 0 1px 2px hsl(0 0% 0% / 0.04);
 }
 
 .wa-bubble-outgoing {
   background: linear-gradient(135deg, hsl(142 55% 42%), hsl(155 50% 38%)) !important;
   color: white !important;
-  box-shadow: 0 1px 4px hsl(142 55% 42% / 0.2);
+  box-shadow: 0 1px 3px hsl(142 55% 42% / 0.15), 0 1px 2px hsl(0 0% 0% / 0.06);
 }
 .dark .wa-bubble-outgoing {
   background: linear-gradient(135deg, hsl(142 45% 28%), hsl(155 40% 25%)) !important;
-  box-shadow: 0 1px 4px hsl(142 45% 28% / 0.3);
+  box-shadow: 0 1px 3px hsl(142 45% 28% / 0.2);
 }
 
 .wa-bubble-ai {
   @apply border text-foreground;
-  background: linear-gradient(135deg, hsl(38 80% 50% / 0.08), hsl(25 85% 53% / 0.05));
-  border-color: hsl(38 80% 50% / 0.2);
+  background: linear-gradient(135deg, hsl(38 80% 50% / 0.06), hsl(25 85% 53% / 0.03));
+  border-color: hsl(38 80% 50% / 0.15);
+  box-shadow: 0 1px 2px hsl(38 80% 50% / 0.05);
+}
+
+/* ── Mobile bubble specific ── */
+.wa-bubble-mobile {
+  font-size: 15px;
+  line-height: 1.42;
+  letter-spacing: -0.01em;
+}
+
+.wa-bubble-mobile .wa-msg-time {
+  font-size: 10px;
+  opacity: 0.55;
+  margin-top: 2px;
+  margin-bottom: -2px;
+}
+
+.wa-bubble-outgoing .wa-msg-time {
+  opacity: 0.7;
 }
 
 /* ── Action pill (desktop hover) ── */
@@ -446,21 +466,21 @@
 
 /* ── Bottom sheet ── */
 @keyframes wa-sheet-up {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+  from { transform: translateY(100%); opacity: 0.8; }
+  to { transform: translateY(0); opacity: 1; }
 }
 .wa-bottom-sheet {
-  animation: wa-sheet-up 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  animation: wa-sheet-up 0.28s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* ── Emoji-only messages ── */
 .wa-emoji-only {
-  font-size: 2.2rem;
-  line-height: 1.2;
+  font-size: 2.4rem;
+  line-height: 1.15;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  padding: 0.25rem !important;
+  padding: 0.2rem !important;
 }
 
 /* ── Send bounce ── */
@@ -489,4 +509,63 @@
 }
 .wa-unread-divider span {
   @apply text-[10px] font-semibold text-primary bg-primary/10 px-3 py-0.5 rounded-full;
+}
+
+/* ── Mobile message entrance ── */
+@keyframes wa-msg-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.wa-msg-enter {
+  animation: wa-msg-in 0.25s ease-out both;
+}
+
+/* ── Reaction badge ── */
+.wa-reaction-badge {
+  @apply text-xs rounded-full px-1.5 py-0.5 cursor-pointer transition-all;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border) / 0.4);
+  box-shadow: 0 1px 3px hsl(0 0% 0% / 0.06);
+}
+.wa-reaction-badge:active {
+  @apply scale-105;
+}
+
+/* ── Date separator pill ── */
+.wa-date-pill {
+  @apply text-[10px] font-semibold tracking-wide;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--card) / 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid hsl(var(--border) / 0.25);
+  box-shadow: 0 1px 4px hsl(0 0% 0% / 0.04);
+  padding: 4px 14px;
+  border-radius: 999px;
+}
+
+/* ── Mobile input floating style ── */
+.wa-input-floating {
+  @apply rounded-[22px] border-0;
+  background: hsl(var(--muted) / 0.35);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.wa-input-floating:focus {
+  background: hsl(var(--muted) / 0.55);
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.1);
+}
+
+/* ── Reply quote bar ── */
+.wa-reply-bar {
+  border-left: 3px solid;
+  border-radius: 0 8px 8px 0;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+}
+.wa-reply-bar-incoming {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--muted) / 0.35);
+}
+.wa-reply-bar-outgoing {
+  border-color: hsl(0 0% 100% / 0.5);
+  background: hsl(0 0% 100% / 0.1);
 }
