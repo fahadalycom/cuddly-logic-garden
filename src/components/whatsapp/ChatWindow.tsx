@@ -890,19 +890,27 @@ export function ChatWindow({
       {/* AI Suggestions */}
       {aiSuggestions.length > 0 && (
         <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-amber-500/15">
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="h-5 w-5 rounded-full bg-amber-500/15 flex items-center justify-center"><Sparkles className="h-3 w-3 text-amber-500" /></div>
-            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">AI</span>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-6 w-6 rounded-full bg-amber-500/15 flex items-center justify-center"><Sparkles className="h-3.5 w-3.5 text-amber-500" /></div>
+            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">AI Suggestions</span>
             <Badge variant="outline" className="text-[9px] border-amber-500/30 text-amber-500">{aiSuggestions.length}</Badge>
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {aiSuggestions.slice(0, 5).map((s) => (
-              <div key={s.id} className="flex items-start gap-2 p-2 rounded-lg bg-card/60 border border-border/50">
-                <p className="text-xs flex-1 text-foreground/80 leading-relaxed line-clamp-2">{s.suggested_response}</p>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <Badge variant="outline" className={`text-[9px] px-1.5 ${s.confidence === "high" ? "border-emerald-500/50 text-emerald-500" : s.confidence === "medium" ? "border-amber-500/50 text-amber-500" : "border-red-500/50 text-red-500"}`}>{s.confidence}</Badge>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-emerald-500/10" onClick={() => onApproveAi(s.id, s.suggested_response)}><Check className="h-4 w-4 text-emerald-500" /></Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-destructive/10" onClick={() => onRejectAi(s.id)}><X className="h-4 w-4 text-destructive" /></Button>
+              <div key={s.id} className="p-3 rounded-xl bg-card border border-border/50 shadow-sm hover:border-amber-500/30 transition-colors">
+                <p className="text-xs text-foreground/80 leading-relaxed line-clamp-3 mb-2">{s.suggested_response}</p>
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className={`text-[9px] px-1.5 ${s.confidence === "high" ? "border-emerald-500/50 text-emerald-500" : s.confidence === "medium" ? "border-amber-500/50 text-amber-500" : "border-red-500/50 text-red-500"}`}>
+                    {s.confidence} confidence
+                  </Badge>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="ghost" className="h-7 px-2.5 rounded-full text-xs hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" onClick={() => onApproveAi(s.id, s.suggested_response)}>
+                      <Check className="h-3.5 w-3.5 mr-1" /> Send
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2.5 rounded-full text-xs hover:bg-destructive/10 text-destructive" onClick={() => onRejectAi(s.id)}>
+                      <X className="h-3.5 w-3.5 mr-1" /> Reject
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
