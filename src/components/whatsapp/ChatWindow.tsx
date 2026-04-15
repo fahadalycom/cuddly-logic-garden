@@ -159,8 +159,8 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
 
   if (isSystem) {
     return (
-      <div className="flex justify-center py-1.5">
-        <span className="text-[10px] text-muted-foreground bg-card/70 backdrop-blur-sm px-4 py-1 rounded-full border border-border/20 shadow-sm">{msg.content}</span>
+      <div className="flex justify-center py-2 my-1">
+        <span className="wa-date-pill text-[10px]">{msg.content}</span>
       </div>
     );
   }
@@ -172,7 +172,7 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
 
   const hasMedia = msg.media_url && msg.media_type !== "text";
   const isVoiceNote = msg.media_type === "audio";
-  const maxW = isMobile ? "max-w-[82vw]" : "max-w-[70%]";
+  const maxW = isMobile ? "max-w-[80%]" : "max-w-[70%]";
   const repliedMsg = msg.reply_to_message_id ? allMessages.find(m => m.id === msg.reply_to_message_id) : null;
 
   const reactions: { emoji: string; count: number }[] = [];
@@ -190,42 +190,53 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
 
   const showTail = !isGrouped;
 
+  // Bubble radius: rounded everywhere except tail corner
+  const bubbleRadius = isMobile
+    ? showTail
+      ? isCustomer ? "rounded-[18px] rounded-tl-[4px]" : "rounded-[18px] rounded-tr-[4px]"
+      : "rounded-[18px]"
+    : showTail
+      ? isCustomer ? "rounded-2xl rounded-tl-[4px]" : "rounded-2xl rounded-tr-[4px]"
+      : "rounded-2xl";
+
   return (
-    <div className={`flex ${isCustomer ? "justify-start" : "justify-end"} ${isGrouped ? "mt-[3px]" : isMobile ? "mt-2.5" : "mt-3"} group ${isSending ? "opacity-70" : ""}`}>
+    <div className={`flex ${isCustomer ? "justify-start" : "justify-end"} ${isGrouped ? "mt-[2px]" : isMobile ? "mt-2" : "mt-2.5"} group wa-msg-enter ${isSending ? "opacity-60" : ""}`}>
       <div className={`relative ${maxW}`}
         onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchCancel={handleTouchEnd}>
 
         {/* Reply quote */}
         {repliedMsg && (
-          <div className={`mb-1 rounded-xl overflow-hidden ${isCustomer ? "mr-4" : "ml-4"}`}>
-            <div className={`px-3 py-2 flex items-start gap-2 ${isCustomer ? "bg-muted/40 border-l-[3px] border-l-primary" : "bg-foreground/5 border-l-[3px] border-l-foreground/20"}`}>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-bold text-primary">{repliedMsg.sender_type === "customer" ? "Customer" : "You"}</p>
-                <p className="text-[11px] line-clamp-2 opacity-70 leading-tight mt-0.5">{repliedMsg.content || `[${repliedMsg.media_type}]`}</p>
-              </div>
+          <div className={`${isCustomer ? "mr-3" : "ml-3"} mb-0.5`}>
+            <div className={`wa-reply-bar ${isCustomer ? "wa-reply-bar-incoming" : "wa-reply-bar-outgoing"}`}>
+              <p className={`text-[10px] font-bold ${isCustomer ? "text-primary" : "text-white/80"}`}>
+                {repliedMsg.sender_type === "customer" ? "Customer" : "You"}
+              </p>
+              <p className={`text-[11px] line-clamp-1 mt-0.5 ${isCustomer ? "text-muted-foreground" : "text-white/60"}`}>
+                {repliedMsg.content || `[${repliedMsg.media_type}]`}
+              </p>
             </div>
           </div>
         )}
 
         {/* Bubble */}
-        <div className={`relative ${isMobile ? "rounded-[20px] px-3.5 py-2.5" : "rounded-2xl px-4 py-2.5"} ${
+        <div className={`relative ${isMobile ? "px-3 py-[7px]" : "px-3.5 py-2"} ${bubbleRadius} ${
           isEmojiOnly ? "wa-emoji-only" :
           isFailed
-            ? "bg-destructive/10 border border-destructive/30 text-foreground rounded-tr-md"
+            ? "bg-destructive/10 border border-destructive/30 text-foreground"
             : isCustomer
-            ? `wa-bubble-incoming ${showTail ? (isMobile ? "rounded-tl-md" : "rounded-tl-md") : ""}`
+            ? "wa-bubble-incoming"
             : isAi
-            ? `wa-bubble-ai ${showTail ? "rounded-tr-md" : ""}`
-            : `wa-bubble-outgoing ${showTail ? "rounded-tr-md" : ""}`
-        } ${showTail && isCustomer && !isEmojiOnly ? "wa-bubble-tail-left" : ""} ${showTail && !isCustomer && !isAi && !isEmojiOnly ? "wa-bubble-tail-right" : ""}`}>
+            ? "wa-bubble-ai"
+            : "wa-bubble-outgoing"
+        } ${showTail && isCustomer && !isEmojiOnly ? "wa-bubble-tail-left" : ""} ${showTail && !isCustomer && !isAi && !isEmojiOnly ? "wa-bubble-tail-right" : ""} ${isMobile ? "wa-bubble-mobile" : ""}`}>
           
           {/* AI label */}
           {isAi && !isGrouped && (
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <div className="h-[18px] w-[18px] rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
-                <Sparkles className="h-2.5 w-2.5 text-white" />
+            <div className="flex items-center gap-1.5 mb-1">
+              <div className="h-4 w-4 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                <Sparkles className="h-2 w-2 text-white" />
               </div>
-              <span className="text-[10px] font-bold text-amber-500 tracking-wide uppercase">AI Assistant</span>
+              <span className="text-[9px] font-bold text-amber-500 tracking-wider uppercase">AI</span>
             </div>
           )}
 
@@ -238,32 +249,34 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
 
           {/* Text content */}
           {msg.content && !isVoiceNote && (
-            <p className={`${isMobile ? "text-[14.5px]" : "text-[13.5px]"} leading-[1.45] whitespace-pre-wrap break-words`}>
+            <p className={`${isMobile ? "text-[15px] leading-[1.4]" : "text-[13.5px] leading-[1.45]"} whitespace-pre-wrap break-words`}>
               {msg.content}
             </p>
           )}
 
-          {/* Time + status */}
-          <div className="flex items-center justify-end gap-1.5 mt-1 -mb-0.5">
-            {isFailed && <span className="text-[9px] text-destructive font-bold mr-1">Failed</span>}
-            <span className={`text-[10px] ${isCustomer ? "text-muted-foreground/70" : "opacity-50"}`}>
-              {format(new Date(msg.created_at), "HH:mm")}
-            </span>
-            {!isCustomer && !isAi && (
-              isSending
-                ? <Clock className="h-3 w-3 opacity-40 animate-pulse" />
-                : isFailed
-                ? <X className="h-3 w-3 text-destructive" />
-                : <CheckCheck className={`h-3.5 w-3.5 ${msg.is_read ? "text-blue-400" : "opacity-40"}`} />
-            )}
-          </div>
+          {/* Time + status — inline float right for natural WhatsApp look */}
+          {!isEmojiOnly && (
+            <div className="flex items-center justify-end gap-1 mt-0.5 -mb-0.5 wa-msg-time select-none">
+              {isFailed && <span className="text-[9px] text-destructive font-bold mr-1">!</span>}
+              <span className={`text-[10px] ${isCustomer ? "text-muted-foreground/60" : "opacity-60"}`}>
+                {format(new Date(msg.created_at), "HH:mm")}
+              </span>
+              {!isCustomer && !isAi && (
+                isSending
+                  ? <Clock className="h-3 w-3 opacity-40 animate-pulse" />
+                  : isFailed
+                  ? <X className="h-3 w-3 text-destructive" />
+                  : <CheckCheck className={`h-3 w-3 ${msg.is_read ? "text-blue-400" : "opacity-40"}`} />
+              )}
+            </div>
+          )}
         </div>
 
         {/* Reactions */}
         {reactions.length > 0 && (
-          <div className={`flex gap-1 -mt-1.5 relative z-[1] ${isCustomer ? "justify-start ml-2" : "justify-end mr-2"}`}>
+          <div className={`flex gap-1 -mt-2 relative z-[1] ${isCustomer ? "justify-start ml-2" : "justify-end mr-2"}`}>
             {reactions.map((r, i) => (
-              <span key={i} className="text-xs bg-card border border-border/50 rounded-full px-2 py-0.5 shadow-sm cursor-pointer hover:shadow-md transition-all">
+              <span key={i} className="wa-reaction-badge">
                 {r.emoji} {r.count > 1 && <span className="text-[9px] text-muted-foreground ml-0.5">{r.count}</span>}
               </span>
             ))}
@@ -291,60 +304,53 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
         {/* Mobile long-press — bottom sheet overlay */}
         {isMobile && showMobileActions && (
           <>
-            <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-[2px]" onClick={() => setShowMobileActions(false)} />
+            <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-[3px]" onClick={() => setShowMobileActions(false)} />
             <div className="fixed inset-x-0 bottom-0 z-[61] wa-bottom-sheet">
-              <div className="bg-card border-t border-border/50 rounded-t-3xl shadow-2xl overflow-hidden"
-                style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+              <div className="bg-card rounded-t-[28px] shadow-2xl overflow-hidden"
+                style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
                 {/* Drag handle */}
-                <div className="flex justify-center pt-3 pb-2">
-                  <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
+                <div className="flex justify-center pt-3 pb-1.5">
+                  <div className="w-9 h-[3px] rounded-full bg-muted-foreground/15" />
+                </div>
+
+                {/* Message preview */}
+                <div className="px-5 pb-3">
+                  <div className={`${isCustomer ? "wa-bubble-incoming" : "wa-bubble-outgoing"} rounded-2xl px-3 py-2 max-w-[85%] ${isCustomer ? "" : "ml-auto"}`}>
+                    <p className="text-[13px] line-clamp-2 leading-snug">{msg.content || `[${msg.media_type}]`}</p>
+                  </div>
                 </div>
 
                 {/* Quick reactions */}
-                <div className="flex justify-center gap-2 px-6 pb-3">
+                <div className="flex justify-center gap-2.5 px-5 pb-4">
                   {QUICK_REACTIONS.map((emoji, i) => (
                     <button key={emoji} onClick={() => { onReact(msg.id, emoji); setShowMobileActions(false); }}
-                      className="h-12 w-12 rounded-2xl bg-muted/50 hover:bg-muted flex items-center justify-center text-2xl active:scale-110 transition-all"
+                      className="h-[52px] w-[52px] rounded-2xl bg-muted/40 hover:bg-muted flex items-center justify-center text-[26px] active:scale-110 transition-all"
                       style={{ animationDelay: `${i * 40}ms` }}>
                       {emoji}
                     </button>
                   ))}
                 </div>
 
-                <div className="h-px bg-border/50 mx-4" />
+                <div className="h-px bg-border/30 mx-5" />
 
                 {/* Action items */}
-                <div className="px-2 py-2">
-                  <button onClick={() => { onReply(msg); setShowMobileActions(false); }}
-                    className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl active:bg-muted/50 transition-colors">
-                    <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                      <Reply className="h-5 w-5 text-blue-500" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm font-medium">Reply</p>
-                      <p className="text-[11px] text-muted-foreground">Reply to this message</p>
-                    </div>
-                  </button>
-                  <button onClick={handleCopy}
-                    className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl active:bg-muted/50 transition-colors">
-                    <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                      <Copy className="h-5 w-5 text-emerald-500" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm font-medium">Copy</p>
-                      <p className="text-[11px] text-muted-foreground">Copy message text</p>
-                    </div>
-                  </button>
-                  <button onClick={() => { toast.info("Forward coming soon"); setShowMobileActions(false); }}
-                    className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl active:bg-muted/50 transition-colors">
-                    <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center">
-                      <Forward className="h-5 w-5 text-purple-500" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm font-medium">Forward</p>
-                      <p className="text-[11px] text-muted-foreground">Forward to another chat</p>
-                    </div>
-                  </button>
+                <div className="px-3 py-1.5">
+                  {[
+                    { action: () => { onReply(msg); setShowMobileActions(false); }, icon: Reply, color: "text-blue-500", bg: "bg-blue-500/10", label: "Reply", desc: "Reply to this message" },
+                    { action: handleCopy, icon: Copy, color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Copy", desc: "Copy message text" },
+                    { action: () => { toast.info("Forward coming soon"); setShowMobileActions(false); }, icon: Forward, color: "text-purple-500", bg: "bg-purple-500/10", label: "Forward", desc: "Forward to another chat" },
+                  ].map((item, i) => (
+                    <button key={i} onClick={item.action}
+                      className="w-full flex items-center gap-3.5 px-3 py-3 rounded-2xl active:bg-muted/40 transition-colors">
+                      <div className={`h-10 w-10 rounded-xl ${item.bg} flex items-center justify-center`}>
+                        <item.icon className={`h-[18px] w-[18px] ${item.color}`} />
+                      </div>
+                      <div className="text-left flex-1">
+                        <p className="text-[14px] font-medium">{item.label}</p>
+                        <p className="text-[11px] text-muted-foreground/70">{item.desc}</p>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
