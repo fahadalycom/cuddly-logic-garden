@@ -1234,6 +1234,41 @@ export type Database = {
           },
         ]
       }
+      wa_conversation_tags: {
+        Row: {
+          color: string
+          conversation_id: string
+          created_at: string
+          created_by: string
+          id: string
+          tag: string
+        }
+        Insert: {
+          color?: string
+          conversation_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          tag: string
+        }
+        Update: {
+          color?: string
+          conversation_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          tag?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_conversation_tags_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wa_conversations: {
         Row: {
           assigned_agent_id: string | null
@@ -1287,6 +1322,38 @@ export type Database = {
           },
         ]
       }
+      wa_internal_notes: {
+        Row: {
+          author_id: string
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          author_id: string
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_internal_notes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wa_messages: {
         Row: {
           content: string | null
@@ -1299,6 +1366,8 @@ export type Database = {
           media_mime_type: string | null
           media_type: Database["public"]["Enums"]["wa_media_type"]
           media_url: string | null
+          reactions: Json | null
+          reply_to_message_id: string | null
           sender_id: string | null
           sender_type: Database["public"]["Enums"]["wa_sender_type"]
           whatsapp_message_id: string | null
@@ -1314,6 +1383,8 @@ export type Database = {
           media_mime_type?: string | null
           media_type?: Database["public"]["Enums"]["wa_media_type"]
           media_url?: string | null
+          reactions?: Json | null
+          reply_to_message_id?: string | null
           sender_id?: string | null
           sender_type?: Database["public"]["Enums"]["wa_sender_type"]
           whatsapp_message_id?: string | null
@@ -1329,6 +1400,8 @@ export type Database = {
           media_mime_type?: string | null
           media_type?: Database["public"]["Enums"]["wa_media_type"]
           media_url?: string | null
+          reactions?: Json | null
+          reply_to_message_id?: string | null
           sender_id?: string | null
           sender_type?: Database["public"]["Enums"]["wa_sender_type"]
           whatsapp_message_id?: string | null
@@ -1339,6 +1412,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "wa_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_messages_reply_to_message_id_fkey"
+            columns: ["reply_to_message_id"]
+            isOneToOne: false
+            referencedRelation: "wa_messages"
             referencedColumns: ["id"]
           },
         ]

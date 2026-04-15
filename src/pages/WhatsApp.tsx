@@ -2,19 +2,33 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { useNotifications } from "@/hooks/useNotifications";
 import { ConversationList } from "@/components/whatsapp/ConversationList";
 import { ChatWindow } from "@/components/whatsapp/ChatWindow";
 import { AgentConfigPanel } from "@/components/whatsapp/AgentConfigPanel";
 import { QueuePanel } from "@/components/whatsapp/QueuePanel";
+import { ContactInfoPanel } from "@/components/whatsapp/ContactInfoPanel";
+import { MessageSearch } from "@/components/whatsapp/MessageSearch";
 import { LoadingState } from "@/components/shared/PageStates";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { MessageSquare, Clock, Users, Zap, TrendingUp } from "lucide-react";
+import {
+  MessageSquare, Clock, Users, Zap, TrendingUp, Search, Bell, BellOff,
+  Volume2, VolumeX, Info, Settings2
+} from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenuSeparator, DropdownMenuLabel
+} from "@/components/ui/dropdown-menu";
 
 export default function WhatsAppPage() {
   const { user, isAdmin } = useAuth();
   const isMobile = useIsMobile();
+  const { notify, soundEnabled, notifEnabled, toggleSound, toggleNotif, requestPermission, permission } = useNotifications();
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -24,8 +38,13 @@ export default function WhatsAppPage() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
-  // Track IDs we already have to deduplicate realtime inserts
+  const [showContactInfo, setShowContactInfo] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const messageIdsRef = useRef<Set<string>>(new Set());
+  const selectedConvRef = useRef<string | null>(null);
+
+  // Keep ref in sync for notification callback
+  useEffect(() => { selectedConvRef.current = selectedConversation?.id || null; }, [selectedConversation?.id]);
 
   const fetchConversations = async () => {
     const { data } = await supabase
@@ -43,7 +62,6 @@ export default function WhatsAppPage() {
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });
     const msgs = data || [];
-    // Build dedup set
     const ids = new Set(msgs.map((m: any) => m.id));
     messageIdsRef.current = ids;
     setMessages(msgs);
@@ -89,9 +107,28 @@ export default function WhatsAppPage() {
     fetchTemplates();
     fetchStaff();
 
+    // Request notification permission on mount
+    if (permission === "default") requestPermission();
+
     const convChannel = supabase
       .channel("wa-conversations")
-      .on("postgres_changes", { event: "*", schema: "public", table: "wa_conversations" }, () => fetchConversations())
+      .on("postgres_changes", { event: "*", schema: "public", table: "wa_conversations" }, (payload) => {
+        fetchConversations();
+        // Notify on new incoming message (unread_count increased)
+        if (payload.eventType === "UPDATE") {
+          const conv = payload.new as any;
+          if (conv.unread_count > 0 && conv.id !== selectedConvRef.current) {
+            notify(
+              conv.customer_name || conv.customer_phone || "New message",
+              conv.last_message_preview || "Sent a message",
+              () => {
+                // Find full conversation and select it
+                setSelectedConversation(conv);
+              }
+            );
+          }
+        }
+      })
       .subscribe();
     const queueChannel = supabase
       .channel("wa-queue")
@@ -116,18 +153,13 @@ export default function WhatsAppPage() {
         filter: `conversation_id=eq.${selectedConversation.id}`,
       }, (payload) => {
         const newMsg = payload.new as any;
-        // Deduplicate: skip if we already have this ID (from optimistic insert or prior fetch)
         if (messageIdsRef.current.has(newMsg.id)) {
-          // Update the existing message in-place (replace optimistic with real data)
           setMessages((prev) => prev.map((m) => m.id === newMsg.id ? newMsg : m));
           return;
         }
-        // Also check for temp IDs — replace optimistic messages by matching content+time
         setMessages((prev) => {
-          // Remove any optimistic message that matches this real one
           const withoutOptimistic = prev.filter((m) => {
             if (!m._optimistic) return true;
-            // Match by content similarity
             if (m.content === newMsg.content && m.media_type === newMsg.media_type) return false;
             return true;
           });
@@ -140,10 +172,9 @@ export default function WhatsAppPage() {
     return () => { supabase.removeChannel(msgChannel); };
   }, [selectedConversation?.id]);
 
-  const handleSendMessage = async (content: string, mediaUrl?: string, mediaType?: string, mediaMimeType?: string, mediaFilename?: string) => {
+  const handleSendMessage = async (content: string, mediaUrl?: string, mediaType?: string, mediaMimeType?: string, mediaFilename?: string, replyToId?: string) => {
     if (!selectedConversation || !user) return;
 
-    // Optimistic: add message immediately to UI
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const optimisticMsg = {
       id: tempId,
@@ -155,6 +186,8 @@ export default function WhatsAppPage() {
       media_type: mediaType || "text",
       media_mime_type: mediaMimeType || null,
       media_filename: mediaFilename || null,
+      reply_to_message_id: replyToId || null,
+      reactions: [],
       is_read: true,
       is_ai_generated: false,
       created_at: new Date().toISOString(),
@@ -178,23 +211,19 @@ export default function WhatsAppPage() {
       });
       if (error) throw error;
 
-      // Replace optimistic message with real one from response
       const realMsg = data?.message;
       if (realMsg) {
         messageIdsRef.current.add(realMsg.id);
         setMessages((prev) => prev.map((m) => m.id === tempId ? { ...realMsg, _sending: false } : m));
       } else {
-        // Edge function succeeded but no message returned — mark as sent
         setMessages((prev) => prev.map((m) => m.id === tempId ? { ...m, _sending: false } : m));
       }
 
-      // Check if delivery failed (207 = saved but not delivered)
       if (data && data.success === false) {
         toast.warning("Message saved but delivery failed — check token");
         setMessages((prev) => prev.map((m) => m.id === tempId ? { ...m, _failed: true, _sending: false } : m));
       }
     } catch (err) {
-      // Mark as failed
       setMessages((prev) => prev.map((m) => m.id === tempId ? { ...m, _failed: true, _sending: false } : m));
       toast.error("Message send failed");
       throw err;
@@ -207,6 +236,7 @@ export default function WhatsAppPage() {
       body: { action: "resolve_conversation", conversation_id: selectedConversation.id, agent_id: user.id },
     });
     setSelectedConversation(null);
+    setShowContactInfo(false);
   };
 
   const handleAssign = async (conversationId: string, agentId: string) => {
@@ -226,12 +256,40 @@ export default function WhatsAppPage() {
     fetchAiSuggestions(selectedConversation?.id);
   };
 
-  const handleBack = () => setSelectedConversation(null);
+  const handleBack = () => { setSelectedConversation(null); setShowContactInfo(false); };
+
+  const handleSearchSelect = (conversationId: string) => {
+    const conv = conversations.find(c => c.id === conversationId);
+    if (conv) setSelectedConversation(conv);
+  };
 
   if (loading) return <LoadingState />;
 
   const activeCount = conversations.filter((c) => c.status === "active").length;
   const unreadCount = conversations.filter((c) => c.unread_count > 0).length;
+
+  // Notification settings dropdown
+  const NotifSettings = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+          {notifEnabled || soundEnabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4 text-muted-foreground" />}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuLabel className="text-xs">Notifications</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <div className="px-2 py-1.5 flex items-center justify-between">
+          <span className="text-xs flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Push</span>
+          <Switch checked={notifEnabled} onCheckedChange={toggleNotif} className="scale-75" />
+        </div>
+        <div className="px-2 py-1.5 flex items-center justify-between">
+          <span className="text-xs flex items-center gap-1.5"><Volume2 className="h-3.5 w-3.5" /> Sound</span>
+          <Switch checked={soundEnabled} onCheckedChange={toggleSound} className="scale-75" />
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   // Mobile: show chat if selected, else show list
   if (isMobile) {
@@ -251,6 +309,7 @@ export default function WhatsAppPage() {
             staff={staff}
             onAssign={handleAssign}
             onBack={handleBack}
+            onOpenContactInfo={() => setShowContactInfo(true)}
             isMobile
           />
         </div>
@@ -259,9 +318,16 @@ export default function WhatsAppPage() {
 
     return (
       <div className="h-[calc(100vh-4rem)] flex flex-col bg-background">
-        {/* Mobile header */}
         <div className="px-4 py-3 border-b border-border bg-card/80">
-          <h1 className="text-lg font-bold">WhatsApp</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-bold">WhatsApp</h1>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setShowSearch(true)}>
+                <Search className="h-4 w-4" />
+              </Button>
+              <NotifSettings />
+            </div>
+          </div>
           <div className="flex items-center gap-3 mt-1">
             <div className="flex items-center gap-1.5">
               <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -281,25 +347,14 @@ export default function WhatsAppPage() {
         <Tabs value={sideTab} onValueChange={setSideTab} className="flex flex-col flex-1 min-h-0">
           <div className="px-3 pt-2 pb-1">
             <TabsList className="grid w-full grid-cols-3 h-10">
-              <TabsTrigger value="chats" className="text-xs gap-1.5">
-                <MessageSquare className="h-4 w-4" />
-                Chats
-              </TabsTrigger>
+              <TabsTrigger value="chats" className="text-xs gap-1.5"><MessageSquare className="h-4 w-4" />Chats</TabsTrigger>
               <TabsTrigger value="queue" className="text-xs gap-1.5 relative">
-                <Clock className="h-4 w-4" />
-                Queue
+                <Clock className="h-4 w-4" />Queue
                 {queue.length > 0 && (
-                  <span className="ml-0.5 bg-destructive text-destructive-foreground text-[9px] px-1.5 min-w-[16px] h-4 rounded-full flex items-center justify-center font-bold">
-                    {queue.length}
-                  </span>
+                  <span className="ml-0.5 bg-destructive text-destructive-foreground text-[9px] px-1.5 min-w-[16px] h-4 rounded-full flex items-center justify-center font-bold">{queue.length}</span>
                 )}
               </TabsTrigger>
-              {isAdmin && (
-                <TabsTrigger value="agents" className="text-xs gap-1.5">
-                  <Users className="h-4 w-4" />
-                  Agents
-                </TabsTrigger>
-              )}
+              {isAdmin && <TabsTrigger value="agents" className="text-xs gap-1.5"><Users className="h-4 w-4" />Agents</TabsTrigger>}
             </TabsList>
           </div>
 
@@ -315,6 +370,8 @@ export default function WhatsAppPage() {
             </TabsContent>
           )}
         </Tabs>
+
+        {showSearch && <MessageSearch onSelectConversation={handleSearchSelect} onClose={() => setShowSearch(false)} />}
       </div>
     );
   }
@@ -324,20 +381,33 @@ export default function WhatsAppPage() {
     <div className="h-[calc(100vh-4rem)] flex bg-background overflow-hidden">
       <div className="w-80 lg:w-96 border-r border-border flex flex-col bg-card/50">
         <div className="px-4 py-2.5 border-b border-border bg-card/80">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs font-medium">{activeCount} active</span>
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-medium">{activeCount} active</span>
+              </div>
+              <div className="w-px h-3 bg-border" />
+              <div className="flex items-center gap-1.5">
+                <MessageSquare className="h-3 w-3 text-primary" />
+                <span className="text-xs text-muted-foreground">{unreadCount} unread</span>
+              </div>
+              <div className="w-px h-3 bg-border" />
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3 w-3 text-amber-500" />
+                <span className="text-xs text-muted-foreground">{queue.length} queued</span>
+              </div>
             </div>
-            <div className="w-px h-3 bg-border" />
-            <div className="flex items-center gap-1.5">
-              <MessageSquare className="h-3 w-3 text-primary" />
-              <span className="text-xs text-muted-foreground">{unreadCount} unread</span>
-            </div>
-            <div className="w-px h-3 bg-border" />
-            <div className="flex items-center gap-1.5">
-              <Clock className="h-3 w-3 text-amber-500" />
-              <span className="text-xs text-muted-foreground">{queue.length} queued</span>
+            <div className="flex items-center gap-0.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setShowSearch(true)}>
+                    <Search className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Search messages</TooltipContent>
+              </Tooltip>
+              <NotifSettings />
             </div>
           </div>
         </div>
@@ -345,30 +415,19 @@ export default function WhatsAppPage() {
         <Tabs value={sideTab} onValueChange={setSideTab} className="flex flex-col flex-1 min-h-0">
           <div className="px-3 pt-2 pb-1">
             <TabsList className="grid w-full grid-cols-3 h-9">
-              <TabsTrigger value="chats" className="text-xs gap-1 data-[state=active]:shadow-sm">
-                <MessageSquare className="h-3.5 w-3.5" />
-                Chats
-              </TabsTrigger>
+              <TabsTrigger value="chats" className="text-xs gap-1 data-[state=active]:shadow-sm"><MessageSquare className="h-3.5 w-3.5" />Chats</TabsTrigger>
               <TabsTrigger value="queue" className="text-xs gap-1 relative data-[state=active]:shadow-sm">
-                <Clock className="h-3.5 w-3.5" />
-                Queue
+                <Clock className="h-3.5 w-3.5" />Queue
                 {queue.length > 0 && (
-                  <span className="ml-0.5 bg-destructive text-destructive-foreground text-[9px] px-1.5 min-w-[16px] h-4 rounded-full flex items-center justify-center font-bold">
-                    {queue.length}
-                  </span>
+                  <span className="ml-0.5 bg-destructive text-destructive-foreground text-[9px] px-1.5 min-w-[16px] h-4 rounded-full flex items-center justify-center font-bold">{queue.length}</span>
                 )}
               </TabsTrigger>
-              {isAdmin && (
-                <TabsTrigger value="agents" className="text-xs gap-1 data-[state=active]:shadow-sm">
-                  <Users className="h-3.5 w-3.5" />
-                  Agents
-                </TabsTrigger>
-              )}
+              {isAdmin && <TabsTrigger value="agents" className="text-xs gap-1 data-[state=active]:shadow-sm"><Users className="h-3.5 w-3.5" />Agents</TabsTrigger>}
             </TabsList>
           </div>
 
           <TabsContent value="chats" className="flex-1 overflow-hidden mt-0">
-            <ConversationList conversations={conversations} selectedId={selectedConversation?.id} onSelect={setSelectedConversation} />
+            <ConversationList conversations={conversations} selectedId={selectedConversation?.id} onSelect={(conv) => { setSelectedConversation(conv); setShowContactInfo(false); }} />
           </TabsContent>
           <TabsContent value="queue" className="flex-1 overflow-hidden mt-0">
             <QueuePanel queue={queue} staff={staff} isAdmin={isAdmin} onAssign={handleAssign} />
@@ -383,19 +442,27 @@ export default function WhatsAppPage() {
 
       <div className="flex-1 flex flex-col relative">
         {selectedConversation ? (
-          <ChatWindow
-            conversation={selectedConversation}
-            messages={messages}
-            templates={templates}
-            aiSuggestions={aiSuggestions}
-            onSend={handleSendMessage}
-            onResolve={handleResolve}
-            onApproveAi={handleApproveAi}
-            onRejectAi={handleRejectAi}
-            isAdmin={isAdmin}
-            staff={staff}
-            onAssign={handleAssign}
-          />
+          <div className="flex flex-1 min-h-0">
+            <div className="flex-1 flex flex-col min-w-0">
+              <ChatWindow
+                conversation={selectedConversation}
+                messages={messages}
+                templates={templates}
+                aiSuggestions={aiSuggestions}
+                onSend={handleSendMessage}
+                onResolve={handleResolve}
+                onApproveAi={handleApproveAi}
+                onRejectAi={handleRejectAi}
+                isAdmin={isAdmin}
+                staff={staff}
+                onAssign={handleAssign}
+                onOpenContactInfo={() => setShowContactInfo(!showContactInfo)}
+              />
+            </div>
+            {showContactInfo && (
+              <ContactInfoPanel conversation={selectedConversation} onClose={() => setShowContactInfo(false)} />
+            )}
+          </div>
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center space-y-4">
@@ -416,6 +483,10 @@ export default function WhatsAppPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {showSearch && (
+          <MessageSearch onSelectConversation={handleSearchSelect} onClose={() => setShowSearch(false)} />
         )}
       </div>
     </div>
