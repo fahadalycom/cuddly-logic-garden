@@ -527,18 +527,280 @@ export function ChatWindow({
   const status = statusConfig[conversation.status] || statusConfig.active;
   const StatusIcon = status.icon;
 
-  return (
-    <div className={`relative ${isMobile ? "" : "flex flex-col h-full"}`} style={isMobile ? { display: 'grid', gridTemplateRows: 'auto 1fr auto', height: '100%', overflow: 'hidden' } : undefined}>
-      {/* Header */}
-      <div className={`flex-shrink-0 ${isMobile ? "px-2 py-2" : "px-5 py-3"} border-b border-border flex items-center justify-between bg-card/95 backdrop-blur-md`} style={isMobile ? { paddingTop: 'max(0.5rem, env(safe-area-inset-top))' } : undefined}>
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {onBack && (
-            <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full -ml-0.5 active:scale-95 transition-transform" onClick={onBack}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+  // ──────────────────────────────────────────────────────
+  // MOBILE: absolute-positioned header / messages / input
+  // ──────────────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <div className="absolute inset-0 flex flex-col overflow-hidden bg-background">
+        {/* ── HEADER ── */}
+        <div className="flex-shrink-0 h-[56px] px-2 flex items-center justify-between border-b border-border bg-card/95 backdrop-blur-md z-20"
+          style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {onBack && (
+              <button className="h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted transition-colors -ml-1" onClick={onBack}>
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+            )}
+            <div className="relative flex-shrink-0" onClick={onOpenContactInfo}>
+              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+                <span className="text-sm font-bold text-primary-foreground">
+                  {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${conversation.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+            </div>
+            <div className="min-w-0 flex-1" onClick={onOpenContactInfo}>
+              <p className="text-[15px] font-semibold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {conversation.status === "active" && <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                <span className="text-[11px] text-muted-foreground truncate">
+                  {conversation.assigned_agent_name ? `Agent: ${conversation.assigned_agent_name}` : conversation.status === "active" ? "Online" : conversation.customer_phone}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center flex-shrink-0">
+            <button className="h-10 w-10 rounded-full flex items-center justify-center active:bg-muted transition-colors" onClick={openWhatsApp}>
+              <Phone className="h-[18px] w-[18px]" />
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="h-10 w-10 rounded-full flex items-center justify-center active:bg-muted transition-colors">
+                  <MoreVertical className="h-[18px] w-[18px]" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={openWhatsApp}><ExternalLink className="h-4 w-4 mr-2" /> Open in WhatsApp</DropdownMenuItem>
+                {onOpenContactInfo && <DropdownMenuItem onClick={onOpenContactInfo}><Info className="h-4 w-4 mr-2" /> Contact Info</DropdownMenuItem>}
+                <DropdownMenuItem onClick={onResolve} className="text-emerald-500"><CheckCircle className="h-4 w-4 mr-2" /> Mark Resolved</DropdownMenuItem>
+                {isAdmin && staff.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Assign to Agent</DropdownMenuLabel>
+                    {staff.map((s) => (
+                      <DropdownMenuItem key={s.id} onClick={() => onAssign(conversation.id, s.user_id)}>
+                        <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center mr-2 text-[10px] font-bold text-primary">{s.full_name?.charAt(0)}</div>
+                        {s.full_name}
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {/* ── AI SUGGESTIONS (compact) ── */}
+        {aiSuggestions.length > 0 && (
+          <div className="flex-shrink-0 px-3 py-2 bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-amber-500/15 z-10">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+              <div className="flex-shrink-0 flex items-center gap-1">
+                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                <span className="text-[10px] font-bold text-amber-500">AI</span>
+              </div>
+              {aiSuggestions.slice(0, 3).map((s) => (
+                <div key={s.id} className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-card/80 border border-border/50 max-w-[60vw]">
+                  <p className="text-[11px] flex-1 truncate">{s.suggested_response}</p>
+                  <button className="h-6 w-6 rounded-full flex items-center justify-center active:bg-emerald-500/20" onClick={() => onApproveAi(s.id, s.suggested_response)}>
+                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  </button>
+                  <button className="h-6 w-6 rounded-full flex items-center justify-center active:bg-destructive/20" onClick={() => onRejectAi(s.id)}>
+                    <X className="h-3.5 w-3.5 text-destructive" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── MESSAGES ── */}
+        <div ref={scrollRef} onScroll={handleScroll}
+          className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-3 py-2 z-0"
+          style={{ WebkitOverflowScrolling: 'touch' }}>
+          {messagesWithDates.map((item, i) => {
+            if (item.type === "date" && item.date) return <DateSeparator key={`date-${i}`} date={item.date} />;
+            if (item.type === "message" && item.msg) return (
+              <MessageBubble key={item.msg.id} msg={item.msg} isGrouped={!!item.isGrouped} isMobile
+                allMessages={messages} onReply={handleReply} onReact={handleReact} />
+            );
+            return null;
+          })}
+          {messages.length === 0 && (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center space-y-2">
+                <div className="h-14 w-14 rounded-2xl bg-muted/30 flex items-center justify-center mx-auto"><MessageSquare className="h-6 w-6 text-muted-foreground/30" /></div>
+                <p className="text-sm font-medium text-muted-foreground">No messages yet</p>
+                <p className="text-xs text-muted-foreground/60">Send a message to start</p>
+              </div>
+            </div>
           )}
-          <div className="relative flex-shrink-0 cursor-pointer active:scale-95 transition-transform" onClick={onOpenContactInfo}>
-            <div className={`${isMobile ? "h-10 w-10" : "h-10 w-10"} rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-sm`}>
+        </div>
+
+        {/* ── SCROLL TO BOTTOM ── */}
+        {showScrollDown && (
+          <div className="absolute z-20 bottom-[76px] right-3">
+            <Button size="icon" variant="secondary" className="h-9 w-9 rounded-full shadow-lg" onClick={scrollToBottom}><ArrowDown className="h-4 w-4" /></Button>
+          </div>
+        )}
+
+        {/* Hidden file input */}
+        <input ref={fileInputRef} type="file" className="hidden" accept={fileAccept} onChange={handleFileSelect} />
+
+        {/* ── REPLY PREVIEW ── */}
+        {replyTo && (
+          <div className="flex-shrink-0 px-3 py-1.5 border-t border-border bg-muted/30 flex items-center gap-2 z-10">
+            <div className="w-0.5 h-8 rounded-full bg-primary flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-semibold text-primary">{replyTo.sender_type === "customer" ? "Customer" : "You"}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{replyTo.content || `[${replyTo.media_type}]`}</p>
+            </div>
+            <button className="h-7 w-7 rounded-full flex items-center justify-center active:bg-muted flex-shrink-0" onClick={() => setReplyTo(null)}>
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* ── SLASH COMMAND MENU ── */}
+        {showSlashMenu && slashFiltered.length > 0 && (
+          <div className="flex-shrink-0 px-3 py-2 border-t border-border bg-card max-h-40 overflow-y-auto z-10">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Quick Replies</p>
+            {slashFiltered.slice(0, 4).map(t => (
+              <button key={t.id} onClick={() => handleTemplateSelect(t)}
+                className="w-full text-left px-2.5 py-2.5 rounded-lg active:bg-accent/50 transition-colors flex items-start gap-2">
+                <FileText className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium">{t.name}</p>
+                  <p className="text-[11px] text-muted-foreground line-clamp-1">{t.body}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── INPUT BAR ── */}
+        <div className="flex-shrink-0 px-2 py-2 border-t border-border bg-card/95 backdrop-blur-md z-20"
+          style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
+          {uploading && (
+            <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg bg-primary/5 border border-primary/20">
+              <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
+              <span className="text-xs text-primary font-medium">Uploading...</span>
+            </div>
+          )}
+          {isRecording ? (
+            <div className="flex items-center gap-2">
+              <button className="h-11 w-11 rounded-full flex items-center justify-center text-destructive active:bg-destructive/10 active:scale-95 transition-transform" onClick={cancelRecording}>
+                <Trash2 className="h-5 w-5" />
+              </button>
+              <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-full bg-muted/30">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-sm font-semibold tabular-nums text-destructive min-w-[40px]">{formatRecordingTime(recordingTime)}</span>
+                </div>
+                <div className="flex items-center gap-[2px] flex-1 h-[24px]">
+                  {Array.from({ length: 20 }).map((_, i) => (
+                    <div key={i} className="flex-1 rounded-full bg-destructive/60"
+                      style={{ height: `${20 + Math.random() * 80}%`, minWidth: 2, animation: `pulse ${0.3 + Math.random() * 0.7}s ease-in-out infinite alternate`, animationDelay: `${i * 0.05}s` }} />
+                  ))}
+                </div>
+              </div>
+              <button className="h-11 w-11 rounded-full bg-primary flex items-center justify-center shadow-md active:scale-90 transition-transform" onClick={stopRecording}>
+                <Send className="h-5 w-5 text-primary-foreground" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-end gap-1">
+              <DropdownMenu open={showAttachMenu} onOpenChange={setShowAttachMenu}>
+                <DropdownMenuTrigger asChild>
+                  <button className="h-11 w-11 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted transition-colors" disabled={uploading}>
+                    <Paperclip className="h-[22px] w-[22px] text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-52" side="top">
+                  <DropdownMenuItem onClick={() => openFilePicker("image/*")} className="py-3"><ImageIcon className="h-4 w-4 mr-2 text-blue-500" /> Photo</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openFilePicker("video/*")} className="py-3"><Video className="h-4 w-4 mr-2 text-purple-500" /> Video</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openFilePicker("audio/*")} className="py-3"><Mic className="h-4 w-4 mr-2 text-orange-500" /> Audio</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")} className="py-3"><FileText className="h-4 w-4 mr-2 text-emerald-500" /> Document</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="py-3" onClick={() => {
+                    setShowAttachMenu(false);
+                    const inp = document.createElement("input");
+                    inp.type = "file"; inp.accept = "image/*"; inp.capture = "environment";
+                    inp.onchange = (e) => { const file = (e.target as HTMLInputElement).files?.[0]; if (file) uploadAndSend(file, file.name, file.type); };
+                    inp.click();
+                  }}><Camera className="h-4 w-4 mr-2 text-pink-500" /> Camera</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <div className="flex-1 relative">
+                <Textarea
+                  ref={inputRef}
+                  placeholder="Message..."
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  rows={1}
+                  className="min-h-[44px] max-h-[100px] text-[15px] py-2.5 px-4 resize-none rounded-full bg-muted/30 border-transparent focus:border-primary/30 focus:bg-background transition-colors"
+                />
+              </div>
+
+              {input.trim() ? (
+                <button
+                  className="h-11 w-11 flex-shrink-0 rounded-full bg-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform"
+                  onClick={handleSend} disabled={sending}>
+                  <Send className={`h-5 w-5 text-primary-foreground ${sending ? "animate-pulse" : ""}`} />
+                </button>
+              ) : (
+                <button
+                  className="h-11 w-11 flex-shrink-0 rounded-full flex items-center justify-center text-primary active:bg-primary/10 active:scale-90 transition-transform"
+                  onClick={startRecording}>
+                  <Mic className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Templates Dialog */}
+        <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
+          <DialogContent className="max-w-[95vw] rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> Templates</DialogTitle>
+            </DialogHeader>
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search templates..." value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)} className="pl-9 h-9 text-sm" />
+            </div>
+            <ScrollArea className="max-h-[50vh]">
+              <div className="space-y-2">
+                {filteredTemplates.map((t) => (
+                  <button key={t.id} onClick={() => handleTemplateSelect(t)}
+                    className="w-full text-left p-3 rounded-xl border border-border/50 active:bg-primary/10 transition-all">
+                    <div className="flex items-center justify-between mb-1"><span className="text-sm font-semibold">{t.name}</span><Badge variant="outline" className="text-[10px]">{t.category}</Badge></div>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{t.body}</p>
+                  </button>
+                ))}
+                {filteredTemplates.length === 0 && (
+                  <div className="text-center py-8"><FileText className="h-8 w-8 mx-auto text-muted-foreground/30 mb-2" /><p className="text-sm text-muted-foreground">No templates found</p></div>
+                )}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // ──────────────────────────────────────────────────────
+  // DESKTOP layout (unchanged)
+  // ──────────────────────────────────────────────────────
+  return (
+    <div className="relative flex flex-col h-full">
+      {/* Header */}
+      <div className="flex-shrink-0 px-5 py-3 border-b border-border flex items-center justify-between bg-card/95 backdrop-blur-md">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <div className="relative flex-shrink-0 cursor-pointer" onClick={onOpenContactInfo}>
+            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-sm">
               <span className="text-sm font-bold text-primary-foreground">
                 {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
               </span>
@@ -546,56 +808,23 @@ export function ChatWindow({
             <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${conversation.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
           </div>
           <div className="min-w-0 flex-1 cursor-pointer" onClick={onOpenContactInfo}>
-            <p className={`${isMobile ? "text-[15px]" : "text-sm"} font-semibold truncate leading-tight`}>{conversation.customer_name || conversation.customer_phone}</p>
+            <p className="text-sm font-semibold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
             <div className="flex items-center gap-1.5 mt-0.5">
-              {isMobile ? (
-                <>
-                  {conversation.status === "active" && <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
-                  <span className="text-[11px] text-muted-foreground">
-                    {conversation.status === "active" ? "Online" : conversation.customer_phone}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 border ${status.bg} ${status.color}`}>
-                    <StatusIcon className="h-2.5 w-2.5 mr-0.5" />{conversation.status}
-                  </Badge>
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground"><Phone className="h-3 w-3" />{conversation.customer_phone}</span>
-                </>
-              )}
+              <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 border ${status.bg} ${status.color}`}>
+                <StatusIcon className="h-2.5 w-2.5 mr-0.5" />{conversation.status}
+              </Badge>
+              <span className="flex items-center gap-1 text-[11px] text-muted-foreground"><Phone className="h-3 w-3" />{conversation.customer_phone}</span>
             </div>
           </div>
         </div>
-
         <div className="flex items-center gap-0 flex-shrink-0">
-          {isMobile && (
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full active:scale-95 transition-transform" onClick={openWhatsApp}>
-              <Phone className="h-4.5 w-4.5" />
-            </Button>
+          {onOpenContactInfo && (
+            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={onOpenContactInfo}><Info className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Contact info</TooltipContent></Tooltip>
           )}
-          {!isMobile && onOpenContactInfo && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={onOpenContactInfo}><Info className="h-4 w-4" /></Button>
-              </TooltipTrigger>
-              <TooltipContent>Contact info</TooltipContent>
-            </Tooltip>
-          )}
-          {!isMobile && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={openWhatsApp}><ExternalLink className="h-4 w-4" /></Button>
-              </TooltipTrigger>
-              <TooltipContent>Open in WhatsApp</TooltipContent>
-            </Tooltip>
-          )}
+          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={openWhatsApp}><ExternalLink className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Open in WhatsApp</TooltipContent></Tooltip>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className={`${isMobile ? "h-9 w-9 rounded-full" : "h-8 w-8 rounded-lg"} active:scale-95 transition-transform`}><MoreVertical className="h-4.5 w-4.5" /></Button>
-            </DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              {isMobile && <DropdownMenuItem onClick={openWhatsApp}><ExternalLink className="h-4 w-4 mr-2" /> Open in WhatsApp</DropdownMenuItem>}
-              {isMobile && onOpenContactInfo && <DropdownMenuItem onClick={onOpenContactInfo}><Info className="h-4 w-4 mr-2" /> Contact Info</DropdownMenuItem>}
               <DropdownMenuItem onClick={onResolve} className="text-emerald-500"><CheckCircle className="h-4 w-4 mr-2" /> Mark Resolved</DropdownMenuItem>
               {isAdmin && staff.length > 0 && (
                 <>
@@ -616,24 +845,20 @@ export function ChatWindow({
 
       {/* AI Suggestions */}
       {aiSuggestions.length > 0 && (
-        <div className={`flex-shrink-0 ${isMobile ? "px-3 py-2" : "px-5 py-3"} bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-amber-500/15`}>
+        <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-amber-500/15">
           <div className="flex items-center gap-2 mb-1.5">
             <div className="h-5 w-5 rounded-full bg-amber-500/15 flex items-center justify-center"><Sparkles className="h-3 w-3 text-amber-500" /></div>
             <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">AI</span>
             <Badge variant="outline" className="text-[9px] border-amber-500/30 text-amber-500">{aiSuggestions.length}</Badge>
           </div>
           <div className="space-y-1.5">
-            {aiSuggestions.slice(0, isMobile ? 1 : 5).map((s) => (
+            {aiSuggestions.slice(0, 5).map((s) => (
               <div key={s.id} className="flex items-start gap-2 p-2 rounded-lg bg-card/60 border border-border/50">
                 <p className="text-xs flex-1 text-foreground/80 leading-relaxed line-clamp-2">{s.suggested_response}</p>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <Badge variant="outline" className={`text-[9px] px-1.5 ${s.confidence === "high" ? "border-emerald-500/50 text-emerald-500" : s.confidence === "medium" ? "border-amber-500/50 text-amber-500" : "border-red-500/50 text-red-500"}`}>{s.confidence}</Badge>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-emerald-500/10 active:scale-95" onClick={() => onApproveAi(s.id, s.suggested_response)}>
-                    <Check className="h-4 w-4 text-emerald-500" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-destructive/10 active:scale-95" onClick={() => onRejectAi(s.id)}>
-                    <X className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-emerald-500/10" onClick={() => onApproveAi(s.id, s.suggested_response)}><Check className="h-4 w-4 text-emerald-500" /></Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-destructive/10" onClick={() => onRejectAi(s.id)}><X className="h-4 w-4 text-destructive" /></Button>
                 </div>
               </div>
             ))}
@@ -643,12 +868,12 @@ export function ChatWindow({
 
       {/* Messages */}
       <div ref={scrollRef} onScroll={handleScroll}
-        className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${isMobile ? "px-2.5" : "px-5"} py-2 bg-gradient-to-b from-muted/10 to-muted/5`}
+        className="flex-1 min-h-0 overflow-y-auto px-5 py-2 bg-gradient-to-b from-muted/10 to-muted/5"
         style={{ backgroundImage: "radial-gradient(circle at 20% 80%, hsl(var(--primary) / 0.02) 0%, transparent 50%), radial-gradient(circle at 80% 20%, hsl(var(--primary) / 0.02) 0%, transparent 50%)" }}>
         {messagesWithDates.map((item, i) => {
           if (item.type === "date" && item.date) return <DateSeparator key={`date-${i}`} date={item.date} />;
           if (item.type === "message" && item.msg) return (
-            <MessageBubble key={item.msg.id} msg={item.msg} isGrouped={!!item.isGrouped} isMobile={isMobile}
+            <MessageBubble key={item.msg.id} msg={item.msg} isGrouped={!!item.isGrouped} isMobile={false}
               allMessages={messages} onReply={handleReply} onReact={handleReact} />
           );
           return null;
@@ -666,7 +891,7 @@ export function ChatWindow({
 
       {/* Scroll to bottom */}
       {showScrollDown && (
-        <div className={`absolute z-10 ${isMobile ? "bottom-[72px] right-3" : "bottom-24 right-8"}`}>
+        <div className="absolute z-10 bottom-24 right-8">
           <Button size="icon" variant="secondary" className="h-9 w-9 rounded-full shadow-lg" onClick={scrollToBottom}><ArrowDown className="h-4 w-4" /></Button>
         </div>
       )}
@@ -707,87 +932,62 @@ export function ChatWindow({
       )}
 
       {/* Input Area */}
-      <div className={`flex-shrink-0 ${isMobile ? "px-2 py-2" : "px-4 py-3"} border-t border-border bg-card/95 backdrop-blur-md`} style={isMobile ? { paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' } : undefined}>
+      <div className="flex-shrink-0 px-4 py-3 border-t border-border bg-card/95 backdrop-blur-md">
         {uploading && (
           <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-primary/5 border border-primary/20">
             <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
             <span className="text-xs text-primary font-medium">Uploading...</span>
           </div>
         )}
-
         {isRecording ? (
           <div className="flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
-            <Button variant="ghost" size="icon" className="h-11 w-11 rounded-full text-destructive active:bg-destructive/10 active:scale-95 transition-transform" onClick={cancelRecording}>
-              <Trash2 className="h-5 w-5" />
-            </Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-destructive" onClick={cancelRecording}><Trash2 className="h-5 w-5" /></Button>
             <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-full bg-muted/30">
               <div className="flex items-center gap-1.5">
-                <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse shadow-sm shadow-red-500/50" />
+                <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
                 <span className="text-sm font-semibold tabular-nums text-destructive min-w-[40px]">{formatRecordingTime(recordingTime)}</span>
               </div>
               <div className="flex items-center gap-[2px] flex-1 h-[24px]">
-                {Array.from({ length: isMobile ? 20 : 36 }).map((_, i) => (
+                {Array.from({ length: 36 }).map((_, i) => (
                   <div key={i} className="flex-1 rounded-full bg-destructive/60"
                     style={{ height: `${20 + Math.random() * 80}%`, minWidth: 2, animation: `pulse ${0.3 + Math.random() * 0.7}s ease-in-out infinite alternate`, animationDelay: `${i * 0.05}s` }} />
                 ))}
               </div>
             </div>
-            <Button size="icon" className="h-11 w-11 rounded-full bg-primary hover:bg-primary/90 shadow-md shadow-primary/30 transition-transform active:scale-90" onClick={stopRecording}>
-              <Send className="h-5 w-5" />
-            </Button>
+            <Button size="icon" className="h-9 w-9 rounded-full bg-primary hover:bg-primary/90 shadow-md" onClick={stopRecording}><Send className="h-5 w-5" /></Button>
           </div>
         ) : (
           <div className="flex items-end gap-1">
             <DropdownMenu open={showAttachMenu} onOpenChange={setShowAttachMenu}>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className={`${isMobile ? "h-11 w-11" : "h-9 w-9"} flex-shrink-0 rounded-full active:scale-95 transition-transform`} disabled={uploading}>
-                  <Paperclip className={`${isMobile ? "h-5.5 w-5.5" : "h-5 w-5"} text-muted-foreground`} />
-                </Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full" disabled={uploading}><Paperclip className="h-5 w-5 text-muted-foreground" /></Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className={`${isMobile ? "w-52" : "w-48"}`} side="top">
-                <DropdownMenuItem onClick={() => openFilePicker("image/*")} className={isMobile ? "py-3" : ""}><ImageIcon className="h-4 w-4 mr-2 text-blue-500" /> Photo</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openFilePicker("video/*")} className={isMobile ? "py-3" : ""}><Video className="h-4 w-4 mr-2 text-purple-500" /> Video</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openFilePicker("audio/*")} className={isMobile ? "py-3" : ""}><Mic className="h-4 w-4 mr-2 text-orange-500" /> Audio File</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")} className={isMobile ? "py-3" : ""}><FileText className="h-4 w-4 mr-2 text-emerald-500" /> Document</DropdownMenuItem>
+              <DropdownMenuContent align="start" className="w-48" side="top">
+                <DropdownMenuItem onClick={() => openFilePicker("image/*")}><ImageIcon className="h-4 w-4 mr-2 text-blue-500" /> Photo</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker("video/*")}><Video className="h-4 w-4 mr-2 text-purple-500" /> Video</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker("audio/*")}><Mic className="h-4 w-4 mr-2 text-orange-500" /> Audio File</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")}><FileText className="h-4 w-4 mr-2 text-emerald-500" /> Document</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className={isMobile ? "py-3" : ""} onClick={() => {
+                <DropdownMenuItem onClick={() => {
                   setShowAttachMenu(false);
-                  const input = document.createElement("input");
-                  input.type = "file"; input.accept = "image/*"; input.capture = "environment";
-                  input.onchange = (e) => { const file = (e.target as HTMLInputElement).files?.[0]; if (file) uploadAndSend(file, file.name, file.type); };
-                  input.click();
+                  const inp = document.createElement("input");
+                  inp.type = "file"; inp.accept = "image/*"; inp.capture = "environment";
+                  inp.onchange = (e) => { const file = (e.target as HTMLInputElement).files?.[0]; if (file) uploadAndSend(file, file.name, file.type); };
+                  inp.click();
                 }}><Camera className="h-4 w-4 mr-2 text-pink-500" /> Camera</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-
-            {!isMobile && (
-              <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full" onClick={() => setShowTemplates(true)}>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            )}
-
+            <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full" onClick={() => setShowTemplates(true)}><FileText className="h-4 w-4 text-muted-foreground" /></Button>
             <div className="flex-1 relative">
-              <Textarea
-                ref={inputRef}
-                placeholder={isMobile ? "Message..." : "Type a message... (/ for quick replies)"}
-                value={input}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                rows={1}
-                className={`${isMobile ? "min-h-[44px] text-[15px] py-2.5 px-4" : "min-h-[40px] text-sm"} max-h-[120px] resize-none rounded-full bg-muted/30 border-transparent focus:border-primary/30 focus:bg-background transition-colors`}
-              />
+              <Textarea ref={inputRef} placeholder="Type a message... (/ for quick replies)" value={input} onChange={handleInputChange} onKeyDown={handleKeyDown} rows={1}
+                className="min-h-[40px] max-h-[120px] text-sm resize-none rounded-full bg-muted/30 border-transparent focus:border-primary/30 focus:bg-background transition-colors" />
             </div>
-
             {input.trim() ? (
-              <Button size="icon"
-                className={`${isMobile ? "h-11 w-11" : "h-9 w-9"} flex-shrink-0 rounded-full bg-primary hover:bg-primary/90 shadow-sm shadow-primary/30 active:scale-90 transition-transform`}
-                onClick={handleSend} disabled={sending}>
+              <Button size="icon" className="h-9 w-9 flex-shrink-0 rounded-full bg-primary hover:bg-primary/90 shadow-sm" onClick={handleSend} disabled={sending}>
                 <Send className={`h-5 w-5 ${sending ? "animate-pulse" : ""}`} />
               </Button>
             ) : (
-              <Button size="icon" variant="ghost"
-                className={`${isMobile ? "h-11 w-11" : "h-9 w-9"} flex-shrink-0 rounded-full text-primary hover:bg-primary/10 active:scale-90 transition-transform`}
-                onClick={startRecording}>
+              <Button size="icon" variant="ghost" className="h-9 w-9 flex-shrink-0 rounded-full text-primary hover:bg-primary/10" onClick={startRecording}>
                 <Mic className="h-5 w-5" />
               </Button>
             )}
@@ -797,7 +997,7 @@ export function ChatWindow({
 
       {/* Templates Dialog */}
       <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
-        <DialogContent className={isMobile ? "max-w-[95vw] rounded-2xl" : "max-w-lg"}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> Templates</DialogTitle>
           </DialogHeader>
@@ -809,7 +1009,7 @@ export function ChatWindow({
             <div className="space-y-2">
               {filteredTemplates.map((t) => (
                 <button key={t.id} onClick={() => handleTemplateSelect(t)}
-                  className="w-full text-left p-3 rounded-xl border border-border/50 hover:border-primary/30 active:bg-primary/10 hover:bg-primary/5 transition-all group">
+                  className="w-full text-left p-3 rounded-xl border border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all group">
                   <div className="flex items-center justify-between mb-1"><span className="text-sm font-semibold group-hover:text-primary">{t.name}</span><Badge variant="outline" className="text-[10px]">{t.category}</Badge></div>
                   <p className="text-xs text-muted-foreground line-clamp-2">{t.body}</p>
                 </button>
