@@ -882,7 +882,6 @@ export function ChatWindow({
       {/* Messages */}
       <div ref={scrollRef} onScroll={handleScroll}
         className="flex-1 min-h-0 overflow-y-auto px-5 py-2 wa-chat-bg relative">
-        style={{ backgroundImage: "radial-gradient(circle at 20% 80%, hsl(var(--primary) / 0.02) 0%, transparent 50%), radial-gradient(circle at 80% 20%, hsl(var(--primary) / 0.02) 0%, transparent 50%)" }}>
         {messagesWithDates.map((item, i) => {
           if (item.type === "date" && item.date) return <DateSeparator key={`date-${i}`} date={item.date} />;
           if (item.type === "message" && item.msg) return (
