@@ -528,7 +528,7 @@ export function ChatWindow({
   const StatusIcon = status.icon;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className={`flex flex-col ${isMobile ? "h-full max-h-full" : "h-full"} relative overflow-hidden`}>
       {/* Header */}
       <div className={`${isMobile ? "px-2 py-2 safe-area-top" : "px-5 py-3"} border-b border-border flex items-center justify-between bg-card/95 backdrop-blur-md`}>
         <div className="flex items-center gap-2 min-w-0 flex-1">
