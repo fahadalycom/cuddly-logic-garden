@@ -13,7 +13,7 @@ import {
   Phone, ExternalLink, Copy, Clock, Search, Bell, BellOff, Volume2,
   ArrowDown, Shield, Zap, MessageSquare, Download, Loader2, Eye, File,
   ArrowLeft, Camera, StopCircle, Trash2, Reply, Smile, Info, CornerDownRight,
-  Forward
+  Forward, ChevronDown
 } from "lucide-react";
 import { useNotifications } from "@/hooks/useNotifications";
 import { Switch } from "@/components/ui/switch";
@@ -41,7 +41,6 @@ interface ChatWindowProps {
 }
 
 const mediaBlobCache = new Map<string, string>();
-
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "🙏", "👏"];
 
 function getMediaTypeIcon(mediaType: string) {
@@ -91,22 +90,22 @@ function LazyMedia({ mediaKey, mediaType, mimeType, filename, isMobile }: {
   if (blobUrl) {
     if (mediaType === "image" || mediaType === "sticker") {
       return (
-        <div className="rounded-lg overflow-hidden mb-1.5 -mx-1 -mt-0.5 relative group/media">
-          <img src={blobUrl} alt="" className="max-w-full object-cover" style={{ maxHeight: isMobile ? 200 : 280 }} />
+        <div className="rounded-xl overflow-hidden mb-1.5 -mx-1 -mt-0.5 relative group/media">
+          <img src={blobUrl} alt="" className="max-w-full object-cover" style={{ maxHeight: isMobile ? 220 : 280 }} />
           <a href={blobUrl} download={filename || `media.${mimeType?.split("/")[1] || "jpg"}`}
-            className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover/media:opacity-100 active:opacity-100 transition-opacity">
+            className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover/media:opacity-100 active:opacity-100 transition-all">
             <Download className="h-4 w-4 text-white" />
           </a>
         </div>
       );
     }
     if (mediaType === "video") {
-      return <div className="rounded-lg overflow-hidden mb-1.5 -mx-1 -mt-0.5"><video src={blobUrl} controls className="max-w-full" style={{ maxHeight: isMobile ? 200 : 280 }} /></div>;
+      return <div className="rounded-xl overflow-hidden mb-1.5 -mx-1 -mt-0.5"><video src={blobUrl} controls className="max-w-full" style={{ maxHeight: isMobile ? 220 : 280 }} /></div>;
     }
     if (mediaType === "audio") return null;
     return (
-      <a href={blobUrl} download={filename || "document"} className="flex items-center gap-3 p-2.5 bg-background/10 rounded-lg mb-1.5 hover:bg-background/20 active:bg-background/30 transition-colors">
-        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0"><FileText className="h-5 w-5 text-primary" /></div>
+      <a href={blobUrl} download={filename || "document"} className="flex items-center gap-3 p-3 bg-background/10 rounded-xl mb-1.5 hover:bg-background/20 active:bg-background/30 transition-colors">
+        <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0"><FileText className="h-5 w-5 text-primary" /></div>
         <div className="min-w-0 flex-1"><p className="text-xs font-medium truncate">{filename || "Document"}</p><p className="text-[10px] opacity-60">{mimeType || "file"}</p></div>
         <Download className="h-4 w-4 opacity-50" />
       </a>
@@ -115,8 +114,8 @@ function LazyMedia({ mediaKey, mediaType, mimeType, filename, isMobile }: {
 
   return (
     <button onClick={loadMedia} disabled={loading}
-      className="flex items-center gap-3 p-3 rounded-lg mb-1.5 w-full text-left transition-all border border-dashed border-border/60 hover:border-primary/40 active:border-primary/60 hover:bg-primary/5 disabled:opacity-60">
-      <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0">
+      className="flex items-center gap-3 p-3 rounded-xl mb-1.5 w-full text-left transition-all border border-dashed border-border/60 hover:border-primary/40 active:border-primary/60 hover:bg-primary/5 disabled:opacity-60">
+      <div className="h-11 w-11 rounded-xl bg-muted/50 flex items-center justify-center flex-shrink-0">
         {loading ? <Loader2 className="h-5 w-5 text-primary animate-spin" /> : <TypeIcon className="h-5 w-5 text-muted-foreground" />}
       </div>
       <div className="min-w-0 flex-1">
@@ -134,10 +133,8 @@ function DateSeparator({ date }: { date: Date }) {
   else if (isYesterday(date)) label = "Yesterday";
   else label = format(date, "EEEE, MMMM d, yyyy");
   return (
-    <div className="flex items-center gap-3 py-3">
-      <div className="flex-1 h-px bg-border/50" />
-      <span className="text-[10px] font-semibold text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">{label}</span>
-      <div className="flex-1 h-px bg-border/50" />
+    <div className="flex items-center justify-center py-3">
+      <span className="text-[10px] font-semibold text-muted-foreground bg-card/80 backdrop-blur-sm px-4 py-1.5 rounded-full shadow-sm border border-border/30">{label}</span>
     </div>
   );
 }
@@ -157,14 +154,13 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
   const isFailed = msg._failed;
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Check if message is emoji-only (1-3 emojis, no other text)
   const emojiRegex = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\u{FE0F}\u{200D}]{1,6}$/u;
   const isEmojiOnly = msg.content && emojiRegex.test(msg.content.trim()) && !msg.media_url;
 
   if (isSystem) {
     return (
-      <div className="flex justify-center py-1">
-        <span className="text-[10px] text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">{msg.content}</span>
+      <div className="flex justify-center py-1.5">
+        <span className="text-[10px] text-muted-foreground bg-card/70 backdrop-blur-sm px-4 py-1 rounded-full border border-border/20 shadow-sm">{msg.content}</span>
       </div>
     );
   }
@@ -177,7 +173,6 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
   const hasMedia = msg.media_url && msg.media_type !== "text";
   const isVoiceNote = msg.media_type === "audio";
   const maxW = isMobile ? "max-w-[82vw]" : "max-w-[70%]";
-
   const repliedMsg = msg.reply_to_message_id ? allMessages.find(m => m.id === msg.reply_to_message_id) : null;
 
   const reactions: { emoji: string; count: number }[] = [];
@@ -193,110 +188,164 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
   };
   const handleTouchEnd = () => { if (longPressRef.current) clearTimeout(longPressRef.current); };
 
-  // Show tail on first message of a group
   const showTail = !isGrouped;
 
   return (
-    <div className={`flex ${isCustomer ? "justify-start" : "justify-end"} ${isGrouped ? "mt-0.5" : isMobile ? "mt-2" : "mt-3"} group animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ${isSending ? "opacity-70" : ""}`}>
+    <div className={`flex ${isCustomer ? "justify-start" : "justify-end"} ${isGrouped ? "mt-[3px]" : isMobile ? "mt-2.5" : "mt-3"} group ${isSending ? "opacity-70" : ""}`}>
       <div className={`relative ${maxW}`}
         onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchCancel={handleTouchEnd}>
 
+        {/* Reply quote */}
         {repliedMsg && (
-          <div className={`mb-1 px-3 py-1.5 rounded-lg border-l-2 ${isCustomer ? "border-l-primary bg-muted/30" : "border-l-primary-foreground/30 bg-primary/20"} cursor-pointer`}>
-            <p className="text-[10px] font-medium text-muted-foreground">{repliedMsg.sender_type === "customer" ? "Customer" : "You"}</p>
-            <p className="text-[11px] line-clamp-1 opacity-80">{repliedMsg.content || `[${repliedMsg.media_type}]`}</p>
+          <div className={`mb-1 rounded-xl overflow-hidden ${isCustomer ? "mr-4" : "ml-4"}`}>
+            <div className={`px-3 py-2 flex items-start gap-2 ${isCustomer ? "bg-muted/40 border-l-[3px] border-l-primary" : "bg-foreground/5 border-l-[3px] border-l-foreground/20"}`}>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold text-primary">{repliedMsg.sender_type === "customer" ? "Customer" : "You"}</p>
+                <p className="text-[11px] line-clamp-2 opacity-70 leading-tight mt-0.5">{repliedMsg.content || `[${repliedMsg.media_type}]`}</p>
+              </div>
+            </div>
           </div>
         )}
 
-        <div className={`${isMobile ? "rounded-[18px] px-3 py-2" : "rounded-2xl px-3.5 py-2"} relative shadow-sm ${
+        {/* Bubble */}
+        <div className={`relative ${isMobile ? "rounded-[20px] px-3.5 py-2.5" : "rounded-2xl px-4 py-2.5"} ${
           isEmojiOnly ? "wa-emoji-only" :
           isFailed
-            ? "bg-destructive/10 border border-destructive/30 text-foreground rounded-tr-sm"
+            ? "bg-destructive/10 border border-destructive/30 text-foreground rounded-tr-md"
             : isCustomer
-            ? `bg-card border border-border/60 ${showTail ? "rounded-tl-sm" : ""}`
+            ? `wa-bubble-incoming ${showTail ? (isMobile ? "rounded-tl-md" : "rounded-tl-md") : ""}`
             : isAi
-            ? `bg-gradient-to-br from-amber-500/15 to-amber-600/10 border border-amber-500/20 text-foreground ${showTail ? "rounded-tr-sm" : ""}`
-            : `wa-bubble-outgoing ${showTail ? "rounded-tr-sm" : ""} shadow-sm`
+            ? `wa-bubble-ai ${showTail ? "rounded-tr-md" : ""}`
+            : `wa-bubble-outgoing ${showTail ? "rounded-tr-md" : ""}`
         } ${showTail && isCustomer && !isEmojiOnly ? "wa-bubble-tail-left" : ""} ${showTail && !isCustomer && !isAi && !isEmojiOnly ? "wa-bubble-tail-right" : ""}`}>
+          
+          {/* AI label */}
           {isAi && !isGrouped && (
-            <div className="flex items-center gap-1.5 mb-1">
-              <div className="h-4 w-4 rounded-full bg-amber-500/20 flex items-center justify-center"><Bot className="h-2.5 w-2.5 text-amber-500" /></div>
-              <span className="text-[10px] font-semibold text-amber-500">AI</span>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="h-[18px] w-[18px] rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
+                <Sparkles className="h-2.5 w-2.5 text-white" />
+              </div>
+              <span className="text-[10px] font-bold text-amber-500 tracking-wide uppercase">AI Assistant</span>
             </div>
           )}
+
+          {/* Media */}
           {isVoiceNote && msg.media_url ? (
             <VoiceNotePlayer mediaKey={msg.media_url} mimeType={msg.media_mime_type} isOutgoing={!isCustomer && !isAi} isMobile={isMobile} />
           ) : hasMedia ? (
             <LazyMedia mediaKey={msg.media_url} mediaType={msg.media_type} mimeType={msg.media_mime_type} filename={msg.media_filename} isMobile={isMobile} />
           ) : null}
-          {msg.content && !isVoiceNote && <p className={`${isMobile ? "text-[14px]" : "text-[13px]"} leading-relaxed whitespace-pre-wrap break-words`}>{msg.content}</p>}
-          <div className="flex items-center justify-end gap-1 mt-0.5">
-            {isFailed && <span className="text-[10px] text-destructive font-medium mr-1">Failed</span>}
-            <span className={`text-[10px] ${isCustomer ? "text-muted-foreground" : "opacity-60"}`}>{format(new Date(msg.created_at), "HH:mm")}</span>
+
+          {/* Text content */}
+          {msg.content && !isVoiceNote && (
+            <p className={`${isMobile ? "text-[14.5px]" : "text-[13.5px]"} leading-[1.45] whitespace-pre-wrap break-words`}>
+              {msg.content}
+            </p>
+          )}
+
+          {/* Time + status */}
+          <div className="flex items-center justify-end gap-1.5 mt-1 -mb-0.5">
+            {isFailed && <span className="text-[9px] text-destructive font-bold mr-1">Failed</span>}
+            <span className={`text-[10px] ${isCustomer ? "text-muted-foreground/70" : "opacity-50"}`}>
+              {format(new Date(msg.created_at), "HH:mm")}
+            </span>
             {!isCustomer && !isAi && (
               isSending
-                ? <Clock className="h-3 w-3 opacity-50 animate-pulse" />
+                ? <Clock className="h-3 w-3 opacity-40 animate-pulse" />
                 : isFailed
                 ? <X className="h-3 w-3 text-destructive" />
-                : <CheckCheck className={`h-3 w-3 ${msg.is_read ? "text-blue-400" : "opacity-50"}`} />
+                : <CheckCheck className={`h-3.5 w-3.5 ${msg.is_read ? "text-blue-400" : "opacity-40"}`} />
             )}
           </div>
         </div>
 
+        {/* Reactions */}
         {reactions.length > 0 && (
-          <div className={`flex gap-0.5 mt-0.5 ${isCustomer ? "justify-start" : "justify-end"}`}>
+          <div className={`flex gap-1 -mt-1.5 relative z-[1] ${isCustomer ? "justify-start ml-2" : "justify-end mr-2"}`}>
             {reactions.map((r, i) => (
-              <span key={i} className="text-xs bg-muted/60 border border-border/50 rounded-full px-1.5 py-0.5 cursor-pointer hover:bg-muted transition-colors">
-                {r.emoji} {r.count > 1 && <span className="text-[9px] text-muted-foreground">{r.count}</span>}
+              <span key={i} className="text-xs bg-card border border-border/50 rounded-full px-2 py-0.5 shadow-sm cursor-pointer hover:shadow-md transition-all">
+                {r.emoji} {r.count > 1 && <span className="text-[9px] text-muted-foreground ml-0.5">{r.count}</span>}
               </span>
             ))}
           </div>
         )}
 
-        {/* Desktop hover actions — floating pill */}
+        {/* Desktop hover actions */}
         {!isMobile && !isSending && (
-          <div className={`absolute top-1 ${isCustomer ? "-right-24" : "-left-24"} hidden group-hover:flex gap-0.5 items-center bg-card/90 backdrop-blur-sm border border-border/60 rounded-full px-1 py-0.5 shadow-lg transition-all`}>
-            <button onClick={() => onReply(msg)} className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-muted" title="Reply">
-              <Reply className="h-3 w-3 text-muted-foreground" />
+          <div className={`absolute top-1 ${isCustomer ? "-right-[7rem]" : "-left-[7rem]"} hidden group-hover:flex gap-0.5 items-center wa-action-pill`}>
+            <button onClick={() => onReply(msg)} className="h-7 w-7 rounded-full flex items-center justify-center hover:bg-muted/80 transition-colors" title="Reply">
+              <Reply className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
-            <button onClick={() => setShowReactions(!showReactions)} className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-muted" title="React">
-              <Smile className="h-3 w-3 text-muted-foreground" />
+            <button onClick={() => setShowReactions(!showReactions)} className="h-7 w-7 rounded-full flex items-center justify-center hover:bg-muted/80 transition-colors" title="React">
+              <Smile className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
-            <button onClick={handleCopy} className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-muted" title="Copy">
-              <Copy className="h-3 w-3 text-muted-foreground" />
+            <button onClick={handleCopy} className="h-7 w-7 rounded-full flex items-center justify-center hover:bg-muted/80 transition-colors" title="Copy">
+              <Copy className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
-            <button onClick={() => toast.info("Forward coming soon")} className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-muted" title="Forward">
-              <Forward className="h-3 w-3 text-muted-foreground" />
+            <button onClick={() => toast.info("Forward coming soon")} className="h-7 w-7 rounded-full flex items-center justify-center hover:bg-muted/80 transition-colors" title="Forward">
+              <Forward className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
           </div>
         )}
 
-        {/* Mobile long-press action sheet */}
+        {/* Mobile long-press — bottom sheet overlay */}
         {isMobile && showMobileActions && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setShowMobileActions(false)} />
-            <div className={`absolute z-50 ${isCustomer ? "left-0" : "right-0"} bottom-full mb-1 animate-in fade-in scale-in-95 duration-150`}>
-              <div className="flex gap-1 bg-card border border-border rounded-2xl px-2 py-1.5 shadow-xl">
-                {QUICK_REACTIONS.map(emoji => (
-                  <button key={emoji} onClick={() => { onReact(msg.id, emoji); setShowMobileActions(false); }}
-                    className="h-9 w-9 rounded-full hover:bg-muted flex items-center justify-center text-lg active:scale-110 transition-transform">
-                    {emoji}
+            <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-[2px]" onClick={() => setShowMobileActions(false)} />
+            <div className="fixed inset-x-0 bottom-0 z-[61] wa-bottom-sheet">
+              <div className="bg-card border-t border-border/50 rounded-t-3xl shadow-2xl overflow-hidden"
+                style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                {/* Drag handle */}
+                <div className="flex justify-center pt-3 pb-2">
+                  <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
+                </div>
+
+                {/* Quick reactions */}
+                <div className="flex justify-center gap-2 px-6 pb-3">
+                  {QUICK_REACTIONS.map((emoji, i) => (
+                    <button key={emoji} onClick={() => { onReact(msg.id, emoji); setShowMobileActions(false); }}
+                      className="h-12 w-12 rounded-2xl bg-muted/50 hover:bg-muted flex items-center justify-center text-2xl active:scale-110 transition-all"
+                      style={{ animationDelay: `${i * 40}ms` }}>
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="h-px bg-border/50 mx-4" />
+
+                {/* Action items */}
+                <div className="px-2 py-2">
+                  <button onClick={() => { onReply(msg); setShowMobileActions(false); }}
+                    className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl active:bg-muted/50 transition-colors">
+                    <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                      <Reply className="h-5 w-5 text-blue-500" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium">Reply</p>
+                      <p className="text-[11px] text-muted-foreground">Reply to this message</p>
+                    </div>
                   </button>
-                ))}
-              </div>
-              <div className="flex gap-1 mt-1 bg-card border border-border rounded-xl px-1 py-1 shadow-xl">
-                <button onClick={() => { onReply(msg); setShowMobileActions(false); }}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg active:bg-muted transition-colors flex-1">
-                  <Reply className="h-4 w-4 text-muted-foreground" /><span className="text-xs font-medium">Reply</span>
-                </button>
-                <button onClick={handleCopy}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg active:bg-muted transition-colors flex-1">
-                  <Copy className="h-4 w-4 text-muted-foreground" /><span className="text-xs font-medium">Copy</span>
-                </button>
-                <button onClick={() => { toast.info("Forward coming soon"); setShowMobileActions(false); }}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg active:bg-muted transition-colors flex-1">
-                  <Forward className="h-4 w-4 text-muted-foreground" /><span className="text-xs font-medium">Forward</span>
-                </button>
+                  <button onClick={handleCopy}
+                    className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl active:bg-muted/50 transition-colors">
+                    <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                      <Copy className="h-5 w-5 text-emerald-500" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium">Copy</p>
+                      <p className="text-[11px] text-muted-foreground">Copy message text</p>
+                    </div>
+                  </button>
+                  <button onClick={() => { toast.info("Forward coming soon"); setShowMobileActions(false); }}
+                    className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl active:bg-muted/50 transition-colors">
+                    <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                      <Forward className="h-5 w-5 text-purple-500" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium">Forward</p>
+                      <p className="text-[11px] text-muted-foreground">Forward to another chat</p>
+                    </div>
+                  </button>
+                </div>
               </div>
             </div>
           </>
@@ -304,10 +353,10 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
 
         {/* Desktop reactions picker */}
         {!isMobile && showReactions && (
-          <div className={`absolute ${isCustomer ? "left-0" : "right-0"} -top-10 flex gap-0.5 bg-card border border-border rounded-full px-2 py-1 shadow-lg z-10 animate-in fade-in scale-in-95 duration-150`}>
+          <div className={`absolute ${isCustomer ? "left-0" : "right-0"} -top-11 flex gap-0.5 bg-card/95 backdrop-blur-md border border-border/50 rounded-full px-2 py-1 shadow-xl z-10 animate-in fade-in scale-in-95 duration-150`}>
             {QUICK_REACTIONS.map(emoji => (
               <button key={emoji} onClick={() => { onReact(msg.id, emoji); setShowReactions(false); }}
-                className="h-7 w-7 rounded-full hover:bg-muted flex items-center justify-center text-base transition-transform hover:scale-125">
+                className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center text-base transition-transform hover:scale-125">
                 {emoji}
               </button>
             ))}
@@ -323,7 +372,7 @@ function MobileNotifButton() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="h-10 w-10 rounded-full flex items-center justify-center active:bg-muted transition-colors">
+        <button className="wa-header-btn">
           {notifEnabled || soundEnabled ? <Bell className="h-[18px] w-[18px]" /> : <BellOff className="h-[18px] w-[18px] text-muted-foreground" />}
         </button>
       </DropdownMenuTrigger>
@@ -385,13 +434,8 @@ export function ChatWindow({
     const replyId = replyTo?.id;
     setReplyTo(null);
     setSending(true);
-    try {
-      await onSend(msg, undefined, undefined, undefined, undefined, replyId);
-    } catch {
-    } finally {
-      setSending(false);
-      inputRef.current?.focus();
-    }
+    try { await onSend(msg, undefined, undefined, undefined, undefined, replyId); }
+    catch {} finally { setSending(false); inputRef.current?.focus(); }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -402,18 +446,13 @@ export function ChatWindow({
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInput(val);
-    // Slash command detection
     if (val === "/") setShowSlashMenu(true);
     else if (!val.startsWith("/")) setShowSlashMenu(false);
   };
 
-  const handleReply = (msg: any) => {
-    setReplyTo(msg);
-    inputRef.current?.focus();
-  };
+  const handleReply = (msg: any) => { setReplyTo(msg); inputRef.current?.focus(); };
 
   const handleReact = async (msgId: string, emoji: string) => {
-    // Update reactions in DB
     const msg = messages.find(m => m.id === msgId);
     if (!msg) return;
     const currentReactions = Array.isArray(msg.reactions) ? [...msg.reactions] : [];
@@ -433,17 +472,14 @@ export function ChatWindow({
         binary += String.fromCharCode(...chunk);
       }
       const base64 = btoa(binary);
-
       let mediaType = "document";
       if (mimeType.startsWith("image/")) mediaType = "image";
       else if (mimeType.startsWith("video/")) mediaType = "video";
       else if (mimeType.startsWith("audio/")) mediaType = "audio";
-
       const { data, error } = await supabase.functions.invoke("whatsapp-media", {
         body: { data: base64, mime_type: mimeType, filename },
       });
       if (error) throw error;
-
       const caption = input.trim() || undefined;
       await onSend(caption || "", data.key, mediaType, mimeType, filename);
       setInput("");
@@ -451,9 +487,7 @@ export function ChatWindow({
     } catch (err: any) {
       console.error("Upload error:", err);
       toast.error("Failed to upload");
-    } finally {
-      setUploading(false);
-    }
+    } finally { setUploading(false); }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -473,20 +507,16 @@ export function ChatWindow({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const preferredMime = MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")
-        ? "audio/ogg;codecs=opus"
-        : MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : undefined;
+        ? "audio/ogg;codecs=opus" : MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus" : undefined;
       const recorder = new MediaRecorder(stream, preferredMime ? { mimeType: preferredMime } : undefined);
       const actualMime = recorder.mimeType || preferredMime || "audio/webm";
       audioChunksRef.current = [];
-
       recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
         const recordedBlob = new Blob(audioChunksRef.current, { type: actualMime });
         if (recordedBlob.size === 0) { toast.error("Recording failed — no audio captured"); return; }
-
         try {
           const { normalizeVoiceNote } = await import("@/lib/voice-note");
           const normalized = await normalizeVoiceNote(recordedBlob, actualMime);
@@ -496,15 +526,12 @@ export function ChatWindow({
           toast.error("Voice note convert nahi hui — please dubara try karein");
         }
       };
-
       recorder.start();
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
       setRecordingTime(0);
       recordingTimerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
-    } catch (err) {
-      toast.error("Microphone access denied");
-    }
+    } catch (err) { toast.error("Microphone access denied"); }
   };
 
   const stopRecording = () => {
@@ -544,7 +571,6 @@ export function ChatWindow({
     (t) => t.name.toLowerCase().includes(templateSearch.toLowerCase()) || t.body.toLowerCase().includes(templateSearch.toLowerCase())
   );
 
-  // Slash-filtered templates
   const slashFiltered = templates.filter(t => {
     const q = input.slice(1).toLowerCase();
     return !q || t.name.toLowerCase().includes(q) || t.body.toLowerCase().includes(q);
@@ -562,82 +588,91 @@ export function ChatWindow({
     lastSender = msg.sender_type;
   });
 
-  const statusConfig: Record<string, { color: string; bg: string; icon: any }> = {
-    active: { color: "text-emerald-500", bg: "bg-emerald-500/10 border-emerald-500/20", icon: Zap },
-    waiting: { color: "text-amber-500", bg: "bg-amber-500/10 border-amber-500/20", icon: Clock },
-    resolved: { color: "text-muted-foreground", bg: "bg-muted/50 border-border", icon: CheckCircle },
-    archived: { color: "text-muted-foreground", bg: "bg-muted/50 border-border", icon: Shield },
+  const statusConfig: Record<string, { color: string; bg: string; label: string; icon: any }> = {
+    active: { color: "text-emerald-400", bg: "bg-emerald-500/15 border-emerald-500/30", label: "Active", icon: Zap },
+    waiting: { color: "text-amber-400", bg: "bg-amber-500/15 border-amber-500/30", label: "Waiting", icon: Clock },
+    resolved: { color: "text-muted-foreground", bg: "bg-muted/50 border-border", label: "Resolved", icon: CheckCircle },
+    archived: { color: "text-muted-foreground", bg: "bg-muted/50 border-border", label: "Archived", icon: Shield },
   };
   const status = statusConfig[conversation.status] || statusConfig.active;
   const StatusIcon = status.icon;
 
   // ──────────────────────────────────────────────────────
-  // MOBILE: absolute-positioned header / messages / input
+  // MOBILE LAYOUT
   // ──────────────────────────────────────────────────────
   if (isMobile) {
     return (
       <div className="flex h-full max-h-full flex-col overflow-hidden overscroll-none bg-background">
-        {/* ── HEADER ── */}
-        <div className="flex-shrink-0 px-1 flex items-center justify-between border-b border-border bg-gradient-to-r from-card/95 to-card/90 backdrop-blur-md z-20"
-          style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))', paddingBottom: '0.5rem', borderBottom: '1px solid hsl(var(--border))' }}>
-          <div className="flex items-center gap-1 min-w-0 flex-1">
-            {onBack && (
-              <button className="h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted transition-colors" onClick={onBack}>
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-            )}
-            <div className="relative flex-shrink-0">
-              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center ring-2 ring-emerald-500/20">
-                <span className="text-sm font-bold text-white">
-                  {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card ${conversation.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[14px] font-semibold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
-              <div className="flex items-center gap-1.5">
-                <Badge variant="outline" className={`text-[8px] px-1 py-0 h-3.5 border ${status.bg} ${status.color}`}>
-                  <StatusIcon className="h-2 w-2 mr-0.5" />{conversation.status}
-                </Badge>
-                <span className="text-[10px] text-muted-foreground truncate">
-                  {conversation.status === "active" ? "online" : conversation.last_message_at ? new Date(conversation.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center flex-shrink-0 gap-0.5 pr-1">
-            <MobileNotifButton />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="h-10 w-10 rounded-full flex items-center justify-center active:bg-muted transition-colors">
-                  <MoreVertical className="h-[18px] w-[18px]" />
+        {/* ── PREMIUM HEADER ── */}
+        <div className="flex-shrink-0 wa-mobile-header z-20"
+          style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))' }}>
+          <div className="flex items-center justify-between px-2 pb-2.5 pt-1">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              {onBack && (
+                <button className="h-9 w-9 flex-shrink-0 rounded-full flex items-center justify-center active:bg-foreground/5 transition-colors" onClick={onBack}>
+                  <ArrowLeft className="h-5 w-5" />
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuItem onClick={onOpenContactInfo} className="py-2.5">
-                  <Info className="h-4 w-4 mr-2" /> Contact Info
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onResolve} className="py-2.5 text-emerald-500">
-                  <CheckCircle className="h-4 w-4 mr-2" /> Mark Resolved
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={openWhatsApp} className="py-2.5">
-                  <ExternalLink className="h-4 w-4 mr-2" /> Open in WhatsApp
-                </DropdownMenuItem>
-                {isAdmin && staff.length > 0 && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Assign Agent</DropdownMenuLabel>
-                    {staff.map((s) => (
-                      <DropdownMenuItem key={s.id} onClick={() => onAssign(conversation.id, s.user_id)} className="py-2">
-                        <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center mr-2 text-[10px] font-bold text-primary">{s.full_name?.charAt(0)}</div>
-                        {s.full_name}
-                      </DropdownMenuItem>
-                    ))}
-                  </>
+              )}
+              <div className="relative flex-shrink-0" onClick={onOpenContactInfo}>
+                <div className="wa-avatar-ring">
+                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-md">
+                    <span className="text-sm font-bold text-white">
+                      {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+                {conversation.status === "active" && (
+                  <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-emerald-500 wa-online-pulse" />
                 )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </div>
+              <div className="min-w-0 flex-1" onClick={onOpenContactInfo}>
+                <p className="text-[15px] font-bold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 border font-semibold ${status.bg} ${status.color}`}>
+                    <StatusIcon className="h-2.5 w-2.5 mr-0.5" />{status.label}
+                  </Badge>
+                  {conversation.status === "active" && (
+                    <span className="text-[10px] text-emerald-500 font-medium">online</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center flex-shrink-0 gap-0.5 pr-0.5">
+              <MobileNotifButton />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="wa-header-btn">
+                    <MoreVertical className="h-[18px] w-[18px]" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 rounded-xl">
+                  <DropdownMenuItem onClick={onOpenContactInfo} className="py-3 gap-3">
+                    <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center"><Info className="h-4 w-4 text-blue-500" /></div>
+                    <div><p className="text-sm font-medium">Contact Info</p><p className="text-[10px] text-muted-foreground">View details & history</p></div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onResolve} className="py-3 gap-3">
+                    <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center"><CheckCircle className="h-4 w-4 text-emerald-500" /></div>
+                    <div><p className="text-sm font-medium text-emerald-500">Mark Resolved</p><p className="text-[10px] text-muted-foreground">Close this conversation</p></div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={openWhatsApp} className="py-3 gap-3">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center"><ExternalLink className="h-4 w-4 text-primary" /></div>
+                    <div><p className="text-sm font-medium">Open in WhatsApp</p><p className="text-[10px] text-muted-foreground">Open native app</p></div>
+                  </DropdownMenuItem>
+                  {isAdmin && staff.length > 0 && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground px-3">Assign Agent</DropdownMenuLabel>
+                      {staff.map((s) => (
+                        <DropdownMenuItem key={s.id} onClick={() => onAssign(conversation.id, s.user_id)} className="py-2.5 gap-3">
+                          <div className="h-7 w-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">{s.full_name?.charAt(0)}</div>
+                          <span className="text-sm">{s.full_name}</span>
+                        </DropdownMenuItem>
+                      ))}
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
 
@@ -655,19 +690,27 @@ export function ChatWindow({
           })}
           {messages.length === 0 && (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center space-y-2">
-                <div className="h-14 w-14 rounded-2xl bg-muted/30 flex items-center justify-center mx-auto"><MessageSquare className="h-6 w-6 text-muted-foreground/30" /></div>
-                <p className="text-sm font-medium text-muted-foreground">No messages yet</p>
-                <p className="text-xs text-muted-foreground/60">Send a message to start</p>
+              <div className="text-center space-y-3">
+                <div className="relative mx-auto w-20 h-20">
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary/20 to-emerald-500/20 animate-pulse" />
+                  <div className="absolute inset-2 rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center">
+                    <MessageSquare className="h-7 w-7 text-muted-foreground/40" />
+                  </div>
+                </div>
+                <p className="text-sm font-semibold text-muted-foreground">No messages yet</p>
+                <p className="text-xs text-muted-foreground/50">Send a message to start the conversation</p>
               </div>
             </div>
           )}
         </div>
 
-        {/* ── SCROLL TO BOTTOM ── */}
+        {/* ── SCROLL TO BOTTOM FAB ── */}
         {showScrollDown && (
-          <div className="absolute z-20 bottom-[76px] right-3">
-            <Button size="icon" variant="secondary" className="h-9 w-9 rounded-full shadow-lg" onClick={scrollToBottom}><ArrowDown className="h-4 w-4" /></Button>
+          <div className="absolute z-20 bottom-[80px] right-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <button className="h-10 w-10 rounded-full bg-card/90 backdrop-blur-md border border-border/50 shadow-xl flex items-center justify-center active:scale-90 transition-transform"
+              onClick={scrollToBottom}>
+              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+            </button>
           </div>
         )}
 
@@ -676,28 +719,30 @@ export function ChatWindow({
 
         {/* ── REPLY PREVIEW ── */}
         {replyTo && (
-          <div className="flex-shrink-0 px-3 py-1.5 border-t border-border bg-muted/30 flex items-center gap-2 z-10">
-            <div className="w-0.5 h-8 rounded-full bg-primary flex-shrink-0" />
+          <div className="flex-shrink-0 px-3 py-2 border-t border-border/50 bg-card/80 backdrop-blur-md flex items-center gap-2.5 z-10 animate-in slide-in-from-bottom-2 duration-150">
+            <div className="w-1 h-10 rounded-full bg-gradient-to-b from-primary to-primary/50 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-semibold text-primary">{replyTo.sender_type === "customer" ? "Customer" : "You"}</p>
-              <p className="text-[11px] text-muted-foreground truncate">{replyTo.content || `[${replyTo.media_type}]`}</p>
+              <p className="text-[11px] font-bold text-primary">{replyTo.sender_type === "customer" ? "Customer" : "You"}</p>
+              <p className="text-[12px] text-muted-foreground truncate">{replyTo.content || `[${replyTo.media_type}]`}</p>
             </div>
-            <button className="h-7 w-7 rounded-full flex items-center justify-center active:bg-muted flex-shrink-0" onClick={() => setReplyTo(null)}>
-              <X className="h-3.5 w-3.5" />
+            <button className="h-8 w-8 rounded-full flex items-center justify-center active:bg-muted flex-shrink-0" onClick={() => setReplyTo(null)}>
+              <X className="h-4 w-4 text-muted-foreground" />
             </button>
           </div>
         )}
 
         {/* ── SLASH COMMAND MENU ── */}
         {showSlashMenu && slashFiltered.length > 0 && (
-          <div className="flex-shrink-0 px-3 py-2 border-t border-border bg-card max-h-40 overflow-y-auto z-10">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Quick Replies</p>
+          <div className="flex-shrink-0 px-3 py-2 border-t border-border/50 bg-card/95 backdrop-blur-md max-h-44 overflow-y-auto z-10 animate-in slide-in-from-bottom-2 duration-150">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 px-1">Quick Replies</p>
             {slashFiltered.slice(0, 4).map(t => (
               <button key={t.id} onClick={() => handleTemplateSelect(t)}
-                className="w-full text-left px-2.5 py-2.5 rounded-lg active:bg-accent/50 transition-colors flex items-start gap-2">
-                <FileText className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
+                className="w-full text-left px-3 py-3 rounded-xl active:bg-accent/50 transition-colors flex items-start gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <FileText className="h-4 w-4 text-primary" />
+                </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-medium">{t.name}</p>
+                  <p className="text-sm font-medium">{t.name}</p>
                   <p className="text-[11px] text-muted-foreground line-clamp-1">{t.body}</p>
                 </div>
               </button>
@@ -705,83 +750,81 @@ export function ChatWindow({
           </div>
         )}
 
-        {/* ── INPUT BAR ── */}
-        <div className="flex-shrink-0 px-2 py-2 border-t border-border bg-card/95 backdrop-blur-md z-20"
+        {/* ── INPUT BAR (Floating glassmorphism) ── */}
+        <div className="flex-shrink-0 wa-input-bar z-20"
           style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
-          {input.length > 0 && (
-            <div className="flex items-center gap-2 mb-1.5 px-3">
-              <div className="wa-typing-dots"><span /><span /><span /></div>
-              <span className="text-[10px] text-muted-foreground">typing...</span>
-            </div>
-          )}
           {uploading && (
-            <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg bg-primary/5 border border-primary/20">
+            <div className="flex items-center gap-2 mb-2 mx-2 px-3 py-2 rounded-xl bg-primary/5 border border-primary/20">
               <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
-              <span className="text-xs text-primary font-medium">Uploading...</span>
+              <span className="text-xs text-primary font-medium">Uploading media...</span>
             </div>
           )}
           {isRecording ? (
-            <div className="flex items-center gap-2">
-              <button className="h-11 w-11 rounded-full flex items-center justify-center text-destructive active:bg-destructive/10 active:scale-95 transition-transform" onClick={cancelRecording}>
+            <div className="flex items-center gap-2 px-2">
+              <button className="h-12 w-12 rounded-full flex items-center justify-center text-destructive active:bg-destructive/10 active:scale-90 transition-all" onClick={cancelRecording}>
                 <Trash2 className="h-5 w-5" />
               </button>
-              <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-full bg-muted/30">
-                <div className="flex items-center gap-1.5">
-                  <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-sm font-semibold tabular-nums text-destructive min-w-[40px]">{formatRecordingTime(recordingTime)}</span>
+              <div className="flex-1 flex items-center gap-3 px-4 py-3 rounded-2xl bg-muted/30 border border-border/30">
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse shadow-sm shadow-red-500/50" />
+                  <span className="text-sm font-bold tabular-nums text-destructive min-w-[44px]">{formatRecordingTime(recordingTime)}</span>
                 </div>
-                <div className="flex items-center gap-[2px] flex-1 h-[24px]">
-                  {Array.from({ length: 20 }).map((_, i) => (
-                    <div key={i} className="flex-1 rounded-full bg-destructive/60"
+                <div className="flex items-center gap-[2px] flex-1 h-[28px]">
+                  {Array.from({ length: 24 }).map((_, i) => (
+                    <div key={i} className="flex-1 rounded-full bg-destructive/50"
                       style={{ height: `${20 + Math.random() * 80}%`, minWidth: 2, animation: `pulse ${0.3 + Math.random() * 0.7}s ease-in-out infinite alternate`, animationDelay: `${i * 0.05}s` }} />
                   ))}
                 </div>
+                <span className="text-[10px] text-muted-foreground">Slide to cancel</span>
               </div>
-              <button className="h-11 w-11 rounded-full bg-primary flex items-center justify-center shadow-md active:scale-90 transition-transform" onClick={stopRecording}>
+              <button className="h-12 w-12 rounded-full wa-send-btn flex items-center justify-center active:scale-90 transition-transform" onClick={stopRecording}>
                 <Send className="h-5 w-5 text-primary-foreground" />
               </button>
             </div>
           ) : (
-            <div className="flex items-end gap-1">
-              <EmojiPicker onSelect={(emoji) => setInput(prev => prev + emoji)} isMobile />
+            <div className="flex items-end gap-1.5 px-2">
+              {/* Icon toolbar */}
+              <div className="flex items-center gap-0.5 flex-shrink-0 pb-1">
+                <EmojiPicker onSelect={(emoji) => setInput(prev => prev + emoji)} isMobile />
+                <DropdownMenu open={showAttachMenu} onOpenChange={setShowAttachMenu}>
+                  <DropdownMenuTrigger asChild>
+                    <button className="h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted/50 transition-colors" disabled={uploading}>
+                      <Paperclip className="h-5 w-5 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56 rounded-xl" side="top">
+                    <DropdownMenuItem onClick={() => openFilePicker("image/*")} className="py-3 gap-3">
+                      <div className="h-9 w-9 rounded-xl bg-blue-500/10 flex items-center justify-center"><ImageIcon className="h-4 w-4 text-blue-500" /></div>
+                      <div><p className="text-sm font-medium">Photo</p><p className="text-[10px] text-muted-foreground">Share an image</p></div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openFilePicker("video/*")} className="py-3 gap-3">
+                      <div className="h-9 w-9 rounded-xl bg-purple-500/10 flex items-center justify-center"><Video className="h-4 w-4 text-purple-500" /></div>
+                      <div><p className="text-sm font-medium">Video</p><p className="text-[10px] text-muted-foreground">Share a video</p></div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openFilePicker("audio/*")} className="py-3 gap-3">
+                      <div className="h-9 w-9 rounded-xl bg-orange-500/10 flex items-center justify-center"><Mic className="h-4 w-4 text-orange-500" /></div>
+                      <div><p className="text-sm font-medium">Audio</p><p className="text-[10px] text-muted-foreground">Share an audio file</p></div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")} className="py-3 gap-3">
+                      <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center"><FileText className="h-4 w-4 text-emerald-500" /></div>
+                      <div><p className="text-sm font-medium">Document</p><p className="text-[10px] text-muted-foreground">Share a file</p></div>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="py-3 gap-3" onClick={() => {
+                      setShowAttachMenu(false);
+                      const inp = document.createElement("input");
+                      inp.type = "file"; inp.accept = "image/*"; inp.capture = "environment";
+                      inp.onchange = (e) => { const file = (e.target as HTMLInputElement).files?.[0]; if (file) uploadAndSend(file, file.name, file.type); };
+                      inp.click();
+                    }}>
+                      <div className="h-9 w-9 rounded-xl bg-pink-500/10 flex items-center justify-center"><Camera className="h-4 w-4 text-pink-500" /></div>
+                      <div><p className="text-sm font-medium">Camera</p><p className="text-[10px] text-muted-foreground">Take a photo</p></div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
 
-              <DropdownMenu open={showAttachMenu} onOpenChange={setShowAttachMenu}>
-                <DropdownMenuTrigger asChild>
-                  <button className="h-11 w-11 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted transition-colors" disabled={uploading}>
-                    <Paperclip className="h-[22px] w-[22px] text-muted-foreground" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-52" side="top">
-                  <DropdownMenuItem onClick={() => openFilePicker("image/*")} className="py-3">
-                    <div className="h-7 w-7 rounded-full bg-blue-500/10 flex items-center justify-center mr-2"><ImageIcon className="h-3.5 w-3.5 text-blue-500" /></div> Photo
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => openFilePicker("video/*")} className="py-3">
-                    <div className="h-7 w-7 rounded-full bg-purple-500/10 flex items-center justify-center mr-2"><Video className="h-3.5 w-3.5 text-purple-500" /></div> Video
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => openFilePicker("audio/*")} className="py-3">
-                    <div className="h-7 w-7 rounded-full bg-orange-500/10 flex items-center justify-center mr-2"><Mic className="h-3.5 w-3.5 text-orange-500" /></div> Audio
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")} className="py-3">
-                    <div className="h-7 w-7 rounded-full bg-emerald-500/10 flex items-center justify-center mr-2"><FileText className="h-3.5 w-3.5 text-emerald-500" /></div> Document
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="py-3" onClick={() => {
-                    setShowAttachMenu(false);
-                    const inp = document.createElement("input");
-                    inp.type = "file"; inp.accept = "image/*"; inp.capture = "environment";
-                    inp.onchange = (e) => { const file = (e.target as HTMLInputElement).files?.[0]; if (file) uploadAndSend(file, file.name, file.type); };
-                    inp.click();
-                  }}>
-                    <div className="h-7 w-7 rounded-full bg-pink-500/10 flex items-center justify-center mr-2"><Camera className="h-3.5 w-3.5 text-pink-500" /></div> Camera
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <button className="h-11 w-11 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted transition-colors"
-                onClick={() => setShowTemplates(true)}>
-                <FileText className="h-[20px] w-[20px] text-muted-foreground" />
-              </button>
-
+              {/* Text input */}
               <div className="flex-1 relative">
                 <Textarea
                   ref={inputRef}
@@ -790,53 +833,65 @@ export function ChatWindow({
                   onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
                   rows={1}
-                  className="min-h-[44px] max-h-[100px] text-[15px] py-2.5 px-4 resize-none rounded-full bg-muted/30 border-transparent focus:border-primary/30 focus:bg-background transition-colors"
+                  className="wa-chat-input min-h-[44px] max-h-[110px] text-[15px] py-2.5 px-4 resize-none rounded-2xl"
                 />
                 {input.length > 500 && (
-                  <span className={`absolute bottom-1 right-3 text-[9px] tabular-nums ${input.length > 900 ? "text-destructive" : "text-muted-foreground"}`}>
+                  <span className={`absolute bottom-1.5 right-3 text-[9px] tabular-nums font-medium ${input.length > 900 ? "text-destructive" : "text-muted-foreground/60"}`}>
                     {input.length}/1000
                   </span>
                 )}
               </div>
 
-              {input.trim() ? (
-                <button
-                  className="h-11 w-11 flex-shrink-0 rounded-full bg-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform wa-send-bounce"
-                  onClick={handleSend} disabled={sending}>
-                  <Send className={`h-5 w-5 text-primary-foreground ${sending ? "animate-pulse" : ""}`} />
-                </button>
-              ) : (
-                <button
-                  className="h-11 w-11 flex-shrink-0 rounded-full flex items-center justify-center text-primary active:bg-primary/10 active:scale-90 transition-transform"
-                  onClick={startRecording}>
-                  <Mic className="h-5 w-5" />
-                </button>
-              )}
+              {/* Send / Mic */}
+              <div className="pb-1">
+                {input.trim() ? (
+                  <button
+                    className="h-11 w-11 flex-shrink-0 rounded-full wa-send-btn flex items-center justify-center active:scale-90 transition-transform"
+                    onClick={handleSend} disabled={sending}>
+                    <Send className={`h-5 w-5 text-primary-foreground ${sending ? "animate-pulse" : ""}`} />
+                  </button>
+                ) : (
+                  <button
+                    className="h-11 w-11 flex-shrink-0 rounded-full flex items-center justify-center text-primary active:bg-primary/10 active:scale-90 transition-all"
+                    onClick={startRecording}>
+                    <Mic className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
 
-        {/* Templates Dialog */}
+        {/* Templates Bottom Sheet */}
         <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
-          <DialogContent className="max-w-[95vw] rounded-2xl">
+          <DialogContent className="max-w-[95vw] rounded-3xl border-border/30 shadow-2xl">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> Templates</DialogTitle>
+              <DialogTitle className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center"><FileText className="h-5 w-5 text-primary" /></div>
+                Templates
+              </DialogTitle>
             </DialogHeader>
             <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search templates..." value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)} className="pl-9 h-9 text-sm" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search templates..." value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)} className="pl-10 h-11 text-sm rounded-xl" />
             </div>
             <ScrollArea className="max-h-[50vh]">
               <div className="space-y-2">
                 {filteredTemplates.map((t) => (
                   <button key={t.id} onClick={() => handleTemplateSelect(t)}
-                    className="w-full text-left p-3 rounded-xl border border-border/50 active:bg-primary/10 transition-all">
-                    <div className="flex items-center justify-between mb-1"><span className="text-sm font-semibold">{t.name}</span><Badge variant="outline" className="text-[10px]">{t.category}</Badge></div>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{t.body}</p>
+                    className="w-full text-left p-3.5 rounded-xl border border-border/40 active:bg-primary/5 active:border-primary/30 transition-all">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-semibold">{t.name}</span>
+                      <Badge variant="outline" className="text-[9px] rounded-lg">{t.category}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{t.body}</p>
                   </button>
                 ))}
                 {filteredTemplates.length === 0 && (
-                  <div className="text-center py-8"><FileText className="h-8 w-8 mx-auto text-muted-foreground/30 mb-2" /><p className="text-sm text-muted-foreground">No templates found</p></div>
+                  <div className="text-center py-10">
+                    <FileText className="h-10 w-10 mx-auto text-muted-foreground/20 mb-3" />
+                    <p className="text-sm text-muted-foreground">No templates found</p>
+                  </div>
                 )}
               </div>
             </ScrollArea>
@@ -847,47 +902,51 @@ export function ChatWindow({
   }
 
   // ──────────────────────────────────────────────────────
-  // DESKTOP layout (unchanged)
+  // DESKTOP LAYOUT
   // ──────────────────────────────────────────────────────
   return (
     <div className="relative flex flex-col h-full">
       {/* Header */}
-      <div className="flex-shrink-0 px-5 py-3 border-b border-border flex items-center justify-between bg-card/95 backdrop-blur-md">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+      <div className="flex-shrink-0 px-5 py-3 border-b border-border/50 flex items-center justify-between bg-card/80 backdrop-blur-xl">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="relative flex-shrink-0 cursor-pointer" onClick={onOpenContactInfo}>
-            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-sm">
-              <span className="text-sm font-bold text-primary-foreground">
-                {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
-              </span>
+            <div className="wa-avatar-ring">
+              <div className="h-11 w-11 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-md">
+                <span className="text-sm font-bold text-white">
+                  {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
+                </span>
+              </div>
             </div>
-            <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${conversation.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+            {conversation.status === "active" && (
+              <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card bg-emerald-500 wa-online-pulse" />
+            )}
           </div>
           <div className="min-w-0 flex-1 cursor-pointer" onClick={onOpenContactInfo}>
-            <p className="text-sm font-semibold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 border ${status.bg} ${status.color}`}>
-                <StatusIcon className="h-2.5 w-2.5 mr-0.5" />{conversation.status}
+            <p className="text-sm font-bold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 border font-semibold ${status.bg} ${status.color}`}>
+                <StatusIcon className="h-2.5 w-2.5 mr-0.5" />{status.label}
               </Badge>
               <span className="flex items-center gap-1 text-[11px] text-muted-foreground"><Phone className="h-3 w-3" />{conversation.customer_phone}</span>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-0 flex-shrink-0">
+        <div className="flex items-center gap-1 flex-shrink-0">
           {onOpenContactInfo && (
-            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={onOpenContactInfo}><Info className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Contact info</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={onOpenContactInfo}><Info className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Contact info</TooltipContent></Tooltip>
           )}
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={openWhatsApp}><ExternalLink className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Open in WhatsApp</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={openWhatsApp}><ExternalLink className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Open in WhatsApp</TooltipContent></Tooltip>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={onResolve} className="text-emerald-500"><CheckCircle className="h-4 w-4 mr-2" /> Mark Resolved</DropdownMenuItem>
+            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52 rounded-xl">
+              <DropdownMenuItem onClick={onResolve} className="text-emerald-500 py-2.5 gap-2"><CheckCircle className="h-4 w-4" /> Mark Resolved</DropdownMenuItem>
               {isAdmin && staff.length > 0 && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Assign to Agent</DropdownMenuLabel>
                   {staff.map((s) => (
-                    <DropdownMenuItem key={s.id} onClick={() => onAssign(conversation.id, s.user_id)}>
-                      <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center mr-2 text-[10px] font-bold text-primary">{s.full_name?.charAt(0)}</div>
+                    <DropdownMenuItem key={s.id} onClick={() => onAssign(conversation.id, s.user_id)} className="py-2 gap-2">
+                      <div className="h-6 w-6 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">{s.full_name?.charAt(0)}</div>
                       {s.full_name}
                     </DropdownMenuItem>
                   ))}
@@ -900,25 +959,27 @@ export function ChatWindow({
 
       {/* AI Suggestions */}
       {aiSuggestions.length > 0 && (
-        <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-amber-500/15">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="h-6 w-6 rounded-full bg-amber-500/15 flex items-center justify-center"><Sparkles className="h-3.5 w-3.5 text-amber-500" /></div>
-            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">AI Suggestions</span>
-            <Badge variant="outline" className="text-[9px] border-amber-500/30 text-amber-500">{aiSuggestions.length}</Badge>
+        <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-amber-500/5 via-transparent to-orange-500/5 border-b border-amber-500/10">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-amber-400/20 to-orange-500/20 flex items-center justify-center">
+              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+            </div>
+            <span className="text-xs font-bold text-amber-600 dark:text-amber-400">AI Suggestions</span>
+            <Badge variant="outline" className="text-[9px] border-amber-500/30 text-amber-500 rounded-lg">{aiSuggestions.length}</Badge>
           </div>
           <div className="space-y-2">
             {aiSuggestions.slice(0, 5).map((s) => (
-              <div key={s.id} className="p-3 rounded-xl bg-card border border-border/50 shadow-sm hover:border-amber-500/30 transition-colors">
-                <p className="text-xs text-foreground/80 leading-relaxed line-clamp-3 mb-2">{s.suggested_response}</p>
+              <div key={s.id} className="p-3.5 rounded-xl bg-card/80 border border-border/40 shadow-sm hover:border-amber-500/30 hover:shadow-md transition-all group">
+                <p className="text-xs text-foreground/80 leading-relaxed line-clamp-3 mb-2.5">{s.suggested_response}</p>
                 <div className="flex items-center justify-between">
-                  <Badge variant="outline" className={`text-[9px] px-1.5 ${s.confidence === "high" ? "border-emerald-500/50 text-emerald-500" : s.confidence === "medium" ? "border-amber-500/50 text-amber-500" : "border-red-500/50 text-red-500"}`}>
+                  <Badge variant="outline" className={`text-[9px] px-2 rounded-lg ${s.confidence === "high" ? "border-emerald-500/50 text-emerald-500" : s.confidence === "medium" ? "border-amber-500/50 text-amber-500" : "border-red-500/50 text-red-500"}`}>
                     {s.confidence} confidence
                   </Badge>
-                  <div className="flex items-center gap-1">
-                    <Button size="sm" variant="ghost" className="h-7 px-2.5 rounded-full text-xs hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" onClick={() => onApproveAi(s.id, s.suggested_response)}>
+                  <div className="flex items-center gap-1.5">
+                    <Button size="sm" variant="ghost" className="h-8 px-3 rounded-xl text-xs hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold" onClick={() => onApproveAi(s.id, s.suggested_response)}>
                       <Check className="h-3.5 w-3.5 mr-1" /> Send
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-7 px-2.5 rounded-full text-xs hover:bg-destructive/10 text-destructive" onClick={() => onRejectAi(s.id)}>
+                    <Button size="sm" variant="ghost" className="h-8 px-3 rounded-xl text-xs hover:bg-destructive/10 text-destructive font-semibold" onClick={() => onRejectAi(s.id)}>
                       <X className="h-3.5 w-3.5 mr-1" /> Reject
                     </Button>
                   </div>
@@ -931,7 +992,7 @@ export function ChatWindow({
 
       {/* Messages */}
       <div ref={scrollRef} onScroll={handleScroll}
-        className="flex-1 min-h-0 overflow-y-auto px-5 py-2 wa-chat-bg relative">
+        className="flex-1 min-h-0 overflow-y-auto px-5 py-3 wa-chat-bg relative">
         {messagesWithDates.map((item, i) => {
           if (item.type === "date" && item.date) return <DateSeparator key={`date-${i}`} date={item.date} />;
           if (item.type === "message" && item.msg) return (
@@ -942,10 +1003,15 @@ export function ChatWindow({
         })}
         {messages.length === 0 && (
           <div className="flex-1 flex items-center justify-center h-full">
-            <div className="text-center space-y-2 py-20">
-              <div className="h-16 w-16 rounded-2xl bg-muted/30 flex items-center justify-center mx-auto"><MessageSquare className="h-7 w-7 text-muted-foreground/30" /></div>
-              <p className="text-sm font-medium text-muted-foreground">No messages yet</p>
-              <p className="text-xs text-muted-foreground/60">Send a message to start the conversation</p>
+            <div className="text-center space-y-4 py-20">
+              <div className="relative mx-auto w-24 h-24">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary/15 to-emerald-500/15 animate-pulse" />
+                <div className="absolute inset-3 rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center border border-border/20">
+                  <MessageSquare className="h-8 w-8 text-muted-foreground/30" />
+                </div>
+              </div>
+              <p className="text-sm font-semibold text-muted-foreground">No messages yet</p>
+              <p className="text-xs text-muted-foreground/50">Send a message to start the conversation</p>
             </div>
           </div>
         )}
@@ -953,8 +1019,11 @@ export function ChatWindow({
 
       {/* Scroll to bottom */}
       {showScrollDown && (
-        <div className="absolute z-10 bottom-24 right-8">
-          <Button size="icon" variant="secondary" className="h-9 w-9 rounded-full shadow-lg" onClick={scrollToBottom}><ArrowDown className="h-4 w-4" /></Button>
+        <div className="absolute z-10 bottom-24 right-8 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <button className="h-10 w-10 rounded-full bg-card/90 backdrop-blur-md border border-border/50 shadow-xl flex items-center justify-center hover:shadow-2xl transition-all"
+            onClick={scrollToBottom}>
+            <ChevronDown className="h-5 w-5 text-muted-foreground" />
+          </button>
         </div>
       )}
 
@@ -963,14 +1032,14 @@ export function ChatWindow({
 
       {/* Reply preview */}
       {replyTo && (
-        <div className="flex-shrink-0 px-4 py-2 border-t border-border bg-muted/30 flex items-center gap-2 animate-in slide-in-from-bottom-2 duration-150">
-          <div className="h-full w-1 rounded-full bg-primary flex-shrink-0" />
+        <div className="flex-shrink-0 px-4 py-2.5 border-t border-border/50 bg-card/80 backdrop-blur-md flex items-center gap-2.5 animate-in slide-in-from-bottom-2 duration-150">
+          <div className="h-full w-1 rounded-full bg-gradient-to-b from-primary to-primary/50 flex-shrink-0" />
           <CornerDownRight className="h-3.5 w-3.5 text-primary flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-semibold text-primary">{replyTo.sender_type === "customer" ? "Customer" : "You"}</p>
+            <p className="text-[10px] font-bold text-primary">{replyTo.sender_type === "customer" ? "Customer" : "You"}</p>
             <p className="text-xs text-muted-foreground truncate">{replyTo.content || `[${replyTo.media_type}]`}</p>
           </div>
-          <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full flex-shrink-0" onClick={() => setReplyTo(null)}>
+          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full flex-shrink-0" onClick={() => setReplyTo(null)}>
             <X className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -978,12 +1047,14 @@ export function ChatWindow({
 
       {/* Slash command menu */}
       {showSlashMenu && slashFiltered.length > 0 && (
-        <div className="flex-shrink-0 px-4 py-2 border-t border-border bg-card max-h-48 overflow-y-auto animate-in slide-in-from-bottom-2 duration-150">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Quick Replies</p>
+        <div className="flex-shrink-0 px-4 py-2 border-t border-border/50 bg-card/95 backdrop-blur-md max-h-48 overflow-y-auto animate-in slide-in-from-bottom-2 duration-150">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Quick Replies</p>
           {slashFiltered.slice(0, 6).map(t => (
             <button key={t.id} onClick={() => handleTemplateSelect(t)}
-              className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-accent/50 transition-colors flex items-start gap-2">
-              <FileText className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
+              className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-accent/50 transition-colors flex items-start gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <FileText className="h-4 w-4 text-primary" />
+              </div>
               <div className="min-w-0">
                 <p className="text-xs font-medium">{t.name}</p>
                 <p className="text-[11px] text-muted-foreground line-clamp-1">{t.body}</p>
@@ -994,42 +1065,42 @@ export function ChatWindow({
       )}
 
       {/* Input Area */}
-      <div className="flex-shrink-0 px-4 py-3 border-t border-border bg-card/95 backdrop-blur-md">
+      <div className="flex-shrink-0 px-4 py-3 border-t border-border/50 bg-card/80 backdrop-blur-xl">
         {uploading && (
-          <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-primary/5 border border-primary/20">
+          <div className="flex items-center gap-2 mb-2 px-3 py-2 rounded-xl bg-primary/5 border border-primary/20">
             <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
-            <span className="text-xs text-primary font-medium">Uploading...</span>
+            <span className="text-xs text-primary font-medium">Uploading media...</span>
           </div>
         )}
         {isRecording ? (
           <div className="flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-destructive" onClick={cancelRecording}><Trash2 className="h-5 w-5" /></Button>
-            <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-full bg-muted/30">
-              <div className="flex items-center gap-1.5">
-                <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-sm font-semibold tabular-nums text-destructive min-w-[40px]">{formatRecordingTime(recordingTime)}</span>
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-destructive" onClick={cancelRecording}><Trash2 className="h-5 w-5" /></Button>
+            <div className="flex-1 flex items-center gap-3 px-4 py-3 rounded-2xl bg-muted/30 border border-border/30">
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse shadow-sm shadow-red-500/50" />
+                <span className="text-sm font-bold tabular-nums text-destructive min-w-[44px]">{formatRecordingTime(recordingTime)}</span>
               </div>
-              <div className="flex items-center gap-[2px] flex-1 h-[24px]">
+              <div className="flex items-center gap-[2px] flex-1 h-[28px]">
                 {Array.from({ length: 36 }).map((_, i) => (
-                  <div key={i} className="flex-1 rounded-full bg-destructive/60"
+                  <div key={i} className="flex-1 rounded-full bg-destructive/50"
                     style={{ height: `${20 + Math.random() * 80}%`, minWidth: 2, animation: `pulse ${0.3 + Math.random() * 0.7}s ease-in-out infinite alternate`, animationDelay: `${i * 0.05}s` }} />
                 ))}
               </div>
             </div>
-            <Button size="icon" className="h-9 w-9 rounded-full bg-primary hover:bg-primary/90 shadow-md" onClick={stopRecording}><Send className="h-5 w-5" /></Button>
+            <Button size="icon" className="h-10 w-10 rounded-full bg-primary hover:bg-primary/90 shadow-lg" onClick={stopRecording}><Send className="h-5 w-5" /></Button>
           </div>
         ) : (
-          <div className="flex items-end gap-1">
+          <div className="flex items-end gap-1.5">
             <EmojiPicker onSelect={(emoji) => setInput(prev => prev + emoji)} />
             <DropdownMenu open={showAttachMenu} onOpenChange={setShowAttachMenu}>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full" disabled={uploading}><Paperclip className="h-5 w-5 text-muted-foreground" /></Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-xl" disabled={uploading}><Paperclip className="h-5 w-5 text-muted-foreground" /></Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48" side="top">
-                <DropdownMenuItem onClick={() => openFilePicker("image/*")}><ImageIcon className="h-4 w-4 mr-2 text-blue-500" /> Photo</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openFilePicker("video/*")}><Video className="h-4 w-4 mr-2 text-purple-500" /> Video</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openFilePicker("audio/*")}><Mic className="h-4 w-4 mr-2 text-orange-500" /> Audio File</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")}><FileText className="h-4 w-4 mr-2 text-emerald-500" /> Document</DropdownMenuItem>
+              <DropdownMenuContent align="start" className="w-52 rounded-xl" side="top">
+                <DropdownMenuItem onClick={() => openFilePicker("image/*")} className="py-2.5 gap-2"><div className="h-7 w-7 rounded-lg bg-blue-500/10 flex items-center justify-center"><ImageIcon className="h-3.5 w-3.5 text-blue-500" /></div> Photo</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker("video/*")} className="py-2.5 gap-2"><div className="h-7 w-7 rounded-lg bg-purple-500/10 flex items-center justify-center"><Video className="h-3.5 w-3.5 text-purple-500" /></div> Video</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker("audio/*")} className="py-2.5 gap-2"><div className="h-7 w-7 rounded-lg bg-orange-500/10 flex items-center justify-center"><Mic className="h-3.5 w-3.5 text-orange-500" /></div> Audio</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")} className="py-2.5 gap-2"><div className="h-7 w-7 rounded-lg bg-emerald-500/10 flex items-center justify-center"><FileText className="h-3.5 w-3.5 text-emerald-500" /></div> Document</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => {
                   setShowAttachMenu(false);
@@ -1037,30 +1108,30 @@ export function ChatWindow({
                   inp.type = "file"; inp.accept = "image/*"; inp.capture = "environment";
                   inp.onchange = (e) => { const file = (e.target as HTMLInputElement).files?.[0]; if (file) uploadAndSend(file, file.name, file.type); };
                   inp.click();
-                }}><Camera className="h-4 w-4 mr-2 text-pink-500" /> Camera</DropdownMenuItem>
+                }} className="py-2.5 gap-2"><div className="h-7 w-7 rounded-lg bg-pink-500/10 flex items-center justify-center"><Camera className="h-3.5 w-3.5 text-pink-500" /></div> Camera</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Tooltip><TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full" onClick={() => setShowTemplates(true)}><FileText className="h-4 w-4 text-muted-foreground" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-xl" onClick={() => setShowTemplates(true)}><FileText className="h-4 w-4 text-muted-foreground" /></Button>
             </TooltipTrigger><TooltipContent>Templates <kbd className="ml-1 text-[9px] bg-muted px-1 rounded">/</kbd></TooltipContent></Tooltip>
             <div className="flex-1 relative">
               <Textarea ref={inputRef} placeholder="Type a message... (/ for quick replies)" value={input} onChange={handleInputChange} onKeyDown={handleKeyDown} rows={1}
-                className="min-h-[40px] max-h-[120px] text-sm resize-none rounded-full bg-muted/30 border-transparent focus:border-primary/30 focus:bg-background transition-colors" />
+                className="wa-chat-input min-h-[42px] max-h-[120px] text-sm resize-none rounded-2xl" />
               {input.length > 500 && (
-                <span className={`absolute bottom-1 right-3 text-[9px] tabular-nums ${input.length > 900 ? "text-destructive" : "text-muted-foreground"}`}>
+                <span className={`absolute bottom-1.5 right-3 text-[9px] tabular-nums font-medium ${input.length > 900 ? "text-destructive" : "text-muted-foreground/60"}`}>
                   {input.length}/1000
                 </span>
               )}
             </div>
             {input.trim() ? (
               <Tooltip><TooltipTrigger asChild>
-                <Button size="icon" className="h-9 w-9 flex-shrink-0 rounded-full bg-primary hover:bg-primary/90 shadow-sm wa-send-bounce" onClick={handleSend} disabled={sending}>
-                  <Send className={`h-5 w-5 ${sending ? "animate-pulse" : ""}`} />
-                </Button>
+                <button className="h-10 w-10 flex-shrink-0 rounded-full wa-send-btn flex items-center justify-center hover:shadow-lg transition-all" onClick={handleSend} disabled={sending}>
+                  <Send className={`h-5 w-5 text-primary-foreground ${sending ? "animate-pulse" : ""}`} />
+                </button>
               </TooltipTrigger><TooltipContent>Send <kbd className="ml-1 text-[9px] bg-muted px-1 rounded">Enter</kbd></TooltipContent></Tooltip>
             ) : (
               <Tooltip><TooltipTrigger asChild>
-                <Button size="icon" variant="ghost" className="h-9 w-9 flex-shrink-0 rounded-full text-primary hover:bg-primary/10" onClick={startRecording}>
+                <Button size="icon" variant="ghost" className="h-10 w-10 flex-shrink-0 rounded-full text-primary hover:bg-primary/10" onClick={startRecording}>
                   <Mic className="h-5 w-5" />
                 </Button>
               </TooltipTrigger><TooltipContent>Voice note</TooltipContent></Tooltip>
@@ -1071,25 +1142,31 @@ export function ChatWindow({
 
       {/* Templates Dialog */}
       <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> Templates</DialogTitle>
+            <DialogTitle className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center"><FileText className="h-5 w-5 text-primary" /></div>
+              Templates
+            </DialogTitle>
           </DialogHeader>
           <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search templates..." value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)} className="pl-9 h-9 text-sm" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Search templates..." value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)} className="pl-10 h-10 text-sm rounded-xl" />
           </div>
           <ScrollArea className="max-h-[400px]">
             <div className="space-y-2">
               {filteredTemplates.map((t) => (
                 <button key={t.id} onClick={() => handleTemplateSelect(t)}
-                  className="w-full text-left p-3 rounded-xl border border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all group">
-                  <div className="flex items-center justify-between mb-1"><span className="text-sm font-semibold group-hover:text-primary">{t.name}</span><Badge variant="outline" className="text-[10px]">{t.category}</Badge></div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">{t.body}</p>
+                  className="w-full text-left p-3.5 rounded-xl border border-border/40 hover:border-primary/30 hover:bg-primary/5 transition-all group">
+                  <div className="flex items-center justify-between mb-1.5"><span className="text-sm font-semibold group-hover:text-primary transition-colors">{t.name}</span><Badge variant="outline" className="text-[9px] rounded-lg">{t.category}</Badge></div>
+                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{t.body}</p>
                 </button>
               ))}
               {filteredTemplates.length === 0 && (
-                <div className="text-center py-8"><FileText className="h-8 w-8 mx-auto text-muted-foreground/30 mb-2" /><p className="text-sm text-muted-foreground">No templates found</p></div>
+                <div className="text-center py-10">
+                  <FileText className="h-10 w-10 mx-auto text-muted-foreground/20 mb-3" />
+                  <p className="text-sm text-muted-foreground">No templates found</p>
+                </div>
               )}
             </div>
           </ScrollArea>

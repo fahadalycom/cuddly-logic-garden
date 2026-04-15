@@ -3,10 +3,17 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Smile } from "lucide-react";
 
 const EMOJI_CATEGORIES = {
-  "Smileys": ["😀", "😂", "🥹", "😍", "🤩", "😘", "😎", "🤔", "😴", "🥺", "😭", "😡"],
-  "Gestures": ["👍", "👎", "👋", "🤝", "🙏", "👏", "💪", "✌️", "🤞", "👌", "🫡", "🫶"],
-  "Hearts": ["❤️", "🧡", "💛", "💚", "💙", "💜", "🤍", "💔", "💕", "💯", "✨", "🔥"],
-  "Objects": ["🎉", "🎊", "🎁", "📱", "💻", "📎", "📌", "⏰", "💰", "📦", "🔑", "✅"],
+  "😀": ["😀", "😂", "🥹", "😍", "🤩", "😘", "😎", "🤔", "😴", "🥺", "😭", "😡", "🤗", "😏", "🥳", "😤"],
+  "👋": ["👍", "👎", "👋", "🤝", "🙏", "👏", "💪", "✌️", "🤞", "👌", "🫡", "🫶", "🤙", "👆", "🫰", "🤘"],
+  "❤️": ["❤️", "🧡", "💛", "💚", "💙", "💜", "🤍", "💔", "💕", "💯", "✨", "🔥", "💖", "🩷", "💝", "🫀"],
+  "🎉": ["🎉", "🎊", "🎁", "📱", "💻", "📎", "📌", "⏰", "💰", "📦", "🔑", "✅", "⭐", "🌟", "🏆", "🎯"],
+};
+
+const TAB_LABELS: Record<string, string> = {
+  "😀": "Smileys",
+  "👋": "Gestures", 
+  "❤️": "Hearts",
+  "🎉": "Objects",
 };
 
 interface EmojiPickerProps {
@@ -16,7 +23,7 @@ interface EmojiPickerProps {
 
 export function EmojiPicker({ onSelect, isMobile }: EmojiPickerProps) {
   const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("Smileys");
+  const [activeTab, setActiveTab] = useState("😀");
 
   const handleSelect = (emoji: string) => {
     onSelect(emoji);
@@ -28,40 +35,40 @@ export function EmojiPicker({ onSelect, isMobile }: EmojiPickerProps) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={`${isMobile ? "h-11 w-11" : "h-9 w-9"} flex-shrink-0 rounded-full flex items-center justify-center ${isMobile ? "active:bg-muted" : "hover:bg-muted"} transition-colors`}
+          className={`${isMobile ? "h-10 w-10" : "h-9 w-9"} flex-shrink-0 rounded-full flex items-center justify-center ${isMobile ? "active:bg-muted/50" : "hover:bg-muted"} transition-colors`}
         >
-          <Smile className={`${isMobile ? "h-[22px] w-[22px]" : "h-4 w-4"} text-muted-foreground`} />
+          <Smile className={`${isMobile ? "h-5 w-5" : "h-4 w-4"} text-muted-foreground`} />
         </button>
       </PopoverTrigger>
       <PopoverContent
         side="top"
         align={isMobile ? "center" : "start"}
-        className={`${isMobile ? "w-[85vw]" : "w-80"} p-2`}
+        className={`${isMobile ? "w-[88vw]" : "w-[340px]"} p-0 rounded-2xl border-border/50 shadow-2xl overflow-hidden`}
         sideOffset={8}
       >
         {/* Category tabs */}
-        <div className="flex gap-1 mb-2 border-b border-border pb-2">
+        <div className="flex border-b border-border/50 bg-muted/30">
           {Object.keys(EMOJI_CATEGORIES).map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveTab(cat)}
-              className={`text-[11px] px-2.5 py-1 rounded-full transition-colors ${
+              className={`flex-1 py-2.5 text-center transition-all ${
                 activeTab === cat
-                  ? "bg-primary/10 text-primary font-semibold"
-                  : "text-muted-foreground hover:bg-muted"
+                  ? "bg-primary/10 border-b-2 border-primary"
+                  : "hover:bg-muted/50"
               }`}
             >
-              {cat}
+              <span className="text-lg">{cat}</span>
             </button>
           ))}
         </div>
         {/* Emoji grid */}
-        <div className="grid grid-cols-6 gap-0.5">
+        <div className={`grid ${isMobile ? "grid-cols-8" : "grid-cols-8"} gap-0.5 p-2`}>
           {EMOJI_CATEGORIES[activeTab as keyof typeof EMOJI_CATEGORIES].map((emoji) => (
             <button
               key={emoji}
               onClick={() => handleSelect(emoji)}
-              className={`${isMobile ? "h-10 w-10" : "h-9 w-9"} rounded-lg flex items-center justify-center text-xl ${isMobile ? "active:bg-muted active:scale-110" : "hover:bg-muted hover:scale-110"} transition-all`}
+              className={`${isMobile ? "h-11 w-full" : "h-10 w-full"} rounded-xl flex items-center justify-center text-xl ${isMobile ? "active:bg-muted active:scale-110" : "hover:bg-muted hover:scale-110"} transition-all`}
             >
               {emoji}
             </button>
