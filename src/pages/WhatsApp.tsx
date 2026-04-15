@@ -312,7 +312,7 @@ export default function WhatsAppPage() {
   if (isMobile) {
     if (selectedConversation) {
       return (
-        <div className="fixed inset-0 z-[120] h-[100dvh] overflow-hidden overscroll-none bg-background">
+        <div className="fixed inset-0 flex flex-col bg-background" style={{ height: '100dvh' }}>
           <ChatWindow
             conversation={selectedConversation}
             messages={messages}
@@ -333,7 +333,7 @@ export default function WhatsAppPage() {
     }
 
     return (
-      <div className="fixed inset-0 z-[100] flex flex-col bg-background" style={{ height: '100dvh' }}>
+      <div className="fixed inset-0 flex flex-col bg-background" style={{ height: '100dvh' }}>
         <div className="flex-shrink-0 px-4 border-b border-border bg-card/95 backdrop-blur-md"
           style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' , paddingBottom: '0.5rem' }}>
           <div className="flex items-center justify-between">
@@ -404,9 +404,9 @@ export default function WhatsAppPage() {
     );
   }
 
-  // Desktop layout
+  // Desktop layout — full viewport, no app shell
   return (
-    <div className="h-[calc(100vh-4rem)] flex bg-background overflow-hidden">
+    <div className="fixed inset-0 flex bg-background overflow-hidden" style={{ height: '100dvh' }}>
       <div className="w-80 lg:w-96 border-r border-border flex flex-col bg-card/50">
         <div className="px-4 py-2.5 border-b border-border bg-card/80">
           <div className="flex items-center justify-between mb-1.5">
