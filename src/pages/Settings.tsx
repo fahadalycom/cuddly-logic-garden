@@ -90,6 +90,12 @@ export default function SettingsPage() {
             )}
             <TabsTrigger value="wa-notifications" className="rounded-lg data-[state=active]:bg-emerald-500/10 data-[state=active]:text-emerald-500 text-xs"><Bell className="h-3.5 w-3.5 mr-1.5" />Alerts</TabsTrigger>
             <TabsTrigger value="wa-theme" className="rounded-lg data-[state=active]:bg-emerald-500/10 data-[state=active]:text-emerald-500 text-xs"><Palette className="h-3.5 w-3.5 mr-1.5" />Theme</TabsTrigger>
+            {isAdmin && (
+              <>
+                <div className="w-px h-5 bg-border/50 mx-1 self-center" />
+                <TabsTrigger value="system" className="rounded-lg data-[state=active]:bg-amber-500/10 data-[state=active]:text-amber-500 text-xs"><Database className="h-3.5 w-3.5 mr-1.5" />All Settings</TabsTrigger>
+              </>
+            )}
           </TabsList>
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
@@ -239,6 +245,7 @@ export default function SettingsPage() {
         {isAdmin && <TabsContent value="wa-agents"><WhatsAppAgentSettings /></TabsContent>}
         <TabsContent value="wa-notifications"><WhatsAppNotificationSettings /></TabsContent>
         <TabsContent value="wa-theme"><WhatsAppThemeSettings /></TabsContent>
+        {isAdmin && <TabsContent value="system"><SystemSettingsManager /></TabsContent>}
       </Tabs>
     </div>
   );
