@@ -19,6 +19,7 @@ interface NavGroup { label: string; items: NavItem[]; }
 const navGroups: NavGroup[] = [
   { label: "Overview", items: [
     { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, module: "dashboard" },
+    { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle, module: "dashboard" },
   ]},
   { label: "Sales", items: [
     { title: "Products", url: "/products", icon: Package, module: "products" },

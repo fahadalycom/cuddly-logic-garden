@@ -41,7 +41,9 @@ export function AgentConfigPanel({ staff }: AgentConfigPanelProps) {
   };
 
   const updateConfig = async (id: string, field: string, value: any) => {
-    const { error } = await supabase.from("wa_agent_config").update({ [field]: value }).eq("id", id);
+    const updateData: Record<string, any> = {};
+    updateData[field] = value;
+    const { error } = await supabase.from("wa_agent_config").update(updateData as any).eq("id", id);
     if (error) {
       toast.error("Failed to update");
     } else {

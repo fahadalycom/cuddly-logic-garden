@@ -27,6 +27,7 @@ import StaffPage from "./pages/Staff";
 import RolesPage from "./pages/Roles";
 import TemplatesPage from "./pages/Templates";
 import AuditLogsPage from "./pages/AuditLogs";
+import WhatsAppPage from "./pages/WhatsApp";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -62,6 +63,7 @@ const App = () => (
               <Route path="/settings/roles" element={<RolesPage />} />
               <Route path="/settings/templates" element={<TemplatesPage />} />
               <Route path="/settings/audit" element={<AuditLogsPage />} />
+              <Route path="/whatsapp" element={<WhatsAppPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
