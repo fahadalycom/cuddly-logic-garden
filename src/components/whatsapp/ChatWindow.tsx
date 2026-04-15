@@ -12,7 +12,8 @@ import {
   Image as ImageIcon, Video, FileText, Mic, Sparkles, X, Check, CheckCheck,
   Phone, ExternalLink, Copy, Clock, Search, Bell, BellOff, Volume2,
   ArrowDown, Shield, Zap, MessageSquare, Download, Loader2, Eye, File,
-  ArrowLeft, Camera, StopCircle, Trash2, Reply, Smile, Info, CornerDownRight
+  ArrowLeft, Camera, StopCircle, Trash2, Reply, Smile, Info, CornerDownRight,
+  Forward
 } from "lucide-react";
 import { useNotifications } from "@/hooks/useNotifications";
 import { Switch } from "@/components/ui/switch";
@@ -20,6 +21,7 @@ import { format, isToday, isYesterday } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { VoiceNotePlayer } from "./VoiceNotePlayer";
+import { EmojiPicker } from "./EmojiPicker";
 
 interface ChatWindowProps {
   conversation: any;
@@ -214,7 +216,7 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
             ? `bg-card border border-border/60 ${showTail ? "rounded-tl-sm" : ""}`
             : isAi
             ? `bg-gradient-to-br from-amber-500/15 to-amber-600/10 border border-amber-500/20 text-foreground ${showTail ? "rounded-tr-sm" : ""}`
-            : `bg-gradient-to-br from-primary to-primary/90 text-primary-foreground ${showTail ? "rounded-tr-sm" : ""} shadow-primary/20`
+            : `wa-bubble-outgoing ${showTail ? "rounded-tr-sm" : ""} shadow-sm`
         } ${showTail && isCustomer && !isEmojiOnly ? "wa-bubble-tail-left" : ""} ${showTail && !isCustomer && !isAi && !isEmojiOnly ? "wa-bubble-tail-right" : ""}`}>
           {isAi && !isGrouped && (
             <div className="flex items-center gap-1.5 mb-1">
@@ -251,17 +253,20 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
           </div>
         )}
 
-        {/* Desktop hover actions */}
+        {/* Desktop hover actions — floating pill */}
         {!isMobile && !isSending && (
-          <div className={`absolute top-0 ${isCustomer ? "-right-20" : "-left-20"} hidden group-hover:flex gap-0.5 items-center`}>
-            <button onClick={() => onReply(msg)} className="h-6 w-6 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted" title="Reply">
+          <div className={`absolute top-1 ${isCustomer ? "-right-24" : "-left-24"} hidden group-hover:flex gap-0.5 items-center bg-card/90 backdrop-blur-sm border border-border/60 rounded-full px-1 py-0.5 shadow-lg transition-all`}>
+            <button onClick={() => onReply(msg)} className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-muted" title="Reply">
               <Reply className="h-3 w-3 text-muted-foreground" />
             </button>
-            <button onClick={() => setShowReactions(!showReactions)} className="h-6 w-6 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted" title="React">
+            <button onClick={() => setShowReactions(!showReactions)} className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-muted" title="React">
               <Smile className="h-3 w-3 text-muted-foreground" />
             </button>
-            <button onClick={handleCopy} className="h-6 w-6 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted" title="Copy">
+            <button onClick={handleCopy} className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-muted" title="Copy">
               <Copy className="h-3 w-3 text-muted-foreground" />
+            </button>
+            <button onClick={() => toast.info("Forward coming soon")} className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-muted" title="Forward">
+              <Forward className="h-3 w-3 text-muted-foreground" />
             </button>
           </div>
         )}
@@ -281,12 +286,16 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
               </div>
               <div className="flex gap-1 mt-1 bg-card border border-border rounded-xl px-1 py-1 shadow-xl">
                 <button onClick={() => { onReply(msg); setShowMobileActions(false); }}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg active:bg-muted transition-colors flex-1">
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg active:bg-muted transition-colors flex-1">
                   <Reply className="h-4 w-4 text-muted-foreground" /><span className="text-xs font-medium">Reply</span>
                 </button>
                 <button onClick={handleCopy}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg active:bg-muted transition-colors flex-1">
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg active:bg-muted transition-colors flex-1">
                   <Copy className="h-4 w-4 text-muted-foreground" /><span className="text-xs font-medium">Copy</span>
+                </button>
+                <button onClick={() => { toast.info("Forward coming soon"); setShowMobileActions(false); }}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg active:bg-muted transition-colors flex-1">
+                  <Forward className="h-4 w-4 text-muted-foreground" /><span className="text-xs font-medium">Forward</span>
                 </button>
               </div>
             </div>
@@ -569,8 +578,8 @@ export function ChatWindow({
     return (
       <div className="flex h-full max-h-full flex-col overflow-hidden overscroll-none bg-background">
         {/* ── HEADER ── */}
-        <div className="flex-shrink-0 px-1 flex items-center justify-between border-b border-border bg-card/95 backdrop-blur-md z-20"
-          style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))', paddingBottom: '0.5rem' }}>
+        <div className="flex-shrink-0 px-1 flex items-center justify-between border-b border-border bg-gradient-to-r from-card/95 to-card/90 backdrop-blur-md z-20"
+          style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))', paddingBottom: '0.5rem', borderBottom: '1px solid hsl(var(--border))' }}>
           <div className="flex items-center gap-1 min-w-0 flex-1">
             {onBack && (
               <button className="h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted transition-colors" onClick={onBack}>
@@ -578,8 +587,8 @@ export function ChatWindow({
               </button>
             )}
             <div className="relative flex-shrink-0">
-              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-                <span className="text-sm font-bold text-primary-foreground">
+              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center ring-2 ring-emerald-500/20">
+                <span className="text-sm font-bold text-white">
                   {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
                 </span>
               </div>
@@ -587,9 +596,14 @@ export function ChatWindow({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[14px] font-semibold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
-              <p className="text-[11px] text-muted-foreground truncate">
-                {conversation.status === "active" ? "Online" : `Last seen ${conversation.last_message_at ? new Date(conversation.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "recently"}`}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <Badge variant="outline" className={`text-[8px] px-1 py-0 h-3.5 border ${status.bg} ${status.color}`}>
+                  <StatusIcon className="h-2 w-2 mr-0.5" />{conversation.status}
+                </Badge>
+                <span className="text-[10px] text-muted-foreground truncate">
+                  {conversation.status === "active" ? "online" : conversation.last_message_at ? new Date(conversation.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
+                </span>
+              </div>
             </div>
           </div>
           <div className="flex items-center flex-shrink-0 gap-0.5 pr-1">
@@ -694,6 +708,12 @@ export function ChatWindow({
         {/* ── INPUT BAR ── */}
         <div className="flex-shrink-0 px-2 py-2 border-t border-border bg-card/95 backdrop-blur-md z-20"
           style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
+          {input.length > 0 && (
+            <div className="flex items-center gap-2 mb-1.5 px-3">
+              <div className="wa-typing-dots"><span /><span /><span /></div>
+              <span className="text-[10px] text-muted-foreground">typing...</span>
+            </div>
+          )}
           {uploading && (
             <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg bg-primary/5 border border-primary/20">
               <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
@@ -723,6 +743,8 @@ export function ChatWindow({
             </div>
           ) : (
             <div className="flex items-end gap-1">
+              <EmojiPicker onSelect={(emoji) => setInput(prev => prev + emoji)} isMobile />
+
               <DropdownMenu open={showAttachMenu} onOpenChange={setShowAttachMenu}>
                 <DropdownMenuTrigger asChild>
                   <button className="h-11 w-11 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted transition-colors" disabled={uploading}>
@@ -730,10 +752,18 @@ export function ChatWindow({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-52" side="top">
-                  <DropdownMenuItem onClick={() => openFilePicker("image/*")} className="py-3"><ImageIcon className="h-4 w-4 mr-2 text-blue-500" /> Photo</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => openFilePicker("video/*")} className="py-3"><Video className="h-4 w-4 mr-2 text-purple-500" /> Video</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => openFilePicker("audio/*")} className="py-3"><Mic className="h-4 w-4 mr-2 text-orange-500" /> Audio</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")} className="py-3"><FileText className="h-4 w-4 mr-2 text-emerald-500" /> Document</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openFilePicker("image/*")} className="py-3">
+                    <div className="h-7 w-7 rounded-full bg-blue-500/10 flex items-center justify-center mr-2"><ImageIcon className="h-3.5 w-3.5 text-blue-500" /></div> Photo
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openFilePicker("video/*")} className="py-3">
+                    <div className="h-7 w-7 rounded-full bg-purple-500/10 flex items-center justify-center mr-2"><Video className="h-3.5 w-3.5 text-purple-500" /></div> Video
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openFilePicker("audio/*")} className="py-3">
+                    <div className="h-7 w-7 rounded-full bg-orange-500/10 flex items-center justify-center mr-2"><Mic className="h-3.5 w-3.5 text-orange-500" /></div> Audio
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")} className="py-3">
+                    <div className="h-7 w-7 rounded-full bg-emerald-500/10 flex items-center justify-center mr-2"><FileText className="h-3.5 w-3.5 text-emerald-500" /></div> Document
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="py-3" onClick={() => {
                     setShowAttachMenu(false);
@@ -741,9 +771,16 @@ export function ChatWindow({
                     inp.type = "file"; inp.accept = "image/*"; inp.capture = "environment";
                     inp.onchange = (e) => { const file = (e.target as HTMLInputElement).files?.[0]; if (file) uploadAndSend(file, file.name, file.type); };
                     inp.click();
-                  }}><Camera className="h-4 w-4 mr-2 text-pink-500" /> Camera</DropdownMenuItem>
+                  }}>
+                    <div className="h-7 w-7 rounded-full bg-pink-500/10 flex items-center justify-center mr-2"><Camera className="h-3.5 w-3.5 text-pink-500" /></div> Camera
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              <button className="h-11 w-11 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted transition-colors"
+                onClick={() => setShowTemplates(true)}>
+                <FileText className="h-[20px] w-[20px] text-muted-foreground" />
+              </button>
 
               <div className="flex-1 relative">
                 <Textarea
@@ -755,11 +792,16 @@ export function ChatWindow({
                   rows={1}
                   className="min-h-[44px] max-h-[100px] text-[15px] py-2.5 px-4 resize-none rounded-full bg-muted/30 border-transparent focus:border-primary/30 focus:bg-background transition-colors"
                 />
+                {input.length > 500 && (
+                  <span className={`absolute bottom-1 right-3 text-[9px] tabular-nums ${input.length > 900 ? "text-destructive" : "text-muted-foreground"}`}>
+                    {input.length}/1000
+                  </span>
+                )}
               </div>
 
               {input.trim() ? (
                 <button
-                  className="h-11 w-11 flex-shrink-0 rounded-full bg-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform"
+                  className="h-11 w-11 flex-shrink-0 rounded-full bg-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform wa-send-bounce"
                   onClick={handleSend} disabled={sending}>
                   <Send className={`h-5 w-5 text-primary-foreground ${sending ? "animate-pulse" : ""}`} />
                 </button>
@@ -859,19 +901,27 @@ export function ChatWindow({
       {/* AI Suggestions */}
       {aiSuggestions.length > 0 && (
         <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-amber-500/15">
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="h-5 w-5 rounded-full bg-amber-500/15 flex items-center justify-center"><Sparkles className="h-3 w-3 text-amber-500" /></div>
-            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">AI</span>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-6 w-6 rounded-full bg-amber-500/15 flex items-center justify-center"><Sparkles className="h-3.5 w-3.5 text-amber-500" /></div>
+            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">AI Suggestions</span>
             <Badge variant="outline" className="text-[9px] border-amber-500/30 text-amber-500">{aiSuggestions.length}</Badge>
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {aiSuggestions.slice(0, 5).map((s) => (
-              <div key={s.id} className="flex items-start gap-2 p-2 rounded-lg bg-card/60 border border-border/50">
-                <p className="text-xs flex-1 text-foreground/80 leading-relaxed line-clamp-2">{s.suggested_response}</p>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <Badge variant="outline" className={`text-[9px] px-1.5 ${s.confidence === "high" ? "border-emerald-500/50 text-emerald-500" : s.confidence === "medium" ? "border-amber-500/50 text-amber-500" : "border-red-500/50 text-red-500"}`}>{s.confidence}</Badge>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-emerald-500/10" onClick={() => onApproveAi(s.id, s.suggested_response)}><Check className="h-4 w-4 text-emerald-500" /></Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-destructive/10" onClick={() => onRejectAi(s.id)}><X className="h-4 w-4 text-destructive" /></Button>
+              <div key={s.id} className="p-3 rounded-xl bg-card border border-border/50 shadow-sm hover:border-amber-500/30 transition-colors">
+                <p className="text-xs text-foreground/80 leading-relaxed line-clamp-3 mb-2">{s.suggested_response}</p>
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className={`text-[9px] px-1.5 ${s.confidence === "high" ? "border-emerald-500/50 text-emerald-500" : s.confidence === "medium" ? "border-amber-500/50 text-amber-500" : "border-red-500/50 text-red-500"}`}>
+                    {s.confidence} confidence
+                  </Badge>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="ghost" className="h-7 px-2.5 rounded-full text-xs hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" onClick={() => onApproveAi(s.id, s.suggested_response)}>
+                      <Check className="h-3.5 w-3.5 mr-1" /> Send
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2.5 rounded-full text-xs hover:bg-destructive/10 text-destructive" onClick={() => onRejectAi(s.id)}>
+                      <X className="h-3.5 w-3.5 mr-1" /> Reject
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -970,6 +1020,7 @@ export function ChatWindow({
           </div>
         ) : (
           <div className="flex items-end gap-1">
+            <EmojiPicker onSelect={(emoji) => setInput(prev => prev + emoji)} />
             <DropdownMenu open={showAttachMenu} onOpenChange={setShowAttachMenu}>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full" disabled={uploading}><Paperclip className="h-5 w-5 text-muted-foreground" /></Button>
@@ -989,19 +1040,30 @@ export function ChatWindow({
                 }}><Camera className="h-4 w-4 mr-2 text-pink-500" /> Camera</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full" onClick={() => setShowTemplates(true)}><FileText className="h-4 w-4 text-muted-foreground" /></Button>
+            <Tooltip><TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full" onClick={() => setShowTemplates(true)}><FileText className="h-4 w-4 text-muted-foreground" /></Button>
+            </TooltipTrigger><TooltipContent>Templates <kbd className="ml-1 text-[9px] bg-muted px-1 rounded">/</kbd></TooltipContent></Tooltip>
             <div className="flex-1 relative">
               <Textarea ref={inputRef} placeholder="Type a message... (/ for quick replies)" value={input} onChange={handleInputChange} onKeyDown={handleKeyDown} rows={1}
                 className="min-h-[40px] max-h-[120px] text-sm resize-none rounded-full bg-muted/30 border-transparent focus:border-primary/30 focus:bg-background transition-colors" />
+              {input.length > 500 && (
+                <span className={`absolute bottom-1 right-3 text-[9px] tabular-nums ${input.length > 900 ? "text-destructive" : "text-muted-foreground"}`}>
+                  {input.length}/1000
+                </span>
+              )}
             </div>
             {input.trim() ? (
-              <Button size="icon" className="h-9 w-9 flex-shrink-0 rounded-full bg-primary hover:bg-primary/90 shadow-sm" onClick={handleSend} disabled={sending}>
-                <Send className={`h-5 w-5 ${sending ? "animate-pulse" : ""}`} />
-              </Button>
+              <Tooltip><TooltipTrigger asChild>
+                <Button size="icon" className="h-9 w-9 flex-shrink-0 rounded-full bg-primary hover:bg-primary/90 shadow-sm wa-send-bounce" onClick={handleSend} disabled={sending}>
+                  <Send className={`h-5 w-5 ${sending ? "animate-pulse" : ""}`} />
+                </Button>
+              </TooltipTrigger><TooltipContent>Send <kbd className="ml-1 text-[9px] bg-muted px-1 rounded">Enter</kbd></TooltipContent></Tooltip>
             ) : (
-              <Button size="icon" variant="ghost" className="h-9 w-9 flex-shrink-0 rounded-full text-primary hover:bg-primary/10" onClick={startRecording}>
-                <Mic className="h-5 w-5" />
-              </Button>
+              <Tooltip><TooltipTrigger asChild>
+                <Button size="icon" variant="ghost" className="h-9 w-9 flex-shrink-0 rounded-full text-primary hover:bg-primary/10" onClick={startRecording}>
+                  <Mic className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger><TooltipContent>Voice note</TooltipContent></Tooltip>
             )}
           </div>
         )}
