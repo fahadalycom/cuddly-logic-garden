@@ -312,6 +312,14 @@ export default function WhatsAppPage() {
             onOpenContactInfo={() => setShowContactInfo(true)}
             isMobile
           />
+          {showContactInfo && (
+            <Sheet open={showContactInfo} onOpenChange={setShowContactInfo}>
+              <SheetContent side="right" className="w-full sm:max-w-sm p-0">
+                <SheetTitle className="sr-only">Contact Info</SheetTitle>
+                <ContactInfoPanel conversation={selectedConversation} onClose={() => setShowContactInfo(false)} />
+              </SheetContent>
+            </Sheet>
+          )}
         </div>
       );
     }
