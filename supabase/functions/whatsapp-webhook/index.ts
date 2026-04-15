@@ -1,11 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { AwsClient } from "https://esm.sh/aws4fetch@1.0.20";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+const BUCKET = "whatsapp-media";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -113,29 +114,29 @@ serve(async (req) => {
         mediaType = "image";
         mediaMimeType = message.image.mime_type;
         content = message.image.caption || null;
-        try { mediaUrl = await downloadAndUploadToR2(message.image.id, mediaMimeType); } catch (e) { console.error("Image R2 upload failed:", e); }
+        try { mediaUrl = await downloadAndUploadToStorage(supabase, message.image.id, mediaMimeType); } catch (e) { console.error("Image upload failed:", e); }
       } else if (message.type === "video") {
         mediaType = "video";
         mediaMimeType = message.video.mime_type;
         content = message.video.caption || null;
-        try { mediaUrl = await downloadAndUploadToR2(message.video.id, mediaMimeType); } catch (e) { console.error("Video R2 upload failed:", e); }
+        try { mediaUrl = await downloadAndUploadToStorage(supabase, message.video.id, mediaMimeType); } catch (e) { console.error("Video upload failed:", e); }
       } else if (message.type === "audio") {
         mediaType = "audio";
         mediaMimeType = message.audio.mime_type;
-        try { mediaUrl = await downloadAndUploadToR2(message.audio.id, mediaMimeType); } catch (e) { console.error("Audio R2 upload failed:", e); }
+        try { mediaUrl = await downloadAndUploadToStorage(supabase, message.audio.id, mediaMimeType); } catch (e) { console.error("Audio upload failed:", e); }
       } else if (message.type === "document") {
         mediaType = "document";
         mediaMimeType = message.document.mime_type;
         mediaFilename = message.document.filename;
         content = message.document.caption || null;
-        try { mediaUrl = await downloadAndUploadToR2(message.document.id, mediaMimeType); } catch (e) { console.error("Document R2 upload failed:", e); }
+        try { mediaUrl = await downloadAndUploadToStorage(supabase, message.document.id, mediaMimeType); } catch (e) { console.error("Document upload failed:", e); }
       } else if (message.type === "sticker") {
         mediaType = "sticker";
         mediaMimeType = "image/webp";
-        try { mediaUrl = await downloadAndUploadToR2(message.sticker.id, "image/webp"); } catch (e) { console.error("Sticker R2 upload failed:", e); }
+        try { mediaUrl = await downloadAndUploadToStorage(supabase, message.sticker.id, "image/webp"); } catch (e) { console.error("Sticker upload failed:", e); }
       }
 
-      // Store message — media_url is now an R2 object key (e.g. "whatsapp/123.jpg")
+      // Store message
       await supabase.from("wa_messages").insert({
         conversation_id: conversation.id,
         sender_type: "customer",
@@ -225,10 +226,10 @@ async function findAvailableAgent(supabase: any): Promise<string | null> {
 }
 
 /**
- * Downloads media from Meta's API and uploads to Cloudflare R2 using proper AWS4 signing.
- * Returns the R2 object key (not full URL).
+ * Downloads media from Meta's API and uploads to Supabase Storage.
+ * Returns the storage object key.
  */
-async function downloadAndUploadToR2(mediaId: string, mimeType: string): Promise<string | null> {
+async function downloadAndUploadToStorage(supabase: any, mediaId: string, mimeType: string): Promise<string | null> {
   try {
     const token = Deno.env.get("META_WHATSAPP_TOKEN")!;
 
@@ -250,31 +251,21 @@ async function downloadAndUploadToR2(mediaId: string, mimeType: string): Promise
     const arrayBuffer = await downloadResp.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
 
-    // Step 3: Upload to R2 with proper AWS4 signing
-    const r2 = new AwsClient({
-      accessKeyId: Deno.env.get("CLOUDFLARE_R2_ACCESS_KEY")!,
-      secretAccessKey: Deno.env.get("CLOUDFLARE_R2_SECRET_KEY")!,
-      service: "s3",
-    });
-
-    const endpoint = Deno.env.get("CLOUDFLARE_R2_ENDPOINT")!;
-    const bucket = Deno.env.get("CLOUDFLARE_R2_BUCKET")!;
+    // Step 3: Upload to Supabase Storage
     const ext = mimeType.split("/")[1]?.split(";")[0] || "bin";
-    const key = `whatsapp/${Date.now()}-${mediaId.slice(-8)}.${ext}`;
-    const r2Url = `${endpoint}/${bucket}/${key}`;
+    const key = `${Date.now()}-${mediaId.slice(-8)}.${ext}`;
 
-    const uploadResp = await r2.fetch(r2Url, {
-      method: "PUT",
-      headers: { "Content-Type": mimeType },
-      body: bytes,
+    const { error } = await supabase.storage.from(BUCKET).upload(key, bytes, {
+      contentType: mimeType,
+      upsert: false,
     });
 
-    if (!uploadResp.ok) {
-      console.error("R2 upload failed:", uploadResp.status, await uploadResp.text());
+    if (error) {
+      console.error("Storage upload failed:", error);
       return null;
     }
 
-    return key; // Return only the key, not the full URL
+    return key;
   } catch (e) {
     console.error("Media download/upload error:", e);
     return null;
