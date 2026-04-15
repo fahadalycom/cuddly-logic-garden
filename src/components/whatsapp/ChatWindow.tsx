@@ -12,7 +12,7 @@ import {
   Image as ImageIcon, Video, FileText, Mic, Sparkles, X, Check, CheckCheck,
   Phone, ExternalLink, Copy, Clock, Search,
   ArrowDown, Shield, Zap, MessageSquare, Download, Loader2, Eye, File,
-  ArrowLeft, Camera, StopCircle, Trash2
+  ArrowLeft, Camera, StopCircle, Trash2, Reply, Smile, Info, CornerDownRight
 } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
 import { toast } from "sonner";
@@ -24,7 +24,7 @@ interface ChatWindowProps {
   messages: any[];
   templates: any[];
   aiSuggestions: any[];
-  onSend: (content: string, mediaUrl?: string, mediaType?: string, mediaMimeType?: string, mediaFilename?: string) => Promise<void>;
+  onSend: (content: string, mediaUrl?: string, mediaType?: string, mediaMimeType?: string, mediaFilename?: string, replyToId?: string) => Promise<void>;
   onResolve: () => Promise<void>;
   onApproveAi: (logId: string, response: string) => Promise<void>;
   onRejectAi: (logId: string) => Promise<void>;
@@ -32,10 +32,13 @@ interface ChatWindowProps {
   staff: any[];
   onAssign: (conversationId: string, agentId: string) => Promise<void>;
   onBack?: () => void;
+  onOpenContactInfo?: () => void;
   isMobile?: boolean;
 }
 
 const mediaBlobCache = new Map<string, string>();
+
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "🙏", "👏"];
 
 function getMediaTypeIcon(mediaType: string) {
   switch (mediaType) {
@@ -96,9 +99,7 @@ function LazyMedia({ mediaKey, mediaType, mimeType, filename, isMobile }: {
     if (mediaType === "video") {
       return <div className="rounded-lg overflow-hidden mb-1.5 -mx-1 -mt-0.5"><video src={blobUrl} controls className="max-w-full" style={{ maxHeight: isMobile ? 200 : 280 }} /></div>;
     }
-    if (mediaType === "audio") {
-      return null; // Handled by VoiceNotePlayer in MessageBubble
-    }
+    if (mediaType === "audio") return null;
     return (
       <a href={blobUrl} download={filename || "document"} className="flex items-center gap-3 p-2.5 bg-background/10 rounded-lg mb-1.5 hover:bg-background/20 active:bg-background/30 transition-colors">
         <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0"><FileText className="h-5 w-5 text-primary" /></div>
@@ -137,7 +138,13 @@ function DateSeparator({ date }: { date: Date }) {
   );
 }
 
-function MessageBubble({ msg, isGrouped, isMobile }: { msg: any; isGrouped: boolean; isMobile?: boolean }) {
+function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact }: {
+  msg: any; isGrouped: boolean; isMobile?: boolean;
+  allMessages: any[];
+  onReply: (msg: any) => void;
+  onReact: (msgId: string, emoji: string) => void;
+}) {
+  const [showReactions, setShowReactions] = useState(false);
   const isCustomer = msg.sender_type === "customer";
   const isAi = msg.sender_type === "ai";
   const isSystem = msg.sender_type === "system";
@@ -160,9 +167,28 @@ function MessageBubble({ msg, isGrouped, isMobile }: { msg: any; isGrouped: bool
   const isVoiceNote = msg.media_type === "audio";
   const maxW = isMobile ? "max-w-[85%]" : "max-w-[70%]";
 
+  // Find replied message
+  const repliedMsg = msg.reply_to_message_id ? allMessages.find(m => m.id === msg.reply_to_message_id) : null;
+
+  // Parse reactions
+  const reactions: { emoji: string; count: number }[] = [];
+  if (msg.reactions && Array.isArray(msg.reactions)) {
+    const emojiCounts: Record<string, number> = {};
+    msg.reactions.forEach((r: any) => { emojiCounts[r.emoji] = (emojiCounts[r.emoji] || 0) + 1; });
+    Object.entries(emojiCounts).forEach(([emoji, count]) => reactions.push({ emoji, count }));
+  }
+
   return (
-    <div className={`flex ${isCustomer ? "justify-start" : "justify-end"} ${isGrouped ? "mt-0.5" : "mt-3"} group ${isSending ? "opacity-70" : ""}`}>
+    <div className={`flex ${isCustomer ? "justify-start" : "justify-end"} ${isGrouped ? "mt-0.5" : "mt-3"} group animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ${isSending ? "opacity-70" : ""}`}>
       <div className={`relative ${maxW}`}>
+        {/* Replied message preview */}
+        {repliedMsg && (
+          <div className={`mb-1 px-3 py-1.5 rounded-lg border-l-2 ${isCustomer ? "border-l-primary bg-muted/30" : "border-l-primary-foreground/30 bg-primary/20"} cursor-pointer`}>
+            <p className="text-[10px] font-medium text-muted-foreground">{repliedMsg.sender_type === "customer" ? "Customer" : "You"}</p>
+            <p className="text-[11px] line-clamp-1 opacity-80">{repliedMsg.content || `[${repliedMsg.media_type}]`}</p>
+          </div>
+        )}
+
         <div className={`rounded-2xl px-3.5 py-2 relative shadow-sm ${
           isFailed
             ? "bg-destructive/10 border border-destructive/30 text-foreground rounded-tr-sm"
@@ -196,9 +222,42 @@ function MessageBubble({ msg, isGrouped, isMobile }: { msg: any; isGrouped: bool
             )}
           </div>
         </div>
-        {!isMobile && (
-          <div className={`absolute top-0 ${isCustomer ? "-right-8" : "-left-8"} hidden group-hover:flex`}>
-            <button onClick={handleCopy} className="h-6 w-6 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted"><Copy className="h-3 w-3 text-muted-foreground" /></button>
+
+        {/* Reactions display */}
+        {reactions.length > 0 && (
+          <div className={`flex gap-0.5 mt-0.5 ${isCustomer ? "justify-start" : "justify-end"}`}>
+            {reactions.map((r, i) => (
+              <span key={i} className="text-xs bg-muted/60 border border-border/50 rounded-full px-1.5 py-0.5 cursor-pointer hover:bg-muted transition-colors">
+                {r.emoji} {r.count > 1 && <span className="text-[9px] text-muted-foreground">{r.count}</span>}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Action buttons on hover */}
+        {!isMobile && !isSending && (
+          <div className={`absolute top-0 ${isCustomer ? "-right-20" : "-left-20"} hidden group-hover:flex gap-0.5 items-center`}>
+            <button onClick={() => onReply(msg)} className="h-6 w-6 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted" title="Reply">
+              <Reply className="h-3 w-3 text-muted-foreground" />
+            </button>
+            <button onClick={() => setShowReactions(!showReactions)} className="h-6 w-6 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted" title="React">
+              <Smile className="h-3 w-3 text-muted-foreground" />
+            </button>
+            <button onClick={handleCopy} className="h-6 w-6 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted" title="Copy">
+              <Copy className="h-3 w-3 text-muted-foreground" />
+            </button>
+          </div>
+        )}
+
+        {/* Reactions picker */}
+        {showReactions && (
+          <div className={`absolute ${isCustomer ? "left-0" : "right-0"} -top-10 flex gap-0.5 bg-card border border-border rounded-full px-2 py-1 shadow-lg z-10 animate-in fade-in scale-in-95 duration-150`}>
+            {QUICK_REACTIONS.map(emoji => (
+              <button key={emoji} onClick={() => { onReact(msg.id, emoji); setShowReactions(false); }}
+                className="h-7 w-7 rounded-full hover:bg-muted flex items-center justify-center text-base transition-transform hover:scale-125">
+                {emoji}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -209,7 +268,7 @@ function MessageBubble({ msg, isGrouped, isMobile }: { msg: any; isGrouped: bool
 export function ChatWindow({
   conversation, messages, templates, aiSuggestions,
   onSend, onResolve, onApproveAi, onRejectAi, isAdmin, staff, onAssign,
-  onBack, isMobile,
+  onBack, onOpenContactInfo, isMobile,
 }: ChatWindowProps) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -220,6 +279,8 @@ export function ChatWindow({
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [replyTo, setReplyTo] = useState<any | null>(null);
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -243,11 +304,12 @@ export function ChatWindow({
     if (!input.trim() || sending) return;
     const msg = input.trim();
     setInput("");
+    const replyId = replyTo?.id;
+    setReplyTo(null);
     setSending(true);
     try {
-      await onSend(msg);
+      await onSend(msg, undefined, undefined, undefined, undefined, replyId);
     } catch {
-      // Error handled in parent via optimistic UI
     } finally {
       setSending(false);
       inputRef.current?.focus();
@@ -256,6 +318,29 @@ export function ChatWindow({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    if (e.key === "Escape" && replyTo) { setReplyTo(null); }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInput(val);
+    // Slash command detection
+    if (val === "/") setShowSlashMenu(true);
+    else if (!val.startsWith("/")) setShowSlashMenu(false);
+  };
+
+  const handleReply = (msg: any) => {
+    setReplyTo(msg);
+    inputRef.current?.focus();
+  };
+
+  const handleReact = async (msgId: string, emoji: string) => {
+    // Update reactions in DB
+    const msg = messages.find(m => m.id === msgId);
+    if (!msg) return;
+    const currentReactions = Array.isArray(msg.reactions) ? [...msg.reactions] : [];
+    currentReactions.push({ emoji, user_id: "agent", created_at: new Date().toISOString() });
+    await supabase.from("wa_messages").update({ reactions: currentReactions } as any).eq("id", msgId);
   };
 
   const uploadAndSend = async (file: File | Blob, filename: string, mimeType: string) => {
@@ -306,7 +391,6 @@ export function ChatWindow({
     setTimeout(() => fileInputRef.current?.click(), 100);
   };
 
-  // Voice recording
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -323,10 +407,7 @@ export function ChatWindow({
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
         const recordedBlob = new Blob(audioChunksRef.current, { type: actualMime });
-        if (recordedBlob.size === 0) {
-          toast.error("Recording failed — no audio captured");
-          return;
-        }
+        if (recordedBlob.size === 0) { toast.error("Recording failed — no audio captured"); return; }
 
         try {
           const { normalizeVoiceNote } = await import("@/lib/voice-note");
@@ -349,9 +430,7 @@ export function ChatWindow({
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop();
     setIsRecording(false);
     if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
   };
@@ -359,9 +438,7 @@ export function ChatWindow({
   const cancelRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.ondataavailable = null;
-      mediaRecorderRef.current.onstop = () => {
-        mediaRecorderRef.current?.stream?.getTracks().forEach(t => t.stop());
-      };
+      mediaRecorderRef.current.onstop = () => { mediaRecorderRef.current?.stream?.getTracks().forEach(t => t.stop()); };
       mediaRecorderRef.current.stop();
     }
     setIsRecording(false);
@@ -375,6 +452,7 @@ export function ChatWindow({
   const handleTemplateSelect = (template: any) => {
     setInput(template.body);
     setShowTemplates(false);
+    setShowSlashMenu(false);
     setTemplateSearch("");
     inputRef.current?.focus();
   };
@@ -387,6 +465,12 @@ export function ChatWindow({
   const filteredTemplates = templates.filter(
     (t) => t.name.toLowerCase().includes(templateSearch.toLowerCase()) || t.body.toLowerCase().includes(templateSearch.toLowerCase())
   );
+
+  // Slash-filtered templates
+  const slashFiltered = templates.filter(t => {
+    const q = input.slice(1).toLowerCase();
+    return !q || t.name.toLowerCase().includes(q) || t.body.toLowerCase().includes(q);
+  });
 
   const messagesWithDates: { type: "date" | "message"; date?: Date; msg?: any; isGrouped?: boolean }[] = [];
   let lastDate: string | null = null;
@@ -419,7 +503,7 @@ export function ChatWindow({
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
-          <div className="relative flex-shrink-0">
+          <div className="relative flex-shrink-0 cursor-pointer" onClick={onOpenContactInfo}>
             <div className={`${isMobile ? "h-9 w-9" : "h-10 w-10"} rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-sm`}>
               <span className={`${isMobile ? "text-xs" : "text-sm"} font-bold text-primary-foreground`}>
                 {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
@@ -427,7 +511,7 @@ export function ChatWindow({
             </div>
             <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${conversation.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 cursor-pointer" onClick={onOpenContactInfo}>
             <div className="flex items-center gap-1.5">
               <p className={`${isMobile ? "text-sm" : "text-sm"} font-semibold truncate`}>{conversation.customer_name || conversation.customer_phone}</p>
               {!isMobile && (
@@ -445,6 +529,14 @@ export function ChatWindow({
         </div>
 
         <div className="flex items-center gap-0.5 flex-shrink-0">
+          {!isMobile && onOpenContactInfo && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={onOpenContactInfo}><Info className="h-4 w-4" /></Button>
+              </TooltipTrigger>
+              <TooltipContent>Contact info</TooltipContent>
+            </Tooltip>
+          )}
           {!isMobile && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -458,9 +550,7 @@ export function ChatWindow({
               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg"><MoreVertical className="h-4 w-4" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              {isMobile && (
-                <DropdownMenuItem onClick={openWhatsApp}><ExternalLink className="h-4 w-4 mr-2" /> Open in WhatsApp</DropdownMenuItem>
-              )}
+              {isMobile && <DropdownMenuItem onClick={openWhatsApp}><ExternalLink className="h-4 w-4 mr-2" /> Open in WhatsApp</DropdownMenuItem>}
               <DropdownMenuItem onClick={onResolve} className="text-emerald-500"><CheckCircle className="h-4 w-4 mr-2" /> Mark Resolved</DropdownMenuItem>
               {isAdmin && staff.length > 0 && (
                 <>
@@ -512,7 +602,10 @@ export function ChatWindow({
         style={{ backgroundImage: "radial-gradient(circle at 20% 80%, hsl(var(--primary) / 0.02) 0%, transparent 50%), radial-gradient(circle at 80% 20%, hsl(var(--primary) / 0.02) 0%, transparent 50%)" }}>
         {messagesWithDates.map((item, i) => {
           if (item.type === "date" && item.date) return <DateSeparator key={`date-${i}`} date={item.date} />;
-          if (item.type === "message" && item.msg) return <MessageBubble key={item.msg.id} msg={item.msg} isGrouped={!!item.isGrouped} isMobile={isMobile} />;
+          if (item.type === "message" && item.msg) return (
+            <MessageBubble key={item.msg.id} msg={item.msg} isGrouped={!!item.isGrouped} isMobile={isMobile}
+              allMessages={messages} onReply={handleReply} onReact={handleReact} />
+          );
           return null;
         })}
         {messages.length === 0 && (
@@ -536,6 +629,38 @@ export function ChatWindow({
       {/* Hidden file input */}
       <input ref={fileInputRef} type="file" className="hidden" accept={fileAccept} onChange={handleFileSelect} />
 
+      {/* Reply preview */}
+      {replyTo && (
+        <div className="px-4 py-2 border-t border-border bg-muted/30 flex items-center gap-2 animate-in slide-in-from-bottom-2 duration-150">
+          <div className="h-full w-1 rounded-full bg-primary flex-shrink-0" />
+          <CornerDownRight className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-semibold text-primary">{replyTo.sender_type === "customer" ? "Customer" : "You"}</p>
+            <p className="text-xs text-muted-foreground truncate">{replyTo.content || `[${replyTo.media_type}]`}</p>
+          </div>
+          <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full flex-shrink-0" onClick={() => setReplyTo(null)}>
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
+
+      {/* Slash command menu */}
+      {showSlashMenu && slashFiltered.length > 0 && (
+        <div className="px-4 py-2 border-t border-border bg-card max-h-48 overflow-y-auto animate-in slide-in-from-bottom-2 duration-150">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Quick Replies</p>
+          {slashFiltered.slice(0, 6).map(t => (
+            <button key={t.id} onClick={() => handleTemplateSelect(t)}
+              className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-accent/50 transition-colors flex items-start gap-2">
+              <FileText className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs font-medium">{t.name}</p>
+                <p className="text-[11px] text-muted-foreground line-clamp-1">{t.body}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Input Area */}
       <div className={`${isMobile ? "px-2 py-2" : "px-4 py-3"} border-t border-border bg-card/80 backdrop-blur-sm safe-area-bottom`}>
         {uploading && (
@@ -555,24 +680,13 @@ export function ChatWindow({
                 <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse shadow-sm shadow-red-500/50" />
                 <span className="text-sm font-semibold tabular-nums text-destructive min-w-[40px]">{formatRecordingTime(recordingTime)}</span>
               </div>
-              {/* Live waveform animation */}
               <div className="flex items-center gap-[2px] flex-1 h-[24px]">
                 {Array.from({ length: isMobile ? 24 : 36 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 rounded-full bg-destructive/60"
-                    style={{
-                      height: `${20 + Math.random() * 80}%`,
-                      minWidth: 2,
-                      animation: `pulse ${0.3 + Math.random() * 0.7}s ease-in-out infinite alternate`,
-                      animationDelay: `${i * 0.05}s`,
-                    }}
-                  />
+                  <div key={i} className="flex-1 rounded-full bg-destructive/60"
+                    style={{ height: `${20 + Math.random() * 80}%`, minWidth: 2, animation: `pulse ${0.3 + Math.random() * 0.7}s ease-in-out infinite alternate`, animationDelay: `${i * 0.05}s` }} />
                 ))}
               </div>
-              <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                {isMobile ? "← Cancel" : "← Slide to cancel"}
-              </span>
+              <span className="text-[11px] text-muted-foreground whitespace-nowrap">{isMobile ? "← Cancel" : "← Slide to cancel"}</span>
             </div>
             <Button size="icon" className="h-10 w-10 rounded-full bg-primary hover:bg-primary/90 shadow-md shadow-primary/30 transition-transform active:scale-95" onClick={stopRecording}>
               <Send className="h-5 w-5" />
@@ -580,7 +694,6 @@ export function ChatWindow({
           </div>
         ) : (
           <div className="flex items-end gap-1.5">
-            {/* Attachment menu */}
             <DropdownMenu open={showAttachMenu} onOpenChange={setShowAttachMenu}>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className={`${isMobile ? "h-10 w-10" : "h-9 w-9"} flex-shrink-0 rounded-full`} disabled={uploading}>
@@ -588,38 +701,21 @@ export function ChatWindow({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-48" side="top">
-                <DropdownMenuItem onClick={() => openFilePicker("image/*")}>
-                  <ImageIcon className="h-4 w-4 mr-2 text-blue-500" /> Photo
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openFilePicker("video/*")}>
-                  <Video className="h-4 w-4 mr-2 text-purple-500" /> Video
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openFilePicker("audio/*")}>
-                  <Mic className="h-4 w-4 mr-2 text-orange-500" /> Audio File
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")}>
-                  <FileText className="h-4 w-4 mr-2 text-emerald-500" /> Document
-                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker("image/*")}><ImageIcon className="h-4 w-4 mr-2 text-blue-500" /> Photo</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker("video/*")}><Video className="h-4 w-4 mr-2 text-purple-500" /> Video</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker("audio/*")}><Mic className="h-4 w-4 mr-2 text-orange-500" /> Audio File</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")}><FileText className="h-4 w-4 mr-2 text-emerald-500" /> Document</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => {
                   setShowAttachMenu(false);
-                  setFileAccept("image/*");
                   const input = document.createElement("input");
-                  input.type = "file";
-                  input.accept = "image/*";
-                  input.capture = "environment";
-                  input.onchange = (e) => {
-                    const file = (e.target as HTMLInputElement).files?.[0];
-                    if (file) uploadAndSend(file, file.name, file.type);
-                  };
+                  input.type = "file"; input.accept = "image/*"; input.capture = "environment";
+                  input.onchange = (e) => { const file = (e.target as HTMLInputElement).files?.[0]; if (file) uploadAndSend(file, file.name, file.type); };
                   input.click();
-                }}>
-                  <Camera className="h-4 w-4 mr-2 text-pink-500" /> Camera
-                </DropdownMenuItem>
+                }}><Camera className="h-4 w-4 mr-2 text-pink-500" /> Camera</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Templates button */}
             {!isMobile && (
               <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full" onClick={() => setShowTemplates(true)}>
                 <FileText className="h-4 w-4 text-muted-foreground" />
@@ -629,9 +725,9 @@ export function ChatWindow({
             <div className="flex-1 relative">
               <Textarea
                 ref={inputRef}
-                placeholder="Type a message..."
+                placeholder="Type a message... (/ for quick replies)"
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
                 rows={1}
                 className={`${isMobile ? "min-h-[42px] text-base" : "min-h-[40px] text-sm"} max-h-[120px] resize-none pr-3 rounded-2xl bg-muted/30 border-transparent focus:border-primary/30 focus:bg-background transition-colors`}
