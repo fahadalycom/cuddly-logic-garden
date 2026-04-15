@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,6 +24,8 @@ export default function WhatsAppPage() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
+  // Track IDs we already have to deduplicate realtime inserts
+  const messageIdsRef = useRef<Set<string>>(new Set());
 
   const fetchConversations = async () => {
     const { data } = await supabase
@@ -40,7 +42,11 @@ export default function WhatsAppPage() {
       .select("*")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });
-    setMessages(data || []);
+    const msgs = data || [];
+    // Build dedup set
+    const ids = new Set(msgs.map((m: any) => m.id));
+    messageIdsRef.current = ids;
+    setMessages(msgs);
     await supabase.from("wa_messages").update({ is_read: true }).eq("conversation_id", conversationId).eq("is_read", false);
     await supabase.from("wa_conversations").update({ unread_count: 0 }).eq("id", conversationId);
   };
@@ -108,7 +114,27 @@ export default function WhatsAppPage() {
       .on("postgres_changes", {
         event: "INSERT", schema: "public", table: "wa_messages",
         filter: `conversation_id=eq.${selectedConversation.id}`,
-      }, (payload) => setMessages((prev) => [...prev, payload.new as any]))
+      }, (payload) => {
+        const newMsg = payload.new as any;
+        // Deduplicate: skip if we already have this ID (from optimistic insert or prior fetch)
+        if (messageIdsRef.current.has(newMsg.id)) {
+          // Update the existing message in-place (replace optimistic with real data)
+          setMessages((prev) => prev.map((m) => m.id === newMsg.id ? newMsg : m));
+          return;
+        }
+        // Also check for temp IDs — replace optimistic messages by matching content+time
+        setMessages((prev) => {
+          // Remove any optimistic message that matches this real one
+          const withoutOptimistic = prev.filter((m) => {
+            if (!m._optimistic) return true;
+            // Match by content similarity
+            if (m.content === newMsg.content && m.media_type === newMsg.media_type) return false;
+            return true;
+          });
+          messageIdsRef.current.add(newMsg.id);
+          return [...withoutOptimistic, newMsg];
+        });
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(msgChannel); };
@@ -116,20 +142,62 @@ export default function WhatsAppPage() {
 
   const handleSendMessage = async (content: string, mediaUrl?: string, mediaType?: string, mediaMimeType?: string, mediaFilename?: string) => {
     if (!selectedConversation || !user) return;
-    const { data, error } = await supabase.functions.invoke("whatsapp-send", {
-      body: {
-        conversation_id: selectedConversation.id,
-        content,
-        media_url: mediaUrl,
-        media_type: mediaType || "text",
-        media_mime_type: mediaMimeType,
-        media_filename: mediaFilename,
-        sender_id: user.id,
-      },
-    });
-    if (error) {
-      toast.error("Message send failed — saved as draft");
-      throw error;
+
+    // Optimistic: add message immediately to UI
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const optimisticMsg = {
+      id: tempId,
+      conversation_id: selectedConversation.id,
+      sender_type: "agent",
+      sender_id: user.id,
+      content,
+      media_url: mediaUrl || null,
+      media_type: mediaType || "text",
+      media_mime_type: mediaMimeType || null,
+      media_filename: mediaFilename || null,
+      is_read: true,
+      is_ai_generated: false,
+      created_at: new Date().toISOString(),
+      whatsapp_message_id: null,
+      _optimistic: true,
+      _sending: true,
+    };
+    setMessages((prev) => [...prev, optimisticMsg]);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-send", {
+        body: {
+          conversation_id: selectedConversation.id,
+          content,
+          media_url: mediaUrl,
+          media_type: mediaType || "text",
+          media_mime_type: mediaMimeType,
+          media_filename: mediaFilename,
+          sender_id: user.id,
+        },
+      });
+      if (error) throw error;
+
+      // Replace optimistic message with real one from response
+      const realMsg = data?.message;
+      if (realMsg) {
+        messageIdsRef.current.add(realMsg.id);
+        setMessages((prev) => prev.map((m) => m.id === tempId ? { ...realMsg, _sending: false } : m));
+      } else {
+        // Edge function succeeded but no message returned — mark as sent
+        setMessages((prev) => prev.map((m) => m.id === tempId ? { ...m, _sending: false } : m));
+      }
+
+      // Check if delivery failed (207 = saved but not delivered)
+      if (data && data.success === false) {
+        toast.warning("Message saved but delivery failed — check token");
+        setMessages((prev) => prev.map((m) => m.id === tempId ? { ...m, _failed: true, _sending: false } : m));
+      }
+    } catch (err) {
+      // Mark as failed
+      setMessages((prev) => prev.map((m) => m.id === tempId ? { ...m, _failed: true, _sending: false } : m));
+      toast.error("Message send failed");
+      throw err;
     }
   };
 
