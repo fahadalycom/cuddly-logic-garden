@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { createPortal } from "react-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -312,8 +311,8 @@ export default function WhatsAppPage() {
   // Mobile: show chat if selected, else show list
   if (isMobile) {
     if (selectedConversation) {
-      return createPortal(
-        <div className="fixed inset-0 z-[100] flex flex-col bg-background" style={{ height: '100dvh' }}>
+      return (
+        <div className="fixed inset-0 z-[100] flex flex-col bg-background" style={{ height: '100vh', height: '100dvh' }}>
           <ChatWindow
             conversation={selectedConversation}
             messages={messages}
@@ -338,8 +337,7 @@ export default function WhatsAppPage() {
               </SheetContent>
             </Sheet>
           )}
-        </div>,
-        document.body
+        </div>
       );
     }
 
