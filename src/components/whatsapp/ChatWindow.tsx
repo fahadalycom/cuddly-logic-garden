@@ -530,39 +530,49 @@ export function ChatWindow({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className={`${isMobile ? "px-3 py-2.5" : "px-5 py-3"} border-b border-border flex items-center justify-between bg-card/80 backdrop-blur-sm`}>
-        <div className="flex items-center gap-2.5 min-w-0">
+      <div className={`${isMobile ? "px-2 py-2 safe-area-top" : "px-5 py-3"} border-b border-border flex items-center justify-between bg-card/95 backdrop-blur-md`}>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {onBack && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 rounded-lg -ml-1" onClick={onBack}>
+            <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full -ml-0.5 active:scale-95 transition-transform" onClick={onBack}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
-          <div className="relative flex-shrink-0 cursor-pointer" onClick={onOpenContactInfo}>
-            <div className={`${isMobile ? "h-9 w-9" : "h-10 w-10"} rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-sm`}>
-              <span className={`${isMobile ? "text-xs" : "text-sm"} font-bold text-primary-foreground`}>
+          <div className="relative flex-shrink-0 cursor-pointer active:scale-95 transition-transform" onClick={onOpenContactInfo}>
+            <div className={`${isMobile ? "h-10 w-10" : "h-10 w-10"} rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-sm`}>
+              <span className="text-sm font-bold text-primary-foreground">
                 {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
               </span>
             </div>
             <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${conversation.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
           </div>
-          <div className="min-w-0 cursor-pointer" onClick={onOpenContactInfo}>
-            <div className="flex items-center gap-1.5">
-              <p className={`${isMobile ? "text-sm" : "text-sm"} font-semibold truncate`}>{conversation.customer_name || conversation.customer_phone}</p>
-              {!isMobile && (
-                <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 border ${status.bg} ${status.color}`}>
-                  <StatusIcon className="h-2.5 w-2.5 mr-0.5" />{conversation.status}
-                </Badge>
+          <div className="min-w-0 flex-1 cursor-pointer" onClick={onOpenContactInfo}>
+            <p className={`${isMobile ? "text-[15px]" : "text-sm"} font-semibold truncate leading-tight`}>{conversation.customer_name || conversation.customer_phone}</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {isMobile ? (
+                <>
+                  {conversation.status === "active" && <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                  <span className="text-[11px] text-muted-foreground">
+                    {conversation.status === "active" ? "Online" : conversation.customer_phone}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 border ${status.bg} ${status.color}`}>
+                    <StatusIcon className="h-2.5 w-2.5 mr-0.5" />{conversation.status}
+                  </Badge>
+                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground"><Phone className="h-3 w-3" />{conversation.customer_phone}</span>
+                </>
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground truncate">
-              {isMobile ? (conversation.status === "active" ? "Online" : conversation.customer_phone) : (
-                <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{conversation.customer_phone}</span>
-              )}
-            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-0.5 flex-shrink-0">
+        <div className="flex items-center gap-0 flex-shrink-0">
+          {isMobile && (
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full active:scale-95 transition-transform" onClick={openWhatsApp}>
+              <Phone className="h-4.5 w-4.5" />
+            </Button>
+          )}
           {!isMobile && onOpenContactInfo && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -581,10 +591,11 @@ export function ChatWindow({
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg"><MoreVertical className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className={`${isMobile ? "h-9 w-9 rounded-full" : "h-8 w-8 rounded-lg"} active:scale-95 transition-transform`}><MoreVertical className="h-4.5 w-4.5" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               {isMobile && <DropdownMenuItem onClick={openWhatsApp}><ExternalLink className="h-4 w-4 mr-2" /> Open in WhatsApp</DropdownMenuItem>}
+              {isMobile && onOpenContactInfo && <DropdownMenuItem onClick={onOpenContactInfo}><Info className="h-4 w-4 mr-2" /> Contact Info</DropdownMenuItem>}
               <DropdownMenuItem onClick={onResolve} className="text-emerald-500"><CheckCircle className="h-4 w-4 mr-2" /> Mark Resolved</DropdownMenuItem>
               {isAdmin && staff.length > 0 && (
                 <>
@@ -608,20 +619,20 @@ export function ChatWindow({
         <div className={`${isMobile ? "px-3 py-2" : "px-5 py-3"} bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-amber-500/15`}>
           <div className="flex items-center gap-2 mb-1.5">
             <div className="h-5 w-5 rounded-full bg-amber-500/15 flex items-center justify-center"><Sparkles className="h-3 w-3 text-amber-500" /></div>
-            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">AI Suggestions</span>
+            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">AI</span>
             <Badge variant="outline" className="text-[9px] border-amber-500/30 text-amber-500">{aiSuggestions.length}</Badge>
           </div>
           <div className="space-y-1.5">
-            {aiSuggestions.slice(0, isMobile ? 2 : 5).map((s) => (
+            {aiSuggestions.slice(0, isMobile ? 1 : 5).map((s) => (
               <div key={s.id} className="flex items-start gap-2 p-2 rounded-lg bg-card/60 border border-border/50">
                 <p className="text-xs flex-1 text-foreground/80 leading-relaxed line-clamp-2">{s.suggested_response}</p>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <Badge variant="outline" className={`text-[9px] px-1.5 ${s.confidence === "high" ? "border-emerald-500/50 text-emerald-500" : s.confidence === "medium" ? "border-amber-500/50 text-amber-500" : "border-red-500/50 text-red-500"}`}>{s.confidence}</Badge>
-                  <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full hover:bg-emerald-500/10" onClick={() => onApproveAi(s.id, s.suggested_response)}>
-                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-emerald-500/10 active:scale-95" onClick={() => onApproveAi(s.id, s.suggested_response)}>
+                    <Check className="h-4 w-4 text-emerald-500" />
                   </Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full hover:bg-destructive/10" onClick={() => onRejectAi(s.id)}>
-                    <X className="h-3.5 w-3.5 text-destructive" />
+                  <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-destructive/10 active:scale-95" onClick={() => onRejectAi(s.id)}>
+                    <X className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
               </div>
@@ -632,7 +643,7 @@ export function ChatWindow({
 
       {/* Messages */}
       <div ref={scrollRef} onScroll={handleScroll}
-        className={`flex-1 overflow-y-auto ${isMobile ? "px-3" : "px-5"} py-2 bg-gradient-to-b from-muted/10 to-muted/5`}
+        className={`flex-1 overflow-y-auto ${isMobile ? "px-2.5" : "px-5"} py-2 bg-gradient-to-b from-muted/10 to-muted/5`}
         style={{ backgroundImage: "radial-gradient(circle at 20% 80%, hsl(var(--primary) / 0.02) 0%, transparent 50%), radial-gradient(circle at 80% 20%, hsl(var(--primary) / 0.02) 0%, transparent 50%)" }}>
         {messagesWithDates.map((item, i) => {
           if (item.type === "date" && item.date) return <DateSeparator key={`date-${i}`} date={item.date} />;
