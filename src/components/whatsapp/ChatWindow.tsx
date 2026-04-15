@@ -253,17 +253,20 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
           </div>
         )}
 
-        {/* Desktop hover actions */}
+        {/* Desktop hover actions — floating pill */}
         {!isMobile && !isSending && (
-          <div className={`absolute top-0 ${isCustomer ? "-right-20" : "-left-20"} hidden group-hover:flex gap-0.5 items-center`}>
-            <button onClick={() => onReply(msg)} className="h-6 w-6 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted" title="Reply">
+          <div className={`absolute top-1 ${isCustomer ? "-right-24" : "-left-24"} hidden group-hover:flex gap-0.5 items-center bg-card/90 backdrop-blur-sm border border-border/60 rounded-full px-1 py-0.5 shadow-lg transition-all`}>
+            <button onClick={() => onReply(msg)} className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-muted" title="Reply">
               <Reply className="h-3 w-3 text-muted-foreground" />
             </button>
-            <button onClick={() => setShowReactions(!showReactions)} className="h-6 w-6 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted" title="React">
+            <button onClick={() => setShowReactions(!showReactions)} className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-muted" title="React">
               <Smile className="h-3 w-3 text-muted-foreground" />
             </button>
-            <button onClick={handleCopy} className="h-6 w-6 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted" title="Copy">
+            <button onClick={handleCopy} className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-muted" title="Copy">
               <Copy className="h-3 w-3 text-muted-foreground" />
+            </button>
+            <button onClick={() => toast.info("Forward coming soon")} className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-muted" title="Forward">
+              <Forward className="h-3 w-3 text-muted-foreground" />
             </button>
           </div>
         )}
@@ -283,12 +286,16 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
               </div>
               <div className="flex gap-1 mt-1 bg-card border border-border rounded-xl px-1 py-1 shadow-xl">
                 <button onClick={() => { onReply(msg); setShowMobileActions(false); }}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg active:bg-muted transition-colors flex-1">
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg active:bg-muted transition-colors flex-1">
                   <Reply className="h-4 w-4 text-muted-foreground" /><span className="text-xs font-medium">Reply</span>
                 </button>
                 <button onClick={handleCopy}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg active:bg-muted transition-colors flex-1">
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg active:bg-muted transition-colors flex-1">
                   <Copy className="h-4 w-4 text-muted-foreground" /><span className="text-xs font-medium">Copy</span>
+                </button>
+                <button onClick={() => { toast.info("Forward coming soon"); setShowMobileActions(false); }}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg active:bg-muted transition-colors flex-1">
+                  <Forward className="h-4 w-4 text-muted-foreground" /><span className="text-xs font-medium">Forward</span>
                 </button>
               </div>
             </div>
