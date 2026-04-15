@@ -30,6 +30,7 @@ serve(async (req) => {
     if (req.method === "GET") {
       const url = new URL(req.url);
       const key = url.searchParams.get("key");
+      // Accept apikey as query param for external callers (e.g., Meta servers)
       if (!key) {
         return new Response(JSON.stringify({ error: "Missing key parameter" }), {
           status: 400,
