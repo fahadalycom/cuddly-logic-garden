@@ -145,11 +145,12 @@ serve(async (req) => {
         messagePayload[waMediaType] = { id: mediaId };
         if (content) messagePayload[waMediaType].caption = content;
       } else {
-        // Fallback: try with public URL
-        console.warn("Direct upload failed, falling back to public URL");
-        const { data: publicUrlData } = supabase.storage.from(BUCKET).getPublicUrl(media_url);
+        // Fallback: try with proxy link via edge function
+        console.warn("Direct upload failed, falling back to proxy link");
+        const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
+        const proxyUrl = `${supabaseUrl}/functions/v1/whatsapp-media?key=${encodeURIComponent(media_url)}&apikey=${encodeURIComponent(anonKey)}`;
         messagePayload.type = waMediaType;
-        messagePayload[waMediaType] = { link: publicUrlData.publicUrl };
+        messagePayload[waMediaType] = { link: proxyUrl };
         if (content) messagePayload[waMediaType].caption = content;
       }
     } else {
