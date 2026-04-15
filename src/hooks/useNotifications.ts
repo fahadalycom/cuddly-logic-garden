@@ -49,11 +49,9 @@ export function useNotifications() {
         const notif = new Notification(title, {
           body,
           icon: "/placeholder.svg",
-          badge: "/placeholder.svg",
           tag: "wa-message",
-          renotify: true,
-          silent: true, // we handle sound ourselves
-        });
+          silent: true,
+        } as NotificationOptions);
         if (onClick) {
           notif.onclick = () => {
             window.focus();
