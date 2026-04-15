@@ -49,10 +49,13 @@ serve(async (req) => {
     };
 
     if (media_type && media_type !== "text" && media_url) {
-      const proxyUrl = `${supabaseUrl}/functions/v1/whatsapp-media?key=${encodeURIComponent(media_url)}`;
-      messagePayload.type = media_type;
-      messagePayload[media_type] = { link: proxyUrl };
-      if (content) messagePayload[media_type].caption = content;
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
+      const proxyUrl = `${supabaseUrl}/functions/v1/whatsapp-media?key=${encodeURIComponent(media_url)}&apikey=${encodeURIComponent(anonKey)}`;
+      // WhatsApp API type: audio voice notes use "audio"
+      const waMediaType = media_type === "audio" ? "audio" : media_type;
+      messagePayload.type = waMediaType;
+      messagePayload[waMediaType] = { link: proxyUrl };
+      if (content) messagePayload[waMediaType].caption = content;
     } else {
       messagePayload.type = "text";
       messagePayload.text = { body: content };
