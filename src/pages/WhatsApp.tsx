@@ -344,7 +344,8 @@ export default function WhatsAppPage() {
               </SheetContent>
             </Sheet>
           )}
-        </div>
+          </div>
+        </>
       );
     }
 
