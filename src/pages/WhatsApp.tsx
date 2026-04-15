@@ -24,6 +24,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
   DropdownMenuSeparator, DropdownMenuLabel
 } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 export default function WhatsAppPage() {
   const { user, isAdmin } = useAuth();
@@ -295,7 +296,7 @@ export default function WhatsAppPage() {
   if (isMobile) {
     if (selectedConversation) {
       return (
-        <div className="h-[calc(100vh-4rem)] flex flex-col bg-background">
+        <div className="fixed inset-0 z-50 flex flex-col bg-background">
           <ChatWindow
             conversation={selectedConversation}
             messages={messages}
@@ -312,6 +313,14 @@ export default function WhatsAppPage() {
             onOpenContactInfo={() => setShowContactInfo(true)}
             isMobile
           />
+          {showContactInfo && (
+            <Sheet open={showContactInfo} onOpenChange={setShowContactInfo}>
+              <SheetContent side="right" className="w-full sm:max-w-sm p-0">
+                <SheetTitle className="sr-only">Contact Info</SheetTitle>
+                <ContactInfoPanel conversation={selectedConversation} onClose={() => setShowContactInfo(false)} />
+              </SheetContent>
+            </Sheet>
+          )}
         </div>
       );
     }
