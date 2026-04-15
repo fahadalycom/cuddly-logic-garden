@@ -587,22 +587,49 @@ export function ChatWindow({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[14px] font-semibold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                {conversation.status === "active" && <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
-                <span className="text-[11px] text-muted-foreground truncate">
-                  {conversation.assigned_agent_name ? `Agent: ${conversation.assigned_agent_name}` : conversation.status === "active" ? "Online" : conversation.customer_phone}
-                </span>
-              </div>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {conversation.status === "active" ? "Online" : `Last seen ${conversation.last_message_at ? new Date(conversation.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "recently"}`}
+              </p>
             </div>
           </div>
           <div className="flex items-center flex-shrink-0 gap-0.5 pr-1">
             <MobileNotifButton />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="h-10 w-10 rounded-full flex items-center justify-center active:bg-muted transition-colors">
+                  <MoreVertical className="h-[18px] w-[18px]" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem onClick={onOpenContactInfo} className="py-2.5">
+                  <Info className="h-4 w-4 mr-2" /> Contact Info
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onResolve} className="py-2.5 text-emerald-500">
+                  <CheckCircle className="h-4 w-4 mr-2" /> Mark Resolved
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={openWhatsApp} className="py-2.5">
+                  <ExternalLink className="h-4 w-4 mr-2" /> Open in WhatsApp
+                </DropdownMenuItem>
+                {isAdmin && staff.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Assign Agent</DropdownMenuLabel>
+                    {staff.map((s) => (
+                      <DropdownMenuItem key={s.id} onClick={() => onAssign(conversation.id, s.user_id)} className="py-2">
+                        <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center mr-2 text-[10px] font-bold text-primary">{s.full_name?.charAt(0)}</div>
+                        {s.full_name}
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
         {/* ── MESSAGES ── */}
         <div ref={scrollRef} onScroll={handleScroll}
-          className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-3 py-2 z-0"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-3 py-2 z-0 wa-chat-bg relative"
           style={{ WebkitOverflowScrolling: 'touch' }}>
           {messagesWithDates.map((item, i) => {
             if (item.type === "date" && item.date) return <DateSeparator key={`date-${i}`} date={item.date} />;
