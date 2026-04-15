@@ -1,58 +1,66 @@
 
+Goal: Make WhatsApp a standalone, immersive section of the app so opening `/whatsapp` hides the main system shell completely and shows only the WhatsApp interface.
 
-# WhatsApp Mobile Full-Screen Layout Overhaul
+What I found
+- `/whatsapp` is currently rendered inside `AppLayout`, so the global sidebar, top header, and page padding still exist at the routing level.
+- The current mobile fullscreen behavior is mostly done with overlays/z-index inside `WhatsApp.tsx` and `ChatWindow.tsx`, which is why the shell still leaks conceptually and visually.
+- The clean fix is architectural: WhatsApp should live outside the main app shell, not fight it with CSS.
 
-## Problem
-On mobile, the WhatsApp page still shows inside the AppLayout wrapper (header, sidebar padding). Both the conversation list and chat window need to be truly full-screen — covering the entire viewport with no app chrome visible.
+Implementation plan
 
-## Current State
-- **Conversation list**: Uses `fixed inset-0 z-40` but the AppLayout header is `z-30` — it overlays but still has visual weight from padding
-- **Chat window**: Uses `fixed inset-0 z-[100]` with `absolute inset-0` inside — works but layout can still shift
-- **AppLayout**: Always renders a `h-16` header + `p-5` padding around content, even on mobile WhatsApp
+1. Move WhatsApp out of the main app shell
+- Update `src/App.tsx` so `/whatsapp` becomes its own protected route instead of being nested under `<AppLayout />`.
+- Keep authentication/permission protection, but render WhatsApp directly without the global layout wrapper.
+- Result: no sidebar, no app header, no main content padding, no shell chrome at all.
 
-## Plan
+2. Make WhatsApp its own full-screen workspace
+- Refine `src/pages/WhatsApp.tsx` so the page itself owns the full viewport on all screen sizes.
+- Use a dedicated root container with full viewport sizing (`fixed inset-0` / `min-h-[100dvh]`) and internal panels only.
+- Remove any remaining layout assumptions that were compensating for AppLayout spacing.
 
-### 1. Make WhatsApp page bypass AppLayout padding on mobile
-- On mobile, the WhatsApp page should render as a `fixed inset-0` overlay at a z-index above the AppLayout header (`z-30`)
-- Both conversation list AND chat views should be full-screen, edge-to-edge
-- Ensure `z-[100]` on both views so sidebar/header are completely hidden
+3. Make mobile chat truly 100% immersive
+- Ensure that when a conversation opens on mobile, only the chat screen is visible.
+- Keep just WhatsApp-native controls inside the chat header (back, notifications, chat identity).
+- No tabs, no external menus, no website navigation, no app-level UI while a chat is open.
 
-### 2. Improve conversation list full-screen layout
-- Full viewport height with proper safe-area padding (notch, home indicator)
-- WhatsApp-style header: green accent, clean title, search + notification icons
-- Remove any extra padding that wastes screen space
-- Make conversation items taller with better touch targets (min 72px)
+4. Keep WhatsApp navigation inside WhatsApp only
+- The conversation list, queue, agents, search, and chat should all remain inside the WhatsApp workspace.
+- On mobile:
+  - list view = full-screen WhatsApp inbox
+  - chat view = full-screen WhatsApp chat
+- On desktop:
+  - WhatsApp still fills the whole screen, but can keep its own internal split layout.
 
-### 3. Improve chat window full-screen layout
-- Ensure header, messages, and input are locked to viewport edges using flex column with `flex-shrink-0` for header/input and `flex-1 min-h-0 overflow-y-auto` for messages
-- Header: back button, avatar, name/status, notification toggle, more menu — compact single row
-- Input bar: proper safe-area-inset-bottom, rounded textarea, attach/send/mic buttons
-- Messages area: full remaining space, smooth scroll, `overscroll-contain`
-- Scroll-to-bottom button positioned relative to input bar
+5. Clean up shell-vs-overlay logic
+- Remove reliance on “cover the app with a higher z-index” as the main strategy.
+- Keep only the viewport-safe behavior needed for mobile stability and safe areas.
+- This makes the experience more robust and easier to maintain.
 
-### 4. Mobile long-press actions fix
-- Use `bottom-full` positioning instead of `-top-14` to prevent action sheet from going off-screen at the top
+Files to update
+- `src/App.tsx` — move `/whatsapp` outside `AppLayout`
+- `src/pages/WhatsApp.tsx` — make WhatsApp the full-screen root workspace
+- `src/components/whatsapp/ChatWindow.tsx` — ensure mobile opened chat stays fully immersive and self-contained
+- Possibly `src/components/layout/AppLayout.tsx` only if minor route-specific cleanup is still needed
 
-## Files to Edit
-1. **`src/pages/WhatsApp.tsx`** — Both mobile views use `fixed inset-0 z-[100]` consistently; remove redundant wrappers
-2. **`src/components/whatsapp/ChatWindow.tsx`** — Solidify the flex-column layout; polish header/input/messages spacing; fix long-press positioning
-
-## Technical Approach
+Technical details
 ```text
-Mobile Conversation List:          Mobile Chat:
-┌─────────────────────────┐       ┌─────────────────────────┐
-│ fixed inset-0 z-[100]   │       │ fixed inset-0 z-[100]   │
-│ ┌─────────────────────┐ │       │ ┌─────────────────────┐ │
-│ │ Header (shrink-0)   │ │       │ │ Header (shrink-0)   │ │
-│ │ Tabs (shrink-0)     │ │       │ ├─────────────────────┤ │
-│ ├─────────────────────┤ │       │ │ Messages (flex-1)   │ │
-│ │ List (flex-1)       │ │       │ │ overflow-y-auto     │ │
-│ │ overflow-y-auto     │ │       │ ├─────────────────────┤ │
-│ │                     │ │       │ │ Input (shrink-0)    │ │
-│ │                     │ │       │ │ + safe-area-bottom  │ │
-│ └─────────────────────┘ │       │ └─────────────────────┘ │
-└─────────────────────────┘       └─────────────────────────┘
+Current:
+ProtectedRoute
+└── AppLayout
+    ├── Sidebar
+    ├── Header
+    └── /whatsapp
+
+Target:
+ProtectedRoute
+├── AppLayout
+│   └── all normal app pages
+└── WhatsAppPage
+    └── full-screen WhatsApp workspace
 ```
 
-Both views will be fully edge-to-edge, covering the entire mobile viewport with no app header or sidebar visible.
-
+Expected result
+- Clicking WhatsApp opens a dedicated full-screen interface.
+- No main sidebar/header/navigation is visible.
+- Mobile chat opens as a completely immersive chat screen.
+- WhatsApp behaves like a separate system section, not like a normal page inside the website.
