@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { AwsClient } from "https://esm.sh/aws4fetch@1.0.20";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,7 +8,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -44,7 +44,7 @@ serve(async (req) => {
     }
 
     for (const message of value.messages) {
-      const from = message.from; // customer phone
+      const from = message.from;
       const waId = value.contacts?.[0]?.wa_id;
       const customerName = value.contacts?.[0]?.profile?.name || null;
 
@@ -59,7 +59,6 @@ serve(async (req) => {
         .single();
 
       if (!conversation) {
-        // Auto-create client if not exists
         let { data: client } = await supabase
           .from("clients")
           .select("id")
@@ -75,10 +74,9 @@ serve(async (req) => {
           client = newClient;
         }
 
-        // Find available agent
         const assignedAgent = await findAvailableAgent(supabase);
-
         const status = assignedAgent ? "active" : "waiting";
+
         const { data: newConv } = await supabase
           .from("wa_conversations")
           .insert({
@@ -94,7 +92,6 @@ serve(async (req) => {
 
         conversation = newConv;
 
-        // If no agent available, add to queue
         if (!assignedAgent && conversation) {
           await supabase.from("wa_queue").insert({
             conversation_id: conversation.id,
@@ -105,40 +102,40 @@ serve(async (req) => {
 
       if (!conversation) continue;
 
-      // Determine media type and content
+      // Determine media
       let content = message.text?.body || null;
       let mediaType = "text";
-      let mediaUrl = null;
-      let mediaMimeType = null;
-      let mediaFilename = null;
+      let mediaUrl: string | null = null;
+      let mediaMimeType: string | null = null;
+      let mediaFilename: string | null = null;
 
       if (message.type === "image") {
         mediaType = "image";
-        mediaUrl = await downloadAndUploadMedia(message.image.id, message.image.mime_type);
+        mediaUrl = await downloadAndUploadToR2(message.image.id, message.image.mime_type);
         mediaMimeType = message.image.mime_type;
         content = message.image.caption || null;
       } else if (message.type === "video") {
         mediaType = "video";
-        mediaUrl = await downloadAndUploadMedia(message.video.id, message.video.mime_type);
+        mediaUrl = await downloadAndUploadToR2(message.video.id, message.video.mime_type);
         mediaMimeType = message.video.mime_type;
         content = message.video.caption || null;
       } else if (message.type === "audio") {
         mediaType = "audio";
-        mediaUrl = await downloadAndUploadMedia(message.audio.id, message.audio.mime_type);
+        mediaUrl = await downloadAndUploadToR2(message.audio.id, message.audio.mime_type);
         mediaMimeType = message.audio.mime_type;
       } else if (message.type === "document") {
         mediaType = "document";
-        mediaUrl = await downloadAndUploadMedia(message.document.id, message.document.mime_type);
+        mediaUrl = await downloadAndUploadToR2(message.document.id, message.document.mime_type);
         mediaMimeType = message.document.mime_type;
         mediaFilename = message.document.filename;
         content = message.document.caption || null;
       } else if (message.type === "sticker") {
         mediaType = "sticker";
-        mediaUrl = await downloadAndUploadMedia(message.sticker.id, "image/webp");
+        mediaUrl = await downloadAndUploadToR2(message.sticker.id, "image/webp");
         mediaMimeType = "image/webp";
       }
 
-      // Store message
+      // Store message — media_url is now an R2 object key (e.g. "whatsapp/123.jpg")
       await supabase.from("wa_messages").insert({
         conversation_id: conversation.id,
         sender_type: "customer",
@@ -150,7 +147,6 @@ serve(async (req) => {
         whatsapp_message_id: message.id,
       });
 
-      // Update conversation
       await supabase
         .from("wa_conversations")
         .update({
@@ -161,7 +157,7 @@ serve(async (req) => {
         })
         .eq("id", conversation.id);
 
-      // Trigger AI auto-response check
+      // Trigger AI auto-response for text messages
       if (content && mediaType === "text") {
         try {
           await fetch(`${supabaseUrl}/functions/v1/whatsapp-ai-respond`, {
@@ -195,7 +191,6 @@ serve(async (req) => {
 });
 
 async function findAvailableAgent(supabase: any): Promise<string | null> {
-  // Get all agent configs that are available
   const { data: configs } = await supabase
     .from("wa_agent_config")
     .select("*")
@@ -204,7 +199,6 @@ async function findAvailableAgent(supabase: any): Promise<string | null> {
   if (!configs?.length) return null;
 
   for (const config of configs) {
-    // Reset daily count if new day
     const today = new Date().toISOString().split("T")[0];
     if (config.last_reset_date !== today) {
       await supabase
@@ -214,10 +208,8 @@ async function findAvailableAgent(supabase: any): Promise<string | null> {
       config.messages_sent_today = 0;
     }
 
-    // Check daily limit
     if (config.messages_sent_today >= config.daily_message_limit) continue;
 
-    // Count active conversations for this agent
     const { count } = await supabase
       .from("wa_conversations")
       .select("id", { count: "exact", head: true })
@@ -232,54 +224,57 @@ async function findAvailableAgent(supabase: any): Promise<string | null> {
   return null;
 }
 
-async function downloadAndUploadMedia(mediaId: string, mimeType: string): Promise<string | null> {
+/**
+ * Downloads media from Meta's API and uploads to Cloudflare R2 using proper AWS4 signing.
+ * Returns the R2 object key (not full URL).
+ */
+async function downloadAndUploadToR2(mediaId: string, mimeType: string): Promise<string | null> {
   try {
     const token = Deno.env.get("META_WHATSAPP_TOKEN")!;
-    
-    // Get media URL from Meta
+
+    // Step 1: Get media URL from Meta
     const mediaResp = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const mediaData = await mediaResp.json();
-    
-    // Download media
+
+    if (!mediaData.url) {
+      console.error("No media URL from Meta:", mediaData);
+      return null;
+    }
+
+    // Step 2: Download the media binary
     const downloadResp = await fetch(mediaData.url, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    const blob = await downloadResp.blob();
-    const arrayBuffer = await blob.arrayBuffer();
+    const arrayBuffer = await downloadResp.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
 
-    // Upload to Cloudflare R2
-    const r2Endpoint = Deno.env.get("CLOUDFLARE_R2_ENDPOINT")!;
-    const r2AccessKey = Deno.env.get("CLOUDFLARE_R2_ACCESS_KEY")!;
-    const r2SecretKey = Deno.env.get("CLOUDFLARE_R2_SECRET_KEY")!;
-    const r2Bucket = Deno.env.get("CLOUDFLARE_R2_BUCKET")!;
+    // Step 3: Upload to R2 with proper AWS4 signing
+    const r2 = new AwsClient({
+      accessKeyId: Deno.env.get("CLOUDFLARE_R2_ACCESS_KEY")!,
+      secretAccessKey: Deno.env.get("CLOUDFLARE_R2_SECRET_KEY")!,
+      service: "s3",
+    });
 
+    const endpoint = Deno.env.get("CLOUDFLARE_R2_ENDPOINT")!;
+    const bucket = Deno.env.get("CLOUDFLARE_R2_BUCKET")!;
     const ext = mimeType.split("/")[1]?.split(";")[0] || "bin";
-    const filename = `whatsapp/${Date.now()}-${mediaId}.${ext}`;
+    const key = `whatsapp/${Date.now()}-${mediaId.slice(-8)}.${ext}`;
+    const r2Url = `${endpoint}/${bucket}/${key}`;
 
-    // Use S3-compatible API for R2
-    const url = `${r2Endpoint}/${r2Bucket}/${filename}`;
-    const date = new Date().toUTCString();
-
-    const uploadResp = await fetch(url, {
+    const uploadResp = await r2.fetch(r2Url, {
       method: "PUT",
-      headers: {
-        "Content-Type": mimeType,
-        "x-amz-date": date,
-        Authorization: `AWS4-HMAC-SHA256 Credential=${r2AccessKey}`,
-      },
+      headers: { "Content-Type": mimeType },
       body: bytes,
     });
 
-    if (uploadResp.ok) {
-      // Return public URL
-      return `${r2Endpoint}/${r2Bucket}/${filename}`;
+    if (!uploadResp.ok) {
+      console.error("R2 upload failed:", uploadResp.status, await uploadResp.text());
+      return null;
     }
-    
-    console.error("R2 upload failed:", await uploadResp.text());
-    return null;
+
+    return key; // Return only the key, not the full URL
   } catch (e) {
     console.error("Media download/upload error:", e);
     return null;
