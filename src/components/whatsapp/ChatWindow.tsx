@@ -10,10 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Send, Paperclip, MoreVertical, CheckCircle, UserPlus, Bot,
   Image as ImageIcon, Video, FileText, Mic, Sparkles, X, Check, CheckCheck,
-  Phone, ExternalLink, Copy, Clock, Search,
+  Phone, ExternalLink, Copy, Clock, Search, Bell, BellOff, Volume2,
   ArrowDown, Shield, Zap, MessageSquare, Download, Loader2, Eye, File,
   ArrowLeft, Camera, StopCircle, Trash2, Reply, Smile, Info, CornerDownRight
 } from "lucide-react";
+import { useNotifications } from "@/hooks/useNotifications";
+import { Switch } from "@/components/ui/switch";
 import { format, isToday, isYesterday } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -299,6 +301,31 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
   );
 }
 
+function MobileNotifButton() {
+  const { soundEnabled, notifEnabled, toggleSound, toggleNotif } = useNotifications();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="h-10 w-10 rounded-full flex items-center justify-center active:bg-muted transition-colors">
+          {notifEnabled || soundEnabled ? <Bell className="h-[18px] w-[18px]" /> : <BellOff className="h-[18px] w-[18px] text-muted-foreground" />}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuLabel className="text-xs">Notifications</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <div className="px-2 py-1.5 flex items-center justify-between">
+          <span className="text-xs flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Push</span>
+          <Switch checked={notifEnabled} onCheckedChange={toggleNotif} className="scale-75" />
+        </div>
+        <div className="px-2 py-1.5 flex items-center justify-between">
+          <span className="text-xs flex items-center gap-1.5"><Volume2 className="h-3.5 w-3.5" /> Sound</span>
+          <Switch checked={soundEnabled} onCheckedChange={toggleSound} className="scale-75" />
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function ChatWindow({
   conversation, messages, templates, aiSuggestions,
   onSend, onResolve, onApproveAi, onRejectAi, isAdmin, staff, onAssign,
@@ -534,24 +561,24 @@ export function ChatWindow({
     return (
       <div className="absolute inset-0 flex flex-col overflow-hidden bg-background">
         {/* ── HEADER ── */}
-        <div className="flex-shrink-0 h-[56px] px-2 flex items-center justify-between border-b border-border bg-card/95 backdrop-blur-md z-20"
-          style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-          <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className="flex-shrink-0 px-1 flex items-center justify-between border-b border-border bg-card/95 backdrop-blur-md z-20"
+          style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))', paddingBottom: '0.5rem' }}>
+          <div className="flex items-center gap-1 min-w-0 flex-1">
             {onBack && (
-              <button className="h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted transition-colors -ml-1" onClick={onBack}>
+              <button className="h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted transition-colors" onClick={onBack}>
                 <ArrowLeft className="h-5 w-5" />
               </button>
             )}
             <div className="relative flex-shrink-0" onClick={onOpenContactInfo}>
-              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
                 <span className="text-sm font-bold text-primary-foreground">
                   {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
                 </span>
               </div>
-              <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${conversation.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+              <div className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card ${conversation.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
             </div>
             <div className="min-w-0 flex-1" onClick={onOpenContactInfo}>
-              <p className="text-[15px] font-semibold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
+              <p className="text-[14px] font-semibold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 {conversation.status === "active" && <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
                 <span className="text-[11px] text-muted-foreground truncate">
@@ -560,17 +587,15 @@ export function ChatWindow({
               </div>
             </div>
           </div>
-          <div className="flex items-center flex-shrink-0">
-            <button className="h-10 w-10 rounded-full flex items-center justify-center active:bg-muted transition-colors" onClick={openWhatsApp}>
-              <Phone className="h-[18px] w-[18px]" />
-            </button>
+          <div className="flex items-center flex-shrink-0 gap-0">
+            <MobileNotifButton />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="h-10 w-10 rounded-full flex items-center justify-center active:bg-muted transition-colors">
                   <MoreVertical className="h-[18px] w-[18px]" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-52">
                 <DropdownMenuItem onClick={openWhatsApp}><ExternalLink className="h-4 w-4 mr-2" /> Open in WhatsApp</DropdownMenuItem>
                 {onOpenContactInfo && <DropdownMenuItem onClick={onOpenContactInfo}><Info className="h-4 w-4 mr-2" /> Contact Info</DropdownMenuItem>}
                 <DropdownMenuItem onClick={onResolve} className="text-emerald-500"><CheckCircle className="h-4 w-4 mr-2" /> Mark Resolved</DropdownMenuItem>
