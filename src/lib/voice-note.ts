@@ -1,11 +1,28 @@
-/**
- * Voice note normalization — lightweight, no WASM needed.
- * Checks if the blob is already OGG/OPUS; if not, sends it as-is
- * with the correct mime type (WhatsApp accepts OGG and the backend
- * uploads with the real mime type).
- */
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { fetchFile, toBlobURL } from "@ffmpeg/util";
 
-const PREFERRED_MIME = "audio/ogg;codecs=opus";
+const OUTPUT_MIME = "audio/ogg;codecs=opus";
+const FFMPEG_BASE_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm";
+
+let ffmpegInstance: FFmpeg | null = null;
+let ffmpegLoadPromise: Promise<FFmpeg> | null = null;
+
+async function getFFmpeg() {
+  if (ffmpegInstance) return ffmpegInstance;
+  if (!ffmpegLoadPromise) {
+    ffmpegLoadPromise = (async () => {
+      const ffmpeg = new FFmpeg();
+      await ffmpeg.load({
+        coreURL: await toBlobURL(`${FFMPEG_BASE_URL}/ffmpeg-core.js`, "text/javascript"),
+        wasmURL: await toBlobURL(`${FFMPEG_BASE_URL}/ffmpeg-core.wasm`, "application/wasm"),
+        workerURL: await toBlobURL(`${FFMPEG_BASE_URL}/ffmpeg-core.worker.js`, "text/javascript"),
+      });
+      ffmpegInstance = ffmpeg;
+      return ffmpeg;
+    })();
+  }
+  return ffmpegLoadPromise;
+}
 
 async function hasOggOpusSignature(blob: Blob) {
   const bytes = new Uint8Array(await blob.slice(0, 64).arrayBuffer());
@@ -13,36 +30,70 @@ async function hasOggOpusSignature(blob: Blob) {
   return header.includes("OggS") && header.includes("OpusHead");
 }
 
-function getExtension(mimeType: string) {
+function getInputExtension(mimeType: string) {
   if (mimeType.includes("ogg")) return "ogg";
   if (mimeType.includes("webm")) return "webm";
   if (mimeType.includes("mp4") || mimeType.includes("aac")) return "m4a";
   if (mimeType.includes("mpeg") || mimeType.includes("mp3")) return "mp3";
-  return "webm";
+  return "bin";
 }
 
-export async function normalizeVoiceNote(blob: Blob, mimeType: string, _durationSecs?: number) {
-  if (blob.size === 0) {
-    throw new Error("Empty voice note");
-  }
-
-  // If already OGG/OPUS, re-wrap with correct mime
+export async function normalizeVoiceNote(blob: Blob, mimeType: string) {
   if (await hasOggOpusSignature(blob)) {
     return {
-      blob: new Blob([await blob.arrayBuffer()], { type: PREFERRED_MIME }),
-      mimeType: PREFERRED_MIME,
+      blob: new Blob([await blob.arrayBuffer()], { type: OUTPUT_MIME }),
+      mimeType: OUTPUT_MIME,
       filename: `voice-${Date.now()}.ogg`,
     };
   }
 
-  // Send as-is with the actual format — the backend will upload
-  // with the real mime type to WhatsApp
-  const ext = getExtension(mimeType);
-  const cleanMime = mimeType.split(";")[0].trim(); // e.g. "audio/webm"
+  if (!mimeType.startsWith("audio/")) {
+    throw new Error("Invalid voice note format");
+  }
 
-  return {
-    blob: new Blob([await blob.arrayBuffer()], { type: cleanMime }),
-    mimeType: cleanMime,
-    filename: `voice-${Date.now()}.${ext}`,
-  };
+  const ffmpeg = await getFFmpeg();
+  const inputName = `input.${getInputExtension(mimeType)}`;
+  const outputName = `output-${crypto.randomUUID()}.ogg`;
+
+  await ffmpeg.writeFile(inputName, await fetchFile(blob));
+
+  try {
+    await ffmpeg.exec([
+      "-i",
+      inputName,
+      "-vn",
+      "-map_metadata",
+      "-1",
+      "-ac",
+      "1",
+      "-c:a",
+      "libopus",
+      "-b:a",
+      "32k",
+      "-application",
+      "voip",
+      outputName,
+    ]);
+
+    const data = await ffmpeg.readFile(outputName);
+    const outputBytes = typeof data === "string" ? new TextEncoder().encode(data) : new Uint8Array(data);
+    const normalizedBlob = new Blob([outputBytes], { type: OUTPUT_MIME });
+
+    if (!(await hasOggOpusSignature(normalizedBlob))) {
+      throw new Error("Voice note conversion failed");
+    }
+
+    return {
+      blob: normalizedBlob,
+      mimeType: OUTPUT_MIME,
+      filename: `voice-${Date.now()}.ogg`,
+    };
+  } finally {
+    try {
+      await ffmpeg.deleteFile(inputName);
+    } catch {}
+    try {
+      await ffmpeg.deleteFile(outputName);
+    } catch {}
+  }
 }
