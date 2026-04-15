@@ -1001,6 +1001,7 @@ export function ChatWindow({
           </div>
         ) : (
           <div className="flex items-end gap-1">
+            <EmojiPicker onSelect={(emoji) => setInput(prev => prev + emoji)} />
             <DropdownMenu open={showAttachMenu} onOpenChange={setShowAttachMenu}>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full" disabled={uploading}><Paperclip className="h-5 w-5 text-muted-foreground" /></Button>
@@ -1020,19 +1021,30 @@ export function ChatWindow({
                 }}><Camera className="h-4 w-4 mr-2 text-pink-500" /> Camera</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full" onClick={() => setShowTemplates(true)}><FileText className="h-4 w-4 text-muted-foreground" /></Button>
+            <Tooltip><TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full" onClick={() => setShowTemplates(true)}><FileText className="h-4 w-4 text-muted-foreground" /></Button>
+            </TooltipTrigger><TooltipContent>Templates <kbd className="ml-1 text-[9px] bg-muted px-1 rounded">/</kbd></TooltipContent></Tooltip>
             <div className="flex-1 relative">
               <Textarea ref={inputRef} placeholder="Type a message... (/ for quick replies)" value={input} onChange={handleInputChange} onKeyDown={handleKeyDown} rows={1}
                 className="min-h-[40px] max-h-[120px] text-sm resize-none rounded-full bg-muted/30 border-transparent focus:border-primary/30 focus:bg-background transition-colors" />
+              {input.length > 500 && (
+                <span className={`absolute bottom-1 right-3 text-[9px] tabular-nums ${input.length > 900 ? "text-destructive" : "text-muted-foreground"}`}>
+                  {input.length}/1000
+                </span>
+              )}
             </div>
             {input.trim() ? (
-              <Button size="icon" className="h-9 w-9 flex-shrink-0 rounded-full bg-primary hover:bg-primary/90 shadow-sm" onClick={handleSend} disabled={sending}>
-                <Send className={`h-5 w-5 ${sending ? "animate-pulse" : ""}`} />
-              </Button>
+              <Tooltip><TooltipTrigger asChild>
+                <Button size="icon" className="h-9 w-9 flex-shrink-0 rounded-full bg-primary hover:bg-primary/90 shadow-sm wa-send-bounce" onClick={handleSend} disabled={sending}>
+                  <Send className={`h-5 w-5 ${sending ? "animate-pulse" : ""}`} />
+                </Button>
+              </TooltipTrigger><TooltipContent>Send <kbd className="ml-1 text-[9px] bg-muted px-1 rounded">Enter</kbd></TooltipContent></Tooltip>
             ) : (
-              <Button size="icon" variant="ghost" className="h-9 w-9 flex-shrink-0 rounded-full text-primary hover:bg-primary/10" onClick={startRecording}>
-                <Mic className="h-5 w-5" />
-              </Button>
+              <Tooltip><TooltipTrigger asChild>
+                <Button size="icon" variant="ghost" className="h-9 w-9 flex-shrink-0 rounded-full text-primary hover:bg-primary/10" onClick={startRecording}>
+                  <Mic className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger><TooltipContent>Voice note</TooltipContent></Tooltip>
             )}
           </div>
         )}
