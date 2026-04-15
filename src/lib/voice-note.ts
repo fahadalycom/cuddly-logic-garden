@@ -104,7 +104,9 @@ export async function normalizeVoiceNote(
     const outputBytes =
       typeof data === "string"
         ? new TextEncoder().encode(data)
-        : new Uint8Array(data as ArrayBuffer);
+        : data instanceof Uint8Array
+          ? data
+          : new Uint8Array(data as unknown as ArrayBuffer);
 
     if (!hasOggOpusSignature(outputBytes)) {
       throw new Error("Conversion output is not valid OGG/OPUS");
