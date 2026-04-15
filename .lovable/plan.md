@@ -1,73 +1,82 @@
 
+# Fix voice note delivery + WhatsApp-style player
 
-# Fix WhatsApp System — All Features Not Working
+## What I found
+- The transport path is mostly working: recent backend logs show media upload + message send succeeding.
+- The likely failure is **audio compatibility**, not basic sending:
+  - the recorder prefers `audio/ogg;codecs=opus`, but if the browser cannot produce that natively it falls back to another format
+  - the current code then **uploads those raw bytes while labeling them as OGG/OPUS**
+  - that means WhatsApp can receive a file that claims to be `.ogg` even when the actual bytes are WebM/another codec, which is the classic reason voice notes appear locally but do not arrive/play correctly on the recipient side
+- The current player also needs UX fixes:
+  - no speed toggle
+  - download action is not clearly separate from play
+  - metadata for outgoing voice notes is not being preserved strongly enough
 
-## Root Cause Analysis
+## Implementation plan
+1. **Fix the recording pipeline**
+   - Replace the “rename mime type and send” approach with a **real voice-note normalization flow**
+   - Record audio, then ensure the final file is truly:
+     - container: `.ogg`
+     - codec: `opus`
+   - Use:
+     - native OGG/OPUS when the browser supports it
+     - a browser-side WASM/polyfill encoder fallback when it does not
+   - Before upload, validate the produced blob and stop with a toast error if conversion/validation fails
 
-I found **5 critical bugs** causing the entire WhatsApp system to be non-functional:
+2. **Keep the existing storage architecture, but store proper metadata**
+   - Continue saving non-text media in Cloudflare R2
+   - Save the R2 key in `wa_messages.media_url`
+   - Also pass/store:
+     - `media_mime_type`
+     - `media_filename`
+   - This will let the UI distinguish true voice notes from generic audio files and keep downloads accurate
 
-### Bug 1: Conversation List Always Empty (MOST VISIBLE)
-The `fetchConversations()` runs inside `useEffect([], [])` on mount, but at that point `isAdmin` from `useAuth` is still `false` (roles haven't loaded yet). So the query adds `assigned_agent_id = user.id` filter — but the only conversation has `assigned_agent_id: null` (unassigned). Result: **empty list for admin**.
+3. **Send voice notes through WhatsApp correctly**
+   - Keep the direct media upload flow in `whatsapp-send`
+   - Upload the validated OGG/OPUS file from R2 to WhatsApp Media API
+   - Send it as `type: "audio"` using the uploaded media ID
+   - Remove any fake mime assumptions and derive the outgoing upload from the actual stored file metadata
 
-**Fix**: Add `isAdmin` and `user` to the useEffect dependency array, or track a `rolesLoaded` state.
+4. **Make failures explicit**
+   - If recording conversion fails, show a clear error and do not send
+   - If the uploaded R2 file is not valid OGG/OPUS, stop before WhatsApp send
+   - Return clearer backend errors so the frontend can show “voice note failed” instead of silently appearing successful
 
-### Bug 2: META_WHATSAPP_TOKEN Expired
-Edge function logs show: `"Error validating access token: Session has expired"`. All outgoing messages fail with 500. This is why text sends show `FunctionsHttpError`.
+5. **Upgrade the voice-note UI to feel like WhatsApp**
+   - Update `VoiceNotePlayer` so:
+     - play/pause is only for playback
+     - waveform/progress stays in the center
+     - **download becomes a separate button** on the message
+     - speed toggle cycles like WhatsApp: `1x → 1.5x → 2x`
+   - Keep lazy loading + cache behavior:
+     - audio loads only on play/load/download
+     - cached blob is reused for playback and download
+   - Preserve progress display during playback
 
-**Fix**: You need to update the META_WHATSAPP_TOKEN secret with a fresh token from Meta Developer Console. I'll also add graceful error handling — on API failure, keep the message as a draft in the input box (as you requested).
+6. **Tighten the send contract between frontend and backend**
+   - Extend the send flow so the frontend passes media metadata with voice notes
+   - Update message insertion so outgoing audio messages store filename/mime consistently
+   - This avoids mismatches between what the UI shows and what WhatsApp actually receives
 
-### Bug 3: Incoming Media Not Stored in R2
-Database shows `media_url: null` for received images. The `downloadAndUploadToR2` in the webhook failed silently (likely because the Meta token expired, so it couldn't fetch the media binary from Meta's servers).
+## Files to update
+- `src/components/whatsapp/ChatWindow.tsx`
+- `src/components/whatsapp/VoiceNotePlayer.tsx`
+- `src/pages/WhatsApp.tsx`
+- `supabase/functions/whatsapp-send/index.ts`
+- possibly `package.json` for an OGG/OPUS encoder/polyfill dependency
 
-**Fix**: Already handled by updating the token. I'll also add better error logging and a fallback placeholder so messages with failed media still show something.
+## Technical details
+- Root fix: **do not fake `audio/ogg;codecs=opus` on non-OGG recordings**
+- Final outbound voice-note file must be a real **OGG container with OPUS codec**
+- No database migration is strictly required because `wa_messages` already has:
+  - `media_filename`
+  - `media_mime_type`
+- I’ll reuse the current lazy-loading/media-cache pattern so storage reads stay optimized
 
-### Bug 4: Send Failure Loses the Message
-Currently when `whatsapp-send` returns a 500, the frontend clears the input and shows a console error. The message is lost.
-
-**Fix**: On send failure, keep the message text in the input box and show a toast error. Do not clear input until send succeeds.
-
-### Bug 5: Large File Upload Can Crash
-The base64 encoding in `ChatWindow` uses a byte-by-byte loop which is slow for large files. For very large files it can also hit memory issues.
-
-**Fix**: Use chunked `String.fromCharCode` processing (8KB chunks).
-
----
-
-## Implementation Plan
-
-### Step 1: Fix Conversation Fetching (WhatsApp.tsx)
-- Add `isAdmin`, `user` to the useEffect dependency so conversations re-fetch when auth loads
-- Remove the `assigned_agent_id` filter entirely — all agents see all conversations (per your preference)
-
-### Step 2: Fix Send Error Handling (WhatsApp.tsx + ChatWindow.tsx)
-- `handleSendMessage`: on error, do NOT clear input; show toast with clear message
-- `ChatWindow.handleSend`: only clear `input` after `onSend` succeeds (wrap in try/catch)
-- `whatsapp-send` edge function: when WhatsApp API fails, still store the message in DB as `status: failed` (optional) OR return the error cleanly so frontend can keep draft
-
-### Step 3: Fix Media Upload Robustness (ChatWindow.tsx)
-- Use chunked base64 encoding (8KB chunks) instead of byte-by-byte loop
-- Better error messages on upload failure
-
-### Step 4: Update whatsapp-send Edge Function
-- On WhatsApp API error, return proper error JSON with details (already does this)
-- Store the message in DB regardless of WhatsApp API success, with a flag indicating delivery status
-
-### Step 5: Update whatsapp-media Edge Function
-- Add CORS header for newer Supabase client headers (`x-supabase-client-platform` etc.)
-
-### Step 6: Request Updated META_WHATSAPP_TOKEN
-- Prompt user to update the expired token
-
-## Files to Edit
-
-| File | Changes |
-|------|---------|
-| `src/pages/WhatsApp.tsx` | Fix useEffect deps; remove assigned_agent_id filter; handle send errors gracefully |
-| `src/components/whatsapp/ChatWindow.tsx` | Fix send to keep draft on failure; chunked base64; better error toasts |
-| `supabase/functions/whatsapp-send/index.ts` | Always store message in DB; mark delivery status |
-| `supabase/functions/whatsapp-media/index.ts` | Expand CORS headers |
-| `supabase/functions/whatsapp-webhook/index.ts` | Better error handling for failed media downloads |
-
-## Important Note
-Your **META_WHATSAPP_TOKEN is expired**. After I fix the code, I will ask you to update it with a fresh token from your Meta Developer Console. Without this, outgoing messages will continue to fail at the WhatsApp API level.
-
+## Expected result
+After implementation:
+- recorded voice notes will be converted/validated before send
+- recipients will receive them properly in WhatsApp
+- playback in the app will feel more like WhatsApp
+- speed control will work
+- download will be a separate action instead of sharing the play control
