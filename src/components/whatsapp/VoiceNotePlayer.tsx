@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Play, Pause, Loader2 } from "lucide-react";
+import { Play, Pause, Loader2, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const mediaBlobCache = new Map<string, string>();
@@ -11,12 +11,15 @@ interface VoiceNotePlayerProps {
   isMobile?: boolean;
 }
 
+const SPEEDS = [1, 1.5, 2];
+
 export function VoiceNotePlayer({ mediaKey, mimeType, isOutgoing, isMobile }: VoiceNotePlayerProps) {
   const [blobUrl, setBlobUrl] = useState<string | null>(mediaBlobCache.get(mediaKey) || null);
   const [loading, setLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [speedIndex, setSpeedIndex] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const loadAudio = useCallback(async () => {
@@ -47,16 +50,12 @@ export function VoiceNotePlayer({ mediaKey, mimeType, isOutgoing, isMobile }: Vo
     audioRef.current = audio;
 
     const onLoaded = () => {
-      if (audio.duration && isFinite(audio.duration)) {
-        setDuration(audio.duration);
-      }
+      if (audio.duration && isFinite(audio.duration)) setDuration(audio.duration);
     };
     const onTimeUpdate = () => setCurrentTime(audio.currentTime);
     const onEnded = () => { setIsPlaying(false); setCurrentTime(0); };
     const onDurationChange = () => {
-      if (audio.duration && isFinite(audio.duration)) {
-        setDuration(audio.duration);
-      }
+      if (audio.duration && isFinite(audio.duration)) setDuration(audio.duration);
     };
 
     audio.addEventListener("loadedmetadata", onLoaded);
@@ -84,9 +83,18 @@ export function VoiceNotePlayer({ mediaKey, mimeType, isOutgoing, isMobile }: Vo
     if (isPlaying) {
       audioRef.current.pause();
     } else {
+      audioRef.current.playbackRate = SPEEDS[speedIndex];
       audioRef.current.play().catch(() => {});
     }
     setIsPlaying(!isPlaying);
+  };
+
+  const cycleSpeed = () => {
+    const next = (speedIndex + 1) % SPEEDS.length;
+    setSpeedIndex(next);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = SPEEDS[next];
+    }
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -95,6 +103,16 @@ export function VoiceNotePlayer({ mediaKey, mimeType, isOutgoing, isMobile }: Vo
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     audioRef.current.currentTime = pct * duration;
     setCurrentTime(pct * duration);
+  };
+
+  const handleDownload = async () => {
+    if (!blobUrl) await loadAudio();
+    const url = blobUrl || mediaBlobCache.get(mediaKey);
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `voice-note.${mimeType?.includes("ogg") ? "ogg" : "webm"}`;
+    a.click();
   };
 
   const formatTime = (t: number) => {
@@ -106,15 +124,14 @@ export function VoiceNotePlayer({ mediaKey, mimeType, isOutgoing, isMobile }: Vo
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  // Generate fake waveform bars
   const barCount = isMobile ? 28 : 35;
   const bars = useRef(
     Array.from({ length: barCount }, () => 0.15 + Math.random() * 0.85)
   ).current;
 
   return (
-    <div className="flex items-center gap-2.5 py-1 min-w-[180px]" style={{ maxWidth: isMobile ? 260 : 300 }}>
-      {/* Play/Pause Button */}
+    <div className="flex items-center gap-2 py-1 min-w-[180px]" style={{ maxWidth: isMobile ? 280 : 320 }}>
+      {/* Play/Pause */}
       <button
         onClick={togglePlay}
         disabled={loading}
@@ -147,12 +164,8 @@ export function VoiceNotePlayer({ mediaKey, mimeType, isOutgoing, isMobile }: Vo
                 key={i}
                 className={`flex-1 rounded-full transition-colors ${
                   isActive
-                    ? isOutgoing
-                      ? "bg-primary-foreground/80"
-                      : "bg-primary"
-                    : isOutgoing
-                    ? "bg-primary-foreground/25"
-                    : "bg-muted-foreground/25"
+                    ? isOutgoing ? "bg-primary-foreground/80" : "bg-primary"
+                    : isOutgoing ? "bg-primary-foreground/25" : "bg-muted-foreground/25"
                 }`}
                 style={{ height: `${h * 100}%`, minWidth: 2.5 }}
               />
@@ -163,8 +176,31 @@ export function VoiceNotePlayer({ mediaKey, mimeType, isOutgoing, isMobile }: Vo
           <span className={`text-[10px] ${isOutgoing ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
             {isPlaying ? formatTime(currentTime) : formatTime(duration)}
           </span>
+          {/* Speed toggle */}
+          <button
+            onClick={cycleSpeed}
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${
+              isOutgoing
+                ? "bg-primary-foreground/15 text-primary-foreground/80 hover:bg-primary-foreground/25"
+                : "bg-muted/60 text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {SPEEDS[speedIndex]}x
+          </button>
         </div>
       </div>
+
+      {/* Download */}
+      <button
+        onClick={handleDownload}
+        className={`h-7 w-7 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+          isOutgoing
+            ? "text-primary-foreground/50 hover:text-primary-foreground/80 hover:bg-primary-foreground/10"
+            : "text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50"
+        }`}
+      >
+        <Download className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }
