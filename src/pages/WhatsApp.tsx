@@ -326,18 +326,18 @@ export default function WhatsAppPage() {
     }
 
     return (
-      <div className="h-[calc(100vh-4rem)] flex flex-col bg-background">
-        <div className="px-4 py-3 border-b border-border bg-card/80">
+      <div className="fixed inset-0 z-40 flex flex-col bg-background">
+        <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 border-b border-border bg-card/95 backdrop-blur-md">
           <div className="flex items-center justify-between">
-            <h1 className="text-lg font-bold">WhatsApp</h1>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setShowSearch(true)}>
-                <Search className="h-4 w-4" />
+            <h1 className="text-xl font-bold">WhatsApp</h1>
+            <div className="flex items-center gap-0.5">
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full active:scale-95 transition-transform" onClick={() => setShowSearch(true)}>
+                <Search className="h-4.5 w-4.5" />
               </Button>
               <NotifSettings />
             </div>
           </div>
-          <div className="flex items-center gap-3 mt-1">
+          <div className="flex items-center gap-3 mt-1.5">
             <div className="flex items-center gap-1.5">
               <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-xs font-medium">{activeCount} active</span>
@@ -355,15 +355,15 @@ export default function WhatsAppPage() {
 
         <Tabs value={sideTab} onValueChange={setSideTab} className="flex flex-col flex-1 min-h-0">
           <div className="px-3 pt-2 pb-1">
-            <TabsList className="grid w-full grid-cols-3 h-10">
-              <TabsTrigger value="chats" className="text-xs gap-1.5"><MessageSquare className="h-4 w-4" />Chats</TabsTrigger>
-              <TabsTrigger value="queue" className="text-xs gap-1.5 relative">
+            <TabsList className="grid w-full grid-cols-3 h-11 rounded-xl">
+              <TabsTrigger value="chats" className="text-xs gap-1.5 rounded-lg"><MessageSquare className="h-4 w-4" />Chats</TabsTrigger>
+              <TabsTrigger value="queue" className="text-xs gap-1.5 relative rounded-lg">
                 <Clock className="h-4 w-4" />Queue
                 {queue.length > 0 && (
                   <span className="ml-0.5 bg-destructive text-destructive-foreground text-[9px] px-1.5 min-w-[16px] h-4 rounded-full flex items-center justify-center font-bold">{queue.length}</span>
                 )}
               </TabsTrigger>
-              {isAdmin && <TabsTrigger value="agents" className="text-xs gap-1.5"><Users className="h-4 w-4" />Agents</TabsTrigger>}
+              {isAdmin && <TabsTrigger value="agents" className="text-xs gap-1.5 rounded-lg"><Users className="h-4 w-4" />Agents</TabsTrigger>}
             </TabsList>
           </div>
 
