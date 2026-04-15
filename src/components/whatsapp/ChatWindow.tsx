@@ -300,15 +300,23 @@ export function ChatWindow({
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+      // Prefer ogg/opus (WhatsApp native), fall back to webm/opus
+      const preferredMime = MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")
+        ? "audio/ogg;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : undefined;
+      const recorder = new MediaRecorder(stream, preferredMime ? { mimeType: preferredMime } : undefined);
+      const actualMime = recorder.mimeType || preferredMime || "audio/webm";
       audioChunksRef.current = [];
 
       recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const ext = actualMime.includes("ogg") ? "ogg" : "webm";
+        const blob = new Blob(audioChunksRef.current, { type: actualMime });
         if (blob.size > 0) {
-          await uploadAndSend(blob, `voice-${Date.now()}.webm`, "audio/webm");
+          await uploadAndSend(blob, `voice-${Date.now()}.${ext}`, actualMime);
         }
       };
 
