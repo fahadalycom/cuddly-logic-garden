@@ -216,7 +216,7 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
             ? `bg-card border border-border/60 ${showTail ? "rounded-tl-sm" : ""}`
             : isAi
             ? `bg-gradient-to-br from-amber-500/15 to-amber-600/10 border border-amber-500/20 text-foreground ${showTail ? "rounded-tr-sm" : ""}`
-            : `bg-gradient-to-br from-primary to-primary/90 text-primary-foreground ${showTail ? "rounded-tr-sm" : ""} shadow-primary/20`
+            : `wa-bubble-outgoing ${showTail ? "rounded-tr-sm" : ""} shadow-sm`
         } ${showTail && isCustomer && !isEmojiOnly ? "wa-bubble-tail-left" : ""} ${showTail && !isCustomer && !isAi && !isEmojiOnly ? "wa-bubble-tail-right" : ""}`}>
           {isAi && !isGrouped && (
             <div className="flex items-center gap-1.5 mb-1">
