@@ -1,95 +1,74 @@
 
 
-# Complete Build-Out Plan — All Remaining Features
+# Fix WhatsApp Media System — Cloudflare R2 + Lazy Loading
 
-## Current State Assessment
+## Problem
+1. **R2 upload is broken** — the `downloadAndUploadMedia` function uses a fake AWS4 auth header (just the credential prefix, no actual signature). R2's S3-compatible API requires proper AWS Signature V4.
+2. **No media upload from chat UI** — agents can't send files/images/voice from the interface.
+3. **Media auto-loads** — all images/videos/audio load immediately via `<img src>`, `<video src>`, etc., wasting R2 bandwidth.
+4. **No send-side R2 upload** — when agent sends media, there's no upload path to R2.
 
-**Fully functional pages:** Dashboard, Products (with add/copy), Orders (with status transitions), NewOrder (buy flow), Payments (verify/reject), Delivery (mark delivered), Completed, Clients (list + profile with notes), Inventory (add accounts), Renewals (list), Reminders (mark response), Feedback (add/list), Staff (read-only list), Templates (read-only list), Audit Logs (read-only list)
+## Solution
 
-**Stub/Empty pages (need full build):**
-- **Settings** — just an EmptyState placeholder
-- **Roles & Permissions** — just an EmptyState placeholder  
-- **Old Clients** — just an EmptyState placeholder
+### 1. New Edge Function: `whatsapp-media` (handles R2 operations)
+- **Upload endpoint** (`POST`): Accepts base64 file data + mime type, uploads to R2 using proper AWS Signature V4 (using `aws4fetch` library from esm.sh), returns the R2 object key (NOT a full URL).
+- **Download/proxy endpoint** (`GET ?key=...`): Fetches file from R2 using signed request, returns the binary data with correct content-type. This acts as a proxy so R2 credentials stay server-side.
+- Store only the R2 object key in `wa_messages.media_url` (e.g. `whatsapp/1234-abc.jpg`), not the full URL.
 
-**Pages needing major feature additions:**
+### 2. Fix `whatsapp-webhook` — Incoming Media
+- Replace broken `downloadAndUploadMedia` to call the new `whatsapp-media` edge function for upload, or inline proper AWS4 signing using `aws4fetch`.
+- Decision: Inline `aws4fetch` in webhook for efficiency (avoid extra function call). Import `AwsClient` from `https://esm.sh/aws4fetch@1.0.20`.
+- Store R2 key in `media_url` field instead of full URL.
 
-| Page | What's Missing |
-|------|---------------|
-| **Dashboard** | No charts/graphs, no quick action buttons, no recent activity feed |
-| **Analytics** | Only stat cards, no charts (revenue trend, order pipeline, subscription timeline) |
-| **Products** | No variant/duration management, no FAQ view, no edit/delete |
-| **Delivery** | No account assignment from inventory (just marks delivered) |
-| **Renewals** | No termination workflow, no auto-reminder creation |
-| **Reminders** | No defer option, no WhatsApp message copy |
-| **Staff** | No add/edit/deactivate staff, no team management |
-| **Templates** | No add/edit/delete templates, no variable preview |
-| **Audit Logs** | No actor name resolution, no date filters |
-| **Inventory** | No edit/archive accounts, no utilization visualization |
-| **Clients** | No transfer between teams, no support issues |
-| **Client Profile** | No subscriptions detail, no support issues tab, no feedback tab |
-| **Feedback** | No star rating display improvements |
-| **Orders** | No order detail view, no order items display |
+### 3. Fix `whatsapp-send` — Outgoing Media
+- When agent sends media, the media is first uploaded via `whatsapp-media` edge function from the frontend, which returns the R2 key.
+- The R2 key is stored in DB. For sending to WhatsApp API, construct a public/signed URL or use the proxy endpoint.
 
----
+### 4. ChatWindow — Lazy Loading UI
+Replace direct `<img src>`, `<video src>`, `<audio src>` with placeholder components:
 
-## Implementation Plan (8 Steps)
+- **`MediaPlaceholder`** component: Shows file type icon + size + "Click to load" button.
+- On click, fetches media via `whatsapp-media?key={media_url}` edge function proxy, caches blob URL in component state.
+- Once loaded, renders the actual `<img>`, `<video>`, `<audio>` with the blob URL.
+- Use `Map<string, string>` in a React ref as a simple in-memory cache — if user navigates back, already-loaded media shows instantly.
 
-### Step 1: Settings Page — Full Build
-- Product duration config management (add/edit/delete durations per product)
-- Sharing standards config
-- Discount rules overview
-- System preferences (app name, default currency)
+### 5. ChatWindow — File Upload UI
+- Add file input (hidden) triggered by the paperclip button.
+- On file select: read as base64, call `whatsapp-media` upload endpoint, get R2 key back.
+- Call `onSend(caption, r2Key, mediaType)` to send via WhatsApp.
 
-### Step 2: Roles & Permissions — Full Build
-- Matrix grid: roles (columns) × modules (rows) with toggle switches for can_view/can_create/can_edit/can_delete
-- Save changes to `permissions` table
-- Visual permission matrix with color coding
+### 6. Database — No Schema Changes
+`wa_messages.media_url` already exists as `text`. We just change what we store (R2 key instead of full URL).
 
-### Step 3: Old Clients — Full Build  
-- Fetch clients whose last order/subscription ended 2-4 months ago
-- Show last active date, total spent, last product
-- "Send Follow-up" button with WhatsApp template copy
-- Filter by inactive duration (2mo, 3mo, 4mo+)
+## Files to Create/Edit
 
-### Step 4: Dashboard & Analytics Enhancement
-- **Dashboard**: Add recharts — revenue trend line chart (last 30 days), order status donut chart, recent activity feed (last 10 order status changes), quick action buttons
-- **Analytics**: Revenue line chart, orders by status bar chart, subscription status pie chart, top products table, monthly comparison
+| File | Action |
+|------|--------|
+| `supabase/functions/whatsapp-media/index.ts` | **Create** — R2 upload + proxy download |
+| `supabase/functions/whatsapp-webhook/index.ts` | **Edit** — Fix `downloadAndUploadMedia` with proper AWS4 signing |
+| `supabase/functions/whatsapp-send/index.ts` | **Edit** — Support R2 proxy URL for media sends to Meta API |
+| `src/components/whatsapp/ChatWindow.tsx` | **Edit** — Add lazy media loading + file upload |
+| `src/pages/WhatsApp.tsx` | **Edit** — Pass media upload handler |
 
-### Step 5: Delivery + Account Assignment
-- When marking an order as delivered, show account selection dialog
-- List available accounts for the ordered product from `software_accounts`
-- Auto-create `account_assignments` record
-- Update `used_seats` on the assigned account
-- Copy delivery credentials message to clipboard
+## Technical Details
 
-### Step 6: Staff & Templates — Full CRUD
-- **Staff**: Add new staff member (creates auth user via edge function), edit profile, toggle active/inactive, assign roles, team management (create teams, add members)
-- **Templates**: Add/edit/delete message templates with variable tag insertion, live preview with sample data
+**AWS4 Signing for R2** (using `aws4fetch`):
+```typescript
+import { AwsClient } from "https://esm.sh/aws4fetch@1.0.20";
+const r2 = new AwsClient({
+  accessKeyId: Deno.env.get("CLOUDFLARE_R2_ACCESS_KEY"),
+  secretAccessKey: Deno.env.get("CLOUDFLARE_R2_SECRET_KEY"),
+});
+// PUT/GET to R2 endpoint with proper signing
+```
 
-### Step 7: Enhanced Pages
-- **Products**: Edit product dialog, manage variants (add/edit/delete), manage durations, FAQ viewer/editor
-- **Inventory**: Edit account dialog, archive accounts, utilization progress bars per product
-- **Orders**: Order detail modal showing order items, status history timeline, payment history
-- **Renewals**: Termination workflow dialog (checklist: password changed, access removed, notes), auto-create reminders for expiring subs
-- **Reminders**: Defer option with date picker, WhatsApp message copy using templates
-- **Audit Logs**: Resolve actor names from staff_profiles, date range filter
-- **Client Profile**: Add support issues tab, feedback tab, transfer team dialog
+**Lazy loading flow**:
+```text
+Message loads → shows placeholder (icon + filename + "Load")
+User clicks → fetch(/whatsapp-media?key=whatsapp/123.jpg)
+Edge function → signs request → fetches from R2 → streams back
+Frontend → creates blob URL → renders media → caches in memory
+```
 
-### Step 8: Additional Useful Features
-- **Command Palette (⌘K)**: Global search across clients, orders, products — navigate anywhere fast
-- **Notifications indicator**: Show real count of pending actions (unverified payments + to-deliver + expiring subs)
-- **Export to CSV**: On Orders, Clients, Payments tables — download button
-- **Bulk actions**: On Orders page — select multiple and bulk update status
-- **WhatsApp deep links**: "Open in WhatsApp" buttons that open `wa.me/{phone}` with pre-filled message
-
----
-
-## Technical Notes
-- Charts use `recharts` (already in dependencies)
-- All new CRUD operations respect existing RLS policies
-- No database schema changes needed — all tables already exist
-- Staff creation will need an edge function to call `auth.admin.createUser()`
-- Command palette uses `cmdk` (already installed via shadcn command component)
-
-Shall I proceed with implementing all of this?
+**Media cache**: Simple `useRef(new Map<string, string>())` per ChatWindow instance. Clears when conversation changes.
 
