@@ -2,8 +2,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { UserPlus, Clock, MoreVertical, AlertTriangle, Inbox, Timer } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { UserPlus, Clock, AlertTriangle, Inbox, Timer, Zap } from "lucide-react";
+import { formatDistanceToNow, differenceInMinutes } from "date-fns";
 
 interface QueuePanelProps {
   queue: any[];
@@ -19,6 +19,22 @@ export function QueuePanel({ queue, staff, isAdmin, onAssign }: QueuePanelProps)
     return { label: "Normal", color: "text-muted-foreground", bg: "bg-muted/50 border-border", icon: Clock };
   };
 
+  const getWaitTimeColor = (createdAt: string) => {
+    const mins = differenceInMinutes(new Date(), new Date(createdAt));
+    if (mins < 5) return "text-emerald-500";
+    if (mins < 15) return "text-amber-500";
+    return "text-red-500";
+  };
+
+  const handleAutoAssign = async () => {
+    if (queue.length === 0 || staff.length === 0) return;
+    // Round-robin: assign each queue item to next available staff
+    for (let i = 0; i < queue.length; i++) {
+      const staffMember = staff[i % staff.length];
+      await onAssign(queue[i].conversation_id, staffMember.user_id);
+    }
+  };
+
   return (
     <ScrollArea className="h-full">
       <div className="p-3 space-y-2">
@@ -26,9 +42,17 @@ export function QueuePanel({ queue, staff, isAdmin, onAssign }: QueuePanelProps)
           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
             Waiting Queue
           </span>
-          <Badge variant="outline" className="text-[10px] h-5">
-            {queue.length} pending
-          </Badge>
+          <div className="flex items-center gap-1.5">
+            {isAdmin && queue.length > 0 && staff.length > 0 && (
+              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 rounded-lg gap-1" onClick={handleAutoAssign}>
+                <Zap className="h-3 w-3" />
+                Auto-assign
+              </Button>
+            )}
+            <Badge variant="outline" className="text-[10px] h-5">
+              {queue.length} pending
+            </Badge>
+          </div>
         </div>
 
         {queue.map((item) => {
@@ -36,6 +60,7 @@ export function QueuePanel({ queue, staff, isAdmin, onAssign }: QueuePanelProps)
           const priority = getPriorityConfig(item.priority);
           const PriorityIcon = priority.icon;
           const waitTime = formatDistanceToNow(new Date(item.created_at), { addSuffix: false });
+          const waitColor = getWaitTimeColor(item.created_at);
 
           return (
             <div key={item.id} className={`p-3.5 rounded-xl border ${priority.bg} space-y-2.5 transition-all hover:shadow-sm`}>
@@ -81,9 +106,9 @@ export function QueuePanel({ queue, staff, isAdmin, onAssign }: QueuePanelProps)
                   <PriorityIcon className={`h-3 w-3 ${priority.color}`} />
                   <span className={`text-[10px] font-medium ${priority.color}`}>{priority.label}</span>
                 </div>
-                <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <div className={`flex items-center gap-1 text-[10px] font-medium ${waitColor}`}>
                   <Clock className="h-3 w-3" />
-                  Waiting {waitTime}
+                  {waitTime}
                 </div>
               </div>
 
