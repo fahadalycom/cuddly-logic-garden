@@ -313,22 +313,24 @@ export default function WhatsAppPage() {
     if (selectedConversation) {
       return (
         <div className="fixed inset-0 z-50 flex flex-col bg-background overflow-hidden" style={{ height: '100dvh' }}>
-          <ChatWindow
-            conversation={selectedConversation}
-            messages={messages}
-            templates={templates}
-            aiSuggestions={aiSuggestions}
-            onSend={handleSendMessage}
-            onResolve={handleResolve}
-            onApproveAi={handleApproveAi}
-            onRejectAi={handleRejectAi}
-            isAdmin={isAdmin}
-            staff={staff}
-            onAssign={handleAssign}
-            onBack={handleBack}
-            onOpenContactInfo={() => setShowContactInfo(true)}
-            isMobile
-          />
+          <div className="flex-1 min-h-0 flex flex-col">
+            <ChatWindow
+              conversation={selectedConversation}
+              messages={messages}
+              templates={templates}
+              aiSuggestions={aiSuggestions}
+              onSend={handleSendMessage}
+              onResolve={handleResolve}
+              onApproveAi={handleApproveAi}
+              onRejectAi={handleRejectAi}
+              isAdmin={isAdmin}
+              staff={staff}
+              onAssign={handleAssign}
+              onBack={handleBack}
+              onOpenContactInfo={() => setShowContactInfo(true)}
+              isMobile
+            />
+          </div>
           {showContactInfo && (
             <Sheet open={showContactInfo} onOpenChange={setShowContactInfo}>
               <SheetContent side="right" className="w-full sm:max-w-sm p-0">
