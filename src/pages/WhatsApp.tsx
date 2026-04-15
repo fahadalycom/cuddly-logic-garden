@@ -50,9 +50,14 @@ export default function WhatsAppPage() {
   const fetchConversations = async () => {
     const { data } = await supabase
       .from("wa_conversations")
-      .select("*, clients(name, phone, whatsapp_number)")
+      .select("*, clients(name, phone, whatsapp_number), staff_profiles!wa_conversations_assigned_agent_id_fkey(full_name)")
       .order("last_message_at", { ascending: false });
-    setConversations(data || []);
+    // Flatten agent name
+    const enriched = (data || []).map((c: any) => ({
+      ...c,
+      assigned_agent_name: c.staff_profiles?.full_name || null,
+    }));
+    setConversations(enriched);
     setLoading(false);
   };
 
