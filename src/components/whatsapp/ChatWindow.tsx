@@ -313,10 +313,18 @@ export function ChatWindow({
       recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const ext = actualMime.includes("ogg") ? "ogg" : "webm";
         const blob = new Blob(audioChunksRef.current, { type: actualMime });
-        if (blob.size > 0) {
-          await uploadAndSend(blob, `voice-${Date.now()}.${ext}`, actualMime);
+        if (blob.size === 0) {
+          toast.error("Recording failed — no audio captured");
+          return;
+        }
+        // Always upload as audio/ogg for WhatsApp voice note compatibility
+        // The server will handle the actual upload to WhatsApp Media API
+        const uploadMime = "audio/ogg;codecs=opus";
+        try {
+          await uploadAndSend(blob, `voice-${Date.now()}.ogg`, uploadMime);
+        } catch (err) {
+          toast.error("Voice note failed to send. Please try again.");
         }
       };
 
