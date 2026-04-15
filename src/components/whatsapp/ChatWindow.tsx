@@ -536,24 +536,24 @@ export function ChatWindow({
     return (
       <div className="absolute inset-0 flex flex-col overflow-hidden bg-background">
         {/* ── HEADER ── */}
-        <div className="flex-shrink-0 h-[56px] px-2 flex items-center justify-between border-b border-border bg-card/95 backdrop-blur-md z-20"
-          style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-          <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className="flex-shrink-0 px-1 flex items-center justify-between border-b border-border bg-card/95 backdrop-blur-md z-20"
+          style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))', paddingBottom: '0.5rem' }}>
+          <div className="flex items-center gap-1 min-w-0 flex-1">
             {onBack && (
-              <button className="h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted transition-colors -ml-1" onClick={onBack}>
+              <button className="h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center active:bg-muted transition-colors" onClick={onBack}>
                 <ArrowLeft className="h-5 w-5" />
               </button>
             )}
             <div className="relative flex-shrink-0" onClick={onOpenContactInfo}>
-              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
                 <span className="text-sm font-bold text-primary-foreground">
                   {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
                 </span>
               </div>
-              <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${conversation.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+              <div className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card ${conversation.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
             </div>
             <div className="min-w-0 flex-1" onClick={onOpenContactInfo}>
-              <p className="text-[15px] font-semibold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
+              <p className="text-[14px] font-semibold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 {conversation.status === "active" && <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
                 <span className="text-[11px] text-muted-foreground truncate">
@@ -562,17 +562,15 @@ export function ChatWindow({
               </div>
             </div>
           </div>
-          <div className="flex items-center flex-shrink-0">
-            <button className="h-10 w-10 rounded-full flex items-center justify-center active:bg-muted transition-colors" onClick={openWhatsApp}>
-              <Phone className="h-[18px] w-[18px]" />
-            </button>
+          <div className="flex items-center flex-shrink-0 gap-0">
+            <MobileNotifButton />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="h-10 w-10 rounded-full flex items-center justify-center active:bg-muted transition-colors">
                   <MoreVertical className="h-[18px] w-[18px]" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-52">
                 <DropdownMenuItem onClick={openWhatsApp}><ExternalLink className="h-4 w-4 mr-2" /> Open in WhatsApp</DropdownMenuItem>
                 {onOpenContactInfo && <DropdownMenuItem onClick={onOpenContactInfo}><Info className="h-4 w-4 mr-2" /> Contact Info</DropdownMenuItem>}
                 <DropdownMenuItem onClick={onResolve} className="text-emerald-500"><CheckCircle className="h-4 w-4 mr-2" /> Mark Resolved</DropdownMenuItem>
