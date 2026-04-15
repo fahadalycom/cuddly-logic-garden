@@ -52,7 +52,23 @@ export default function WhatsAppPage() {
       .from("wa_conversations")
       .select("*, clients(name, phone, whatsapp_number)")
       .order("last_message_at", { ascending: false });
-    setConversations(data || []);
+
+    // Fetch agent names for assigned conversations
+    const agentIds = [...new Set((data || []).map((c: any) => c.assigned_agent_id).filter(Boolean))];
+    let agentMap: Record<string, string> = {};
+    if (agentIds.length > 0) {
+      const { data: agents } = await supabase
+        .from("staff_profiles")
+        .select("user_id, full_name")
+        .in("user_id", agentIds);
+      (agents || []).forEach((a: any) => { agentMap[a.user_id] = a.full_name; });
+    }
+
+    const enriched = (data || []).map((c: any) => ({
+      ...c,
+      assigned_agent_name: agentMap[c.assigned_agent_id] || null,
+    }));
+    setConversations(enriched);
     setLoading(false);
   };
 

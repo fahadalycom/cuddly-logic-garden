@@ -164,9 +164,16 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
                   </div>
 
                   <div className="flex items-center justify-between mt-0.5 gap-2">
-                    <p className={`text-[13px] truncate pr-1 ${hasUnread ? "text-foreground/80 font-medium" : "text-muted-foreground"}`}>
-                      {conv.last_message_preview || "No messages yet"}
-                    </p>
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <p className={`text-[13px] truncate pr-1 ${hasUnread ? "text-foreground/80 font-medium" : "text-muted-foreground"}`}>
+                        {conv.last_message_preview || "No messages yet"}
+                      </p>
+                      {conv.assigned_agent_name && (
+                        <span className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
+                          👤 {conv.assigned_agent_name}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {conv.status === "waiting" && (
                         <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-amber-500/50 text-amber-500 bg-amber-500/10">
