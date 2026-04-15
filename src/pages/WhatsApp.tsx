@@ -295,7 +295,7 @@ export default function WhatsAppPage() {
   if (isMobile) {
     if (selectedConversation) {
       return (
-        <div className="h-[calc(100vh-4rem)] flex flex-col bg-background">
+        <div className="fixed inset-0 z-50 flex flex-col bg-background">
           <ChatWindow
             conversation={selectedConversation}
             messages={messages}
