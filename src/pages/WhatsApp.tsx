@@ -312,7 +312,7 @@ export default function WhatsAppPage() {
   if (isMobile) {
     if (selectedConversation) {
       return (
-        <div className="fixed inset-0 z-50 flex flex-col bg-background">
+        <div className="fixed inset-0 z-50 flex flex-col bg-background" style={{ height: '100dvh' }}>
           <ChatWindow
             conversation={selectedConversation}
             messages={messages}
@@ -342,8 +342,8 @@ export default function WhatsAppPage() {
     }
 
     return (
-      <div className="fixed inset-0 z-40 flex flex-col bg-background">
-        <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 border-b border-border bg-card/95 backdrop-blur-md">
+      <div className="fixed inset-0 z-40 flex flex-col bg-background" style={{ height: '100dvh' }}>
+        <div className="flex-shrink-0 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 border-b border-border bg-card/95 backdrop-blur-md">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold">WhatsApp</h1>
             <div className="flex items-center gap-0.5">
@@ -369,32 +369,43 @@ export default function WhatsAppPage() {
           </div>
         </div>
 
-        <Tabs value={sideTab} onValueChange={setSideTab} className="flex flex-col flex-1 min-h-0">
-          <div className="px-3 pt-2 pb-1">
-            <TabsList className="grid w-full grid-cols-3 h-11 rounded-xl">
-              <TabsTrigger value="chats" className="text-xs gap-1.5 rounded-lg"><MessageSquare className="h-4 w-4" />Chats</TabsTrigger>
-              <TabsTrigger value="queue" className="text-xs gap-1.5 relative rounded-lg">
-                <Clock className="h-4 w-4" />Queue
-                {queue.length > 0 && (
-                  <span className="ml-0.5 bg-destructive text-destructive-foreground text-[9px] px-1.5 min-w-[16px] h-4 rounded-full flex items-center justify-center font-bold">{queue.length}</span>
+        <div className="flex-shrink-0 px-3 pt-2 pb-1">
+          <div className="grid w-full grid-cols-3 h-11 rounded-xl bg-muted p-1">
+            {[
+              { key: "chats", icon: <MessageSquare className="h-4 w-4" />, label: "Chats" },
+              { key: "queue", icon: <Clock className="h-4 w-4" />, label: "Queue", badge: queue.length > 0 ? queue.length : undefined },
+              ...(isAdmin ? [{ key: "agents", icon: <Users className="h-4 w-4" />, label: "Agents" }] : []),
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setSideTab(tab.key)}
+                className={`inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-all ${
+                  sideTab === tab.key
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+                {tab.badge && (
+                  <span className="ml-0.5 bg-destructive text-destructive-foreground text-[9px] px-1.5 min-w-[16px] h-4 rounded-full flex items-center justify-center font-bold">{tab.badge}</span>
                 )}
-              </TabsTrigger>
-              {isAdmin && <TabsTrigger value="agents" className="text-xs gap-1.5 rounded-lg"><Users className="h-4 w-4" />Agents</TabsTrigger>}
-            </TabsList>
+              </button>
+            ))}
           </div>
+        </div>
 
-          <TabsContent value="chats" className="flex-1 overflow-hidden mt-0">
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {sideTab === "chats" && (
             <ConversationList conversations={conversations} selectedId={selectedConversation?.id} onSelect={setSelectedConversation} />
-          </TabsContent>
-          <TabsContent value="queue" className="flex-1 overflow-hidden mt-0">
-            <QueuePanel queue={queue} staff={staff} isAdmin={isAdmin} onAssign={handleAssign} />
-          </TabsContent>
-          {isAdmin && (
-            <TabsContent value="agents" className="flex-1 overflow-hidden mt-0">
-              <AgentConfigPanel staff={staff} />
-            </TabsContent>
           )}
-        </Tabs>
+          {sideTab === "queue" && (
+            <QueuePanel queue={queue} staff={staff} isAdmin={isAdmin} onAssign={handleAssign} />
+          )}
+          {sideTab === "agents" && isAdmin && (
+            <AgentConfigPanel staff={staff} />
+          )}
+        </div>
 
         {showSearch && <MessageSearch onSelectConversation={handleSearchSelect} onClose={() => setShowSearch(false)} />}
       </div>
