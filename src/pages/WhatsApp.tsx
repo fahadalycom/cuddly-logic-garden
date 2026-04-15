@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { ConversationList } from "@/components/whatsapp/ConversationList";
@@ -7,7 +7,8 @@ import { AgentConfigPanel } from "@/components/whatsapp/AgentConfigPanel";
 import { QueuePanel } from "@/components/whatsapp/QueuePanel";
 import { LoadingState } from "@/components/shared/PageStates";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Users, Clock, Settings } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { MessageSquare, Clock, Settings, Zap, Users, TrendingUp } from "lucide-react";
 
 export default function WhatsAppPage() {
   const { user, isAdmin } = useAuth();
@@ -27,7 +28,6 @@ export default function WhatsAppPage() {
       .select("*, clients(name, phone, whatsapp_number)")
       .order("last_message_at", { ascending: false });
 
-    // Non-admin agents only see their assigned chats
     if (!isAdmin && user) {
       query = query.eq("assigned_agent_id", user.id);
     }
@@ -45,7 +45,6 @@ export default function WhatsAppPage() {
       .order("created_at", { ascending: true });
     setMessages(data || []);
 
-    // Mark as read
     await supabase
       .from("wa_messages")
       .update({ is_read: true })
@@ -99,7 +98,6 @@ export default function WhatsAppPage() {
     fetchTemplates();
     if (isAdmin) fetchStaff();
 
-    // Realtime subscriptions
     const convChannel = supabase
       .channel("wa-conversations")
       .on("postgres_changes", { event: "*", schema: "public", table: "wa_conversations" }, () => {
@@ -146,7 +144,7 @@ export default function WhatsAppPage() {
   const handleSendMessage = async (content: string, mediaUrl?: string, mediaType?: string) => {
     if (!selectedConversation || !user) return;
 
-    const { data, error } = await supabase.functions.invoke("whatsapp-send", {
+    const { error } = await supabase.functions.invoke("whatsapp-send", {
       body: {
         conversation_id: selectedConversation.id,
         content,
@@ -156,9 +154,7 @@ export default function WhatsAppPage() {
       },
     });
 
-    if (error) {
-      console.error("Send error:", error);
-    }
+    if (error) console.error("Send error:", error);
   };
 
   const handleResolve = async () => {
@@ -189,9 +185,7 @@ export default function WhatsAppPage() {
       .update({ agent_approved: true, was_sent: true })
       .eq("id", logId);
     
-    if (selectedConversation) {
-      await handleSendMessage(response);
-    }
+    if (selectedConversation) await handleSendMessage(response);
     fetchAiSuggestions(selectedConversation?.id);
   };
 
@@ -205,29 +199,52 @@ export default function WhatsAppPage() {
 
   if (loading) return <LoadingState />;
 
+  const activeCount = conversations.filter((c) => c.status === "active").length;
+  const unreadCount = conversations.filter((c) => c.unread_count > 0).length;
+
   return (
-    <div className="h-[calc(100vh-4rem)] flex bg-background">
+    <div className="h-[calc(100vh-4rem)] flex bg-background overflow-hidden">
       {/* Left Panel */}
-      <div className="w-80 lg:w-96 border-r border-border flex flex-col bg-card">
-        <Tabs value={sideTab} onValueChange={setSideTab} className="flex flex-col h-full">
-          <div className="p-3 border-b border-border">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="chats" className="text-xs gap-1">
+      <div className="w-80 lg:w-96 border-r border-border flex flex-col bg-card/50">
+        {/* Stats bar */}
+        <div className="px-4 py-2.5 border-b border-border bg-card/80">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-medium">{activeCount} active</span>
+            </div>
+            <div className="w-px h-3 bg-border" />
+            <div className="flex items-center gap-1.5">
+              <MessageSquare className="h-3 w-3 text-primary" />
+              <span className="text-xs text-muted-foreground">{unreadCount} unread</span>
+            </div>
+            <div className="w-px h-3 bg-border" />
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-3 w-3 text-amber-500" />
+              <span className="text-xs text-muted-foreground">{queue.length} queued</span>
+            </div>
+          </div>
+        </div>
+
+        <Tabs value={sideTab} onValueChange={setSideTab} className="flex flex-col flex-1 min-h-0">
+          <div className="px-3 pt-2 pb-1">
+            <TabsList className="grid w-full grid-cols-3 h-9">
+              <TabsTrigger value="chats" className="text-xs gap-1 data-[state=active]:shadow-sm">
                 <MessageSquare className="h-3.5 w-3.5" />
                 Chats
               </TabsTrigger>
-              <TabsTrigger value="queue" className="text-xs gap-1">
+              <TabsTrigger value="queue" className="text-xs gap-1 relative data-[state=active]:shadow-sm">
                 <Clock className="h-3.5 w-3.5" />
                 Queue
                 {queue.length > 0 && (
-                  <span className="ml-1 bg-destructive text-destructive-foreground text-[10px] px-1.5 rounded-full">
+                  <span className="ml-0.5 bg-destructive text-destructive-foreground text-[9px] px-1.5 min-w-[16px] h-4 rounded-full flex items-center justify-center font-bold">
                     {queue.length}
                   </span>
                 )}
               </TabsTrigger>
               {isAdmin && (
-                <TabsTrigger value="agents" className="text-xs gap-1">
-                  <Settings className="h-3.5 w-3.5" />
+                <TabsTrigger value="agents" className="text-xs gap-1 data-[state=active]:shadow-sm">
+                  <Users className="h-3.5 w-3.5" />
                   Agents
                 </TabsTrigger>
               )}
@@ -243,12 +260,7 @@ export default function WhatsAppPage() {
           </TabsContent>
 
           <TabsContent value="queue" className="flex-1 overflow-hidden mt-0">
-            <QueuePanel
-              queue={queue}
-              staff={staff}
-              isAdmin={isAdmin}
-              onAssign={handleAssign}
-            />
+            <QueuePanel queue={queue} staff={staff} isAdmin={isAdmin} onAssign={handleAssign} />
           </TabsContent>
 
           {isAdmin && (
@@ -260,7 +272,7 @@ export default function WhatsAppPage() {
       </div>
 
       {/* Right Panel - Chat */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col relative">
         {selectedConversation ? (
           <ChatWindow
             conversation={selectedConversation}
@@ -276,11 +288,25 @@ export default function WhatsAppPage() {
             onAssign={handleAssign}
           />
         ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            <div className="text-center space-y-3">
-              <MessageSquare className="h-16 w-16 mx-auto opacity-20" />
-              <p className="text-lg font-medium">Select a conversation</p>
-              <p className="text-sm">Choose from the left panel to start chatting</p>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <div className="relative mx-auto w-24 h-24">
+                <div className="absolute inset-0 rounded-3xl bg-primary/5 animate-pulse" />
+                <div className="absolute inset-3 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <MessageSquare className="h-10 w-10 text-primary/40" />
+                </div>
+              </div>
+              <div>
+                <p className="text-lg font-semibold text-foreground">Select a conversation</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Choose a chat from the left panel to start messaging
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/60">
+                <span className="flex items-center gap-1"><Zap className="h-3 w-3" /> AI-powered</span>
+                <span className="flex items-center gap-1"><Users className="h-3 w-3" /> Multi-agent</span>
+                <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Real-time</span>
+              </div>
             </div>
           </div>
         )}
