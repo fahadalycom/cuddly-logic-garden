@@ -645,7 +645,6 @@ export function ChatWindow({
       <div ref={scrollRef} onScroll={handleScroll}
         className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${isMobile ? "px-2.5" : "px-5"} py-2 bg-gradient-to-b from-muted/10 to-muted/5`}
         style={{ backgroundImage: "radial-gradient(circle at 20% 80%, hsl(var(--primary) / 0.02) 0%, transparent 50%), radial-gradient(circle at 80% 20%, hsl(var(--primary) / 0.02) 0%, transparent 50%)" }}>
-        style={{ backgroundImage: "radial-gradient(circle at 20% 80%, hsl(var(--primary) / 0.02) 0%, transparent 50%), radial-gradient(circle at 80% 20%, hsl(var(--primary) / 0.02) 0%, transparent 50%)" }}>
         {messagesWithDates.map((item, i) => {
           if (item.type === "date" && item.date) return <DateSeparator key={`date-${i}`} date={item.date} />;
           if (item.type === "message" && item.msg) return (
