@@ -676,7 +676,7 @@ export function ChatWindow({
 
       {/* Reply preview */}
       {replyTo && (
-        <div className="px-4 py-2 border-t border-border bg-muted/30 flex items-center gap-2 animate-in slide-in-from-bottom-2 duration-150">
+        <div className="flex-shrink-0 px-4 py-2 border-t border-border bg-muted/30 flex items-center gap-2 animate-in slide-in-from-bottom-2 duration-150">
           <div className="h-full w-1 rounded-full bg-primary flex-shrink-0" />
           <CornerDownRight className="h-3.5 w-3.5 text-primary flex-shrink-0" />
           <div className="flex-1 min-w-0">
@@ -691,7 +691,7 @@ export function ChatWindow({
 
       {/* Slash command menu */}
       {showSlashMenu && slashFiltered.length > 0 && (
-        <div className="px-4 py-2 border-t border-border bg-card max-h-48 overflow-y-auto animate-in slide-in-from-bottom-2 duration-150">
+        <div className="flex-shrink-0 px-4 py-2 border-t border-border bg-card max-h-48 overflow-y-auto animate-in slide-in-from-bottom-2 duration-150">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Quick Replies</p>
           {slashFiltered.slice(0, 6).map(t => (
             <button key={t.id} onClick={() => handleTemplateSelect(t)}
