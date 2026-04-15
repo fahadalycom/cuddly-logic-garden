@@ -35,7 +35,7 @@ serve(async (req) => {
       const mode = url.searchParams.get("hub.mode");
       const token = url.searchParams.get("hub.verify_token");
       const challenge = url.searchParams.get("hub.challenge");
-      const verifyToken = Deno.env.get("META_WEBHOOK_VERIFY_TOKEN");
+      const verifyToken = await getSettingValue(supabase, "meta_webhook_verify_token", "META_WEBHOOK_VERIFY_TOKEN");
 
       if (mode === "subscribe" && token === verifyToken) {
         return new Response(challenge, { status: 200 });
