@@ -215,6 +215,7 @@ export function ChatWindow({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingTimeRef = useRef(0);
   const [fileAccept, setFileAccept] = useState("*/*");
 
   useEffect(() => { scrollToBottom(); }, [messages]);
@@ -317,9 +318,12 @@ export function ChatWindow({
           return;
         }
 
+        // Use actual recording duration for FFmpeg cap
+        const actualDuration = recordingTimeRef.current;
+
         try {
           const { normalizeVoiceNote } = await import("@/lib/voice-note");
-          const normalized = await normalizeVoiceNote(recordedBlob, actualMime);
+          const normalized = await normalizeVoiceNote(recordedBlob, actualMime, actualDuration);
           await uploadAndSend(normalized.blob, normalized.filename, normalized.mimeType);
         } catch (err) {
           console.error("Voice note conversion error:", err);
@@ -327,11 +331,15 @@ export function ChatWindow({
         }
       };
 
-      recorder.start();
+      recorder.start(250); // Frequent chunks for better WebM metadata
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
       setRecordingTime(0);
-      recordingTimerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
+      recordingTimeRef.current = 0;
+      recordingTimerRef.current = setInterval(() => {
+        recordingTimeRef.current += 1;
+        setRecordingTime(t => t + 1);
+      }, 1000);
     } catch (err) {
       toast.error("Microphone access denied");
     }
