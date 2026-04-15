@@ -141,6 +141,8 @@ function MessageBubble({ msg, isGrouped, isMobile }: { msg: any; isGrouped: bool
   const isCustomer = msg.sender_type === "customer";
   const isAi = msg.sender_type === "ai";
   const isSystem = msg.sender_type === "system";
+  const isSending = msg._sending;
+  const isFailed = msg._failed;
 
   if (isSystem) {
     return (
@@ -159,10 +161,12 @@ function MessageBubble({ msg, isGrouped, isMobile }: { msg: any; isGrouped: bool
   const maxW = isMobile ? "max-w-[85%]" : "max-w-[70%]";
 
   return (
-    <div className={`flex ${isCustomer ? "justify-start" : "justify-end"} ${isGrouped ? "mt-0.5" : "mt-3"} group`}>
+    <div className={`flex ${isCustomer ? "justify-start" : "justify-end"} ${isGrouped ? "mt-0.5" : "mt-3"} group ${isSending ? "opacity-70" : ""}`}>
       <div className={`relative ${maxW}`}>
         <div className={`rounded-2xl px-3.5 py-2 relative shadow-sm ${
-          isCustomer
+          isFailed
+            ? "bg-destructive/10 border border-destructive/30 text-foreground rounded-tr-sm"
+            : isCustomer
             ? "bg-card border border-border/60 rounded-tl-sm"
             : isAi
             ? "bg-gradient-to-br from-amber-500/15 to-amber-600/10 border border-amber-500/20 text-foreground rounded-tr-sm"
@@ -181,8 +185,15 @@ function MessageBubble({ msg, isGrouped, isMobile }: { msg: any; isGrouped: bool
           ) : null}
           {msg.content && !isVoiceNote && <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>}
           <div className="flex items-center justify-end gap-1 mt-0.5">
+            {isFailed && <span className="text-[10px] text-destructive font-medium mr-1">Failed</span>}
             <span className={`text-[10px] ${isCustomer ? "text-muted-foreground" : "opacity-60"}`}>{format(new Date(msg.created_at), "HH:mm")}</span>
-            {!isCustomer && !isAi && <CheckCheck className={`h-3 w-3 ${msg.is_read ? "text-blue-400" : "opacity-50"}`} />}
+            {!isCustomer && !isAi && (
+              isSending
+                ? <Clock className="h-3 w-3 opacity-50 animate-pulse" />
+                : isFailed
+                ? <X className="h-3 w-3 text-destructive" />
+                : <CheckCheck className={`h-3 w-3 ${msg.is_read ? "text-blue-400" : "opacity-50"}`} />
+            )}
           </div>
         </div>
         {!isMobile && (
@@ -231,12 +242,12 @@ export function ChatWindow({
   const handleSend = async () => {
     if (!input.trim() || sending) return;
     const msg = input.trim();
+    setInput("");
     setSending(true);
     try {
       await onSend(msg);
-      setInput("");
     } catch {
-      // Keep input as draft on failure
+      // Error handled in parent via optimistic UI
     } finally {
       setSending(false);
       inputRef.current?.focus();
