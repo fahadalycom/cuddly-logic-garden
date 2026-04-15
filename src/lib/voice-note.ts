@@ -2,22 +2,26 @@ import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 
 const OUTPUT_MIME = "audio/ogg;codecs=opus";
-// Use the single-threaded (umd) build — does NOT require SharedArrayBuffer
-const FFMPEG_CORE_URL =
-  "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js";
-const FFMPEG_WASM_URL =
-  "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm";
+const FFMPEG_CORE_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js";
+const FFMPEG_WASM_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm";
+const FFMPEG_WORKER_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/worker.js";
 
 let ffmpegInstance: FFmpeg | null = null;
 let ffmpegLoadPromise: Promise<FFmpeg> | null = null;
+
+function toSafeArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
 
 async function getFFmpeg(): Promise<FFmpeg> {
   if (ffmpegInstance) return ffmpegInstance;
   if (!ffmpegLoadPromise) {
     ffmpegLoadPromise = (async () => {
       const ffmpeg = new FFmpeg();
-      // Single-threaded load — no workerURL, so no SharedArrayBuffer needed
       await ffmpeg.load({
+        classWorkerURL: await toBlobURL(FFMPEG_WORKER_URL, "text/javascript"),
         coreURL: await toBlobURL(FFMPEG_CORE_URL, "text/javascript"),
         wasmURL: await toBlobURL(FFMPEG_WASM_URL, "application/wasm"),
       });
@@ -30,17 +34,18 @@ async function getFFmpeg(): Promise<FFmpeg> {
 
 function hasOggOpusSignature(buf: Uint8Array): boolean {
   if (buf.length < 36) return false;
-  // OggS magic at byte 0
-  const hasOgg =
-    buf[0] === 0x4f && buf[1] === 0x67 && buf[2] === 0x67 && buf[3] === 0x53;
+  const hasOgg = buf[0] === 0x4f && buf[1] === 0x67 && buf[2] === 0x67 && buf[3] === 0x53;
   if (!hasOgg) return false;
-  // Search for "OpusHead" in the first 64 bytes
+
   const searchEnd = Math.min(buf.length, 64);
-  const needle = [0x4f, 0x70, 0x75, 0x73, 0x48, 0x65, 0x61, 0x64]; // "OpusHead"
+  const needle = [0x4f, 0x70, 0x75, 0x73, 0x48, 0x65, 0x61, 0x64];
   for (let i = 0; i <= searchEnd - needle.length; i++) {
     let found = true;
     for (let j = 0; j < needle.length; j++) {
-      if (buf[i + j] !== needle[j]) { found = false; break; }
+      if (buf[i + j] !== needle[j]) {
+        found = false;
+        break;
+      }
     }
     if (found) return true;
   }
@@ -52,7 +57,7 @@ function getInputExtension(mimeType: string): string {
   if (mimeType.includes("webm")) return "webm";
   if (mimeType.includes("mp4") || mimeType.includes("aac")) return "m4a";
   if (mimeType.includes("mpeg") || mimeType.includes("mp3")) return "mp3";
-  return "webm"; // safe default for browser audio
+  return "webm";
 }
 
 export async function normalizeVoiceNote(
@@ -61,10 +66,9 @@ export async function normalizeVoiceNote(
 ): Promise<{ blob: Blob; mimeType: string; filename: string }> {
   const rawBytes = new Uint8Array(await blob.arrayBuffer());
 
-  // Already valid OGG/OPUS — just re-wrap with correct MIME
   if (hasOggOpusSignature(rawBytes)) {
     return {
-      blob: new Blob([rawBytes], { type: OUTPUT_MIME }),
+      blob: new Blob([toSafeArrayBuffer(rawBytes)], { type: OUTPUT_MIME }),
       mimeType: OUTPUT_MIME,
       filename: `voice-${Date.now()}.ogg`,
     };
@@ -78,21 +82,29 @@ export async function normalizeVoiceNote(
 
   const ffmpeg = await getFFmpeg();
   const inputName = `input.${getInputExtension(mimeType)}`;
-  const outputName = `output.ogg`;
+  const outputName = `output-${crypto.randomUUID()}.ogg`;
 
   await ffmpeg.writeFile(inputName, await fetchFile(blob));
 
   try {
     const exitCode = await ffmpeg.exec([
-      "-i", inputName,
-      "-vn",                   // no video
-      "-map_metadata", "-1",   // strip metadata
-      "-ac", "1",              // mono
-      "-ar", "48000",          // 48kHz — required for OPUS
-      "-c:a", "libopus",
-      "-b:a", "32k",
-      "-application", "voip",
-      "-frame_duration", "20", // 20ms frames — WhatsApp standard
+      "-i",
+      inputName,
+      "-vn",
+      "-map_metadata",
+      "-1",
+      "-ac",
+      "1",
+      "-ar",
+      "48000",
+      "-c:a",
+      "libopus",
+      "-b:a",
+      "32k",
+      "-application",
+      "voip",
+      "-frame_duration",
+      "20",
       outputName,
     ]);
 
@@ -101,12 +113,11 @@ export async function normalizeVoiceNote(
     }
 
     const data = await ffmpeg.readFile(outputName);
-    const outputBytes =
-      typeof data === "string"
-        ? new TextEncoder().encode(data)
-        : data instanceof Uint8Array
-          ? data
-          : new Uint8Array(data as unknown as ArrayBuffer);
+    const outputBytes = typeof data === "string"
+      ? new TextEncoder().encode(data)
+      : data instanceof Uint8Array
+        ? data
+        : new Uint8Array(data as unknown as ArrayBuffer);
 
     if (!hasOggOpusSignature(outputBytes)) {
       throw new Error("Conversion output is not valid OGG/OPUS");
@@ -115,12 +126,16 @@ export async function normalizeVoiceNote(
     console.log(`[voice-note] Conversion successful: ${outputBytes.length} bytes`);
 
     return {
-      blob: new Blob([new Uint8Array(outputBytes).buffer as ArrayBuffer], { type: OUTPUT_MIME }),
+      blob: new Blob([toSafeArrayBuffer(outputBytes)], { type: OUTPUT_MIME }),
       mimeType: OUTPUT_MIME,
       filename: `voice-${Date.now()}.ogg`,
     };
   } finally {
-    try { await ffmpeg.deleteFile(inputName); } catch { /* ignore */ }
-    try { await ffmpeg.deleteFile(outputName); } catch { /* ignore */ }
+    try {
+      await ffmpeg.deleteFile(inputName);
+    } catch {}
+    try {
+      await ffmpeg.deleteFile(outputName);
+    } catch {}
   }
 }
