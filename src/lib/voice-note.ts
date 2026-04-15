@@ -115,7 +115,7 @@ export async function normalizeVoiceNote(
     console.log(`[voice-note] Conversion successful: ${outputBytes.length} bytes`);
 
     return {
-      blob: new Blob([outputBytes], { type: OUTPUT_MIME }),
+      blob: new Blob([outputBytes.buffer.slice(outputBytes.byteOffset, outputBytes.byteOffset + outputBytes.byteLength)], { type: OUTPUT_MIME }),
       mimeType: OUTPUT_MIME,
       filename: `voice-${Date.now()}.ogg`,
     };
