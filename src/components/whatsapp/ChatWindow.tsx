@@ -528,9 +528,9 @@ export function ChatWindow({
   const StatusIcon = status.icon;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className={`relative ${isMobile ? "" : "flex flex-col h-full"}`} style={isMobile ? { display: 'grid', gridTemplateRows: 'auto 1fr auto', height: '100%', overflow: 'hidden' } : undefined}>
       {/* Header */}
-      <div className={`${isMobile ? "px-2 py-2 safe-area-top" : "px-5 py-3"} border-b border-border flex items-center justify-between bg-card/95 backdrop-blur-md`}>
+      <div className={`flex-shrink-0 ${isMobile ? "px-2 py-2" : "px-5 py-3"} border-b border-border flex items-center justify-between bg-card/95 backdrop-blur-md`} style={isMobile ? { paddingTop: 'max(0.5rem, env(safe-area-inset-top))' } : undefined}>
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {onBack && (
             <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full -ml-0.5 active:scale-95 transition-transform" onClick={onBack}>
@@ -616,7 +616,7 @@ export function ChatWindow({
 
       {/* AI Suggestions */}
       {aiSuggestions.length > 0 && (
-        <div className={`${isMobile ? "px-3 py-2" : "px-5 py-3"} bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-amber-500/15`}>
+        <div className={`flex-shrink-0 ${isMobile ? "px-3 py-2" : "px-5 py-3"} bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-amber-500/15`}>
           <div className="flex items-center gap-2 mb-1.5">
             <div className="h-5 w-5 rounded-full bg-amber-500/15 flex items-center justify-center"><Sparkles className="h-3 w-3 text-amber-500" /></div>
             <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">AI</span>
@@ -643,7 +643,7 @@ export function ChatWindow({
 
       {/* Messages */}
       <div ref={scrollRef} onScroll={handleScroll}
-        className={`flex-1 overflow-y-auto ${isMobile ? "px-2.5" : "px-5"} py-2 bg-gradient-to-b from-muted/10 to-muted/5`}
+        className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${isMobile ? "px-2.5" : "px-5"} py-2 bg-gradient-to-b from-muted/10 to-muted/5`}
         style={{ backgroundImage: "radial-gradient(circle at 20% 80%, hsl(var(--primary) / 0.02) 0%, transparent 50%), radial-gradient(circle at 80% 20%, hsl(var(--primary) / 0.02) 0%, transparent 50%)" }}>
         {messagesWithDates.map((item, i) => {
           if (item.type === "date" && item.date) return <DateSeparator key={`date-${i}`} date={item.date} />;
@@ -666,7 +666,7 @@ export function ChatWindow({
 
       {/* Scroll to bottom */}
       {showScrollDown && (
-        <div className={`absolute ${isMobile ? "bottom-20 right-4" : "bottom-24 right-8"}`}>
+        <div className={`absolute z-10 ${isMobile ? "bottom-[72px] right-3" : "bottom-24 right-8"}`}>
           <Button size="icon" variant="secondary" className="h-9 w-9 rounded-full shadow-lg" onClick={scrollToBottom}><ArrowDown className="h-4 w-4" /></Button>
         </div>
       )}
@@ -676,7 +676,7 @@ export function ChatWindow({
 
       {/* Reply preview */}
       {replyTo && (
-        <div className="px-4 py-2 border-t border-border bg-muted/30 flex items-center gap-2 animate-in slide-in-from-bottom-2 duration-150">
+        <div className="flex-shrink-0 px-4 py-2 border-t border-border bg-muted/30 flex items-center gap-2 animate-in slide-in-from-bottom-2 duration-150">
           <div className="h-full w-1 rounded-full bg-primary flex-shrink-0" />
           <CornerDownRight className="h-3.5 w-3.5 text-primary flex-shrink-0" />
           <div className="flex-1 min-w-0">
@@ -691,7 +691,7 @@ export function ChatWindow({
 
       {/* Slash command menu */}
       {showSlashMenu && slashFiltered.length > 0 && (
-        <div className="px-4 py-2 border-t border-border bg-card max-h-48 overflow-y-auto animate-in slide-in-from-bottom-2 duration-150">
+        <div className="flex-shrink-0 px-4 py-2 border-t border-border bg-card max-h-48 overflow-y-auto animate-in slide-in-from-bottom-2 duration-150">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Quick Replies</p>
           {slashFiltered.slice(0, 6).map(t => (
             <button key={t.id} onClick={() => handleTemplateSelect(t)}
@@ -707,7 +707,7 @@ export function ChatWindow({
       )}
 
       {/* Input Area */}
-      <div className={`${isMobile ? "px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]" : "px-4 py-3"} border-t border-border bg-card/95 backdrop-blur-md`}>
+      <div className={`flex-shrink-0 ${isMobile ? "px-2 py-2" : "px-4 py-3"} border-t border-border bg-card/95 backdrop-blur-md`} style={isMobile ? { paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' } : undefined}>
         {uploading && (
           <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-primary/5 border border-primary/20">
             <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
