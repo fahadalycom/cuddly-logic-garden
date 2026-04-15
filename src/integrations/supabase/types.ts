@@ -1134,6 +1134,256 @@ export type Database = {
         }
         Relationships: []
       }
+      wa_agent_config: {
+        Row: {
+          agent_id: string
+          created_at: string
+          daily_message_limit: number
+          id: string
+          is_available: boolean
+          last_reset_date: string
+          max_active_chats: number
+          max_unread_visible: number
+          messages_sent_today: number
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          daily_message_limit?: number
+          id?: string
+          is_available?: boolean
+          last_reset_date?: string
+          max_active_chats?: number
+          max_unread_visible?: number
+          messages_sent_today?: number
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          daily_message_limit?: number
+          id?: string
+          is_available?: boolean
+          last_reset_date?: string
+          max_active_chats?: number
+          max_unread_visible?: number
+          messages_sent_today?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      wa_auto_response_log: {
+        Row: {
+          agent_approved: boolean | null
+          confidence: Database["public"]["Enums"]["wa_ai_confidence"]
+          conversation_id: string
+          created_at: string
+          detected_intent: string | null
+          id: string
+          matched_product_id: string | null
+          message_id: string | null
+          suggested_response: string | null
+          was_sent: boolean
+        }
+        Insert: {
+          agent_approved?: boolean | null
+          confidence?: Database["public"]["Enums"]["wa_ai_confidence"]
+          conversation_id: string
+          created_at?: string
+          detected_intent?: string | null
+          id?: string
+          matched_product_id?: string | null
+          message_id?: string | null
+          suggested_response?: string | null
+          was_sent?: boolean
+        }
+        Update: {
+          agent_approved?: boolean | null
+          confidence?: Database["public"]["Enums"]["wa_ai_confidence"]
+          conversation_id?: string
+          created_at?: string
+          detected_intent?: string | null
+          id?: string
+          matched_product_id?: string | null
+          message_id?: string | null
+          suggested_response?: string | null
+          was_sent?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_auto_response_log_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_auto_response_log_matched_product_id_fkey"
+            columns: ["matched_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_auto_response_log_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "wa_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_conversations: {
+        Row: {
+          assigned_agent_id: string | null
+          client_id: string | null
+          created_at: string
+          customer_name: string | null
+          customer_phone: string
+          customer_whatsapp_id: string | null
+          id: string
+          last_message_at: string | null
+          last_message_preview: string | null
+          status: Database["public"]["Enums"]["wa_conversation_status"]
+          unread_count: number
+          updated_at: string
+        }
+        Insert: {
+          assigned_agent_id?: string | null
+          client_id?: string | null
+          created_at?: string
+          customer_name?: string | null
+          customer_phone: string
+          customer_whatsapp_id?: string | null
+          id?: string
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          status?: Database["public"]["Enums"]["wa_conversation_status"]
+          unread_count?: number
+          updated_at?: string
+        }
+        Update: {
+          assigned_agent_id?: string | null
+          client_id?: string | null
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string
+          customer_whatsapp_id?: string | null
+          id?: string
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          status?: Database["public"]["Enums"]["wa_conversation_status"]
+          unread_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_messages: {
+        Row: {
+          content: string | null
+          conversation_id: string
+          created_at: string
+          id: string
+          is_ai_generated: boolean
+          is_read: boolean
+          media_filename: string | null
+          media_mime_type: string | null
+          media_type: Database["public"]["Enums"]["wa_media_type"]
+          media_url: string | null
+          sender_id: string | null
+          sender_type: Database["public"]["Enums"]["wa_sender_type"]
+          whatsapp_message_id: string | null
+        }
+        Insert: {
+          content?: string | null
+          conversation_id: string
+          created_at?: string
+          id?: string
+          is_ai_generated?: boolean
+          is_read?: boolean
+          media_filename?: string | null
+          media_mime_type?: string | null
+          media_type?: Database["public"]["Enums"]["wa_media_type"]
+          media_url?: string | null
+          sender_id?: string | null
+          sender_type?: Database["public"]["Enums"]["wa_sender_type"]
+          whatsapp_message_id?: string | null
+        }
+        Update: {
+          content?: string | null
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          is_ai_generated?: boolean
+          is_read?: boolean
+          media_filename?: string | null
+          media_mime_type?: string | null
+          media_type?: Database["public"]["Enums"]["wa_media_type"]
+          media_url?: string | null
+          sender_id?: string | null
+          sender_type?: Database["public"]["Enums"]["wa_sender_type"]
+          whatsapp_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_queue: {
+        Row: {
+          assigned_at: string | null
+          assigned_to: string | null
+          conversation_id: string
+          created_at: string
+          id: string
+          priority: number
+          reason: string | null
+          status: Database["public"]["Enums"]["wa_queue_status"]
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_to?: string | null
+          conversation_id: string
+          created_at?: string
+          id?: string
+          priority?: number
+          reason?: string | null
+          status?: Database["public"]["Enums"]["wa_queue_status"]
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_to?: string | null
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          priority?: number
+          reason?: string | null
+          status?: Database["public"]["Enums"]["wa_queue_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_queue_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_assignments: {
         Row: {
           assigned_at: string
@@ -1231,6 +1481,17 @@ export type Database = {
         | "product_info"
         | "general"
       trust_tag: "not_trusted" | "trusted" | "super_client"
+      wa_ai_confidence: "high" | "medium" | "low"
+      wa_conversation_status: "active" | "waiting" | "resolved" | "archived"
+      wa_media_type:
+        | "text"
+        | "image"
+        | "video"
+        | "audio"
+        | "document"
+        | "sticker"
+      wa_queue_status: "waiting" | "assigned" | "expired"
+      wa_sender_type: "customer" | "agent" | "system" | "ai"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1398,6 +1659,11 @@ export const Constants = {
         "general",
       ],
       trust_tag: ["not_trusted", "trusted", "super_client"],
+      wa_ai_confidence: ["high", "medium", "low"],
+      wa_conversation_status: ["active", "waiting", "resolved", "archived"],
+      wa_media_type: ["text", "image", "video", "audio", "document", "sticker"],
+      wa_queue_status: ["waiting", "assigned", "expired"],
+      wa_sender_type: ["customer", "agent", "system", "ai"],
     },
   },
 } as const
