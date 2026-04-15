@@ -155,6 +155,10 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
   const isFailed = msg._failed;
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Check if message is emoji-only (1-3 emojis, no other text)
+  const emojiRegex = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\u{FE0F}\u{200D}]{1,6}$/u;
+  const isEmojiOnly = msg.content && emojiRegex.test(msg.content.trim()) && !msg.media_url;
+
   if (isSystem) {
     return (
       <div className="flex justify-center py-1">
@@ -187,6 +191,9 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
   };
   const handleTouchEnd = () => { if (longPressRef.current) clearTimeout(longPressRef.current); };
 
+  // Show tail on first message of a group
+  const showTail = !isGrouped;
+
   return (
     <div className={`flex ${isCustomer ? "justify-start" : "justify-end"} ${isGrouped ? "mt-0.5" : isMobile ? "mt-2" : "mt-3"} group animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ${isSending ? "opacity-70" : ""}`}>
       <div className={`relative ${maxW}`}
@@ -200,14 +207,15 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
         )}
 
         <div className={`${isMobile ? "rounded-[18px] px-3 py-2" : "rounded-2xl px-3.5 py-2"} relative shadow-sm ${
+          isEmojiOnly ? "wa-emoji-only" :
           isFailed
             ? "bg-destructive/10 border border-destructive/30 text-foreground rounded-tr-sm"
             : isCustomer
-            ? "bg-card border border-border/60 rounded-tl-sm"
+            ? `bg-card border border-border/60 ${showTail ? "rounded-tl-sm" : ""}`
             : isAi
-            ? "bg-gradient-to-br from-amber-500/15 to-amber-600/10 border border-amber-500/20 text-foreground rounded-tr-sm"
-            : "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-tr-sm shadow-primary/20"
-        }`}>
+            ? `bg-gradient-to-br from-amber-500/15 to-amber-600/10 border border-amber-500/20 text-foreground ${showTail ? "rounded-tr-sm" : ""}`
+            : `bg-gradient-to-br from-primary to-primary/90 text-primary-foreground ${showTail ? "rounded-tr-sm" : ""} shadow-primary/20`
+        } ${showTail && isCustomer && !isEmojiOnly ? "wa-bubble-tail-left" : ""} ${showTail && !isCustomer && !isAi && !isEmojiOnly ? "wa-bubble-tail-right" : ""}`}>
           {isAi && !isGrouped && (
             <div className="flex items-center gap-1.5 mb-1">
               <div className="h-4 w-4 rounded-full bg-amber-500/20 flex items-center justify-center"><Bot className="h-2.5 w-2.5 text-amber-500" /></div>
