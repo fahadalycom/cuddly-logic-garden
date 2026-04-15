@@ -1,10 +1,10 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
-import ffmpegWorkerUrl from "@ffmpeg/ffmpeg/dist/esm/worker.js?url";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 
 const OUTPUT_MIME = "audio/ogg;codecs=opus";
 const FFMPEG_CORE_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js";
 const FFMPEG_WASM_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm";
+const FFMPEG_WORKER_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/worker.js";
 
 let ffmpegInstance: FFmpeg | null = null;
 let ffmpegLoadPromise: Promise<FFmpeg> | null = null;
@@ -21,7 +21,7 @@ async function getFFmpeg(): Promise<FFmpeg> {
     ffmpegLoadPromise = (async () => {
       const ffmpeg = new FFmpeg();
       await ffmpeg.load({
-        classWorkerURL: ffmpegWorkerUrl,
+        classWorkerURL: await toBlobURL(FFMPEG_WORKER_URL, "text/javascript"),
         coreURL: await toBlobURL(FFMPEG_CORE_URL, "text/javascript"),
         wasmURL: await toBlobURL(FFMPEG_WASM_URL, "application/wasm"),
       });
