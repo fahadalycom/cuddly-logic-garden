@@ -535,16 +535,35 @@ export function ChatWindow({
         )}
 
         {isRecording ? (
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-destructive" onClick={cancelRecording}>
+          <div className="flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-destructive hover:bg-destructive/10" onClick={cancelRecording}>
               <Trash2 className="h-5 w-5" />
             </Button>
-            <div className="flex-1 flex items-center justify-center gap-2">
-              <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-sm font-medium text-destructive">{formatRecordingTime(recordingTime)}</span>
-              <span className="text-xs text-muted-foreground">Recording...</span>
+            <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-muted/30">
+              <div className="flex items-center gap-1.5">
+                <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse shadow-sm shadow-red-500/50" />
+                <span className="text-sm font-semibold tabular-nums text-destructive min-w-[40px]">{formatRecordingTime(recordingTime)}</span>
+              </div>
+              {/* Live waveform animation */}
+              <div className="flex items-center gap-[2px] flex-1 h-[24px]">
+                {Array.from({ length: isMobile ? 24 : 36 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 rounded-full bg-destructive/60"
+                    style={{
+                      height: `${20 + Math.random() * 80}%`,
+                      minWidth: 2,
+                      animation: `pulse ${0.3 + Math.random() * 0.7}s ease-in-out infinite alternate`,
+                      animationDelay: `${i * 0.05}s`,
+                    }}
+                  />
+                ))}
+              </div>
+              <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                {isMobile ? "← Cancel" : "← Slide to cancel"}
+              </span>
             </div>
-            <Button size="icon" className="h-10 w-10 rounded-full bg-primary hover:bg-primary/90 shadow-sm" onClick={stopRecording}>
+            <Button size="icon" className="h-10 w-10 rounded-full bg-primary hover:bg-primary/90 shadow-md shadow-primary/30 transition-transform active:scale-95" onClick={stopRecording}>
               <Send className="h-5 w-5" />
             </Button>
           </div>
