@@ -242,7 +242,7 @@ async function findAvailableAgent(supabase: any): Promise<string | null> {
  */
 async function downloadAndUploadToStorage(supabase: any, mediaId: string, mimeType: string): Promise<string | null> {
   try {
-    const token = Deno.env.get("META_WHATSAPP_TOKEN")!;
+    const token = await getSettingValue(supabase, "meta_whatsapp_token", "META_WHATSAPP_TOKEN");
 
     // Step 1: Get media URL from Meta
     const mediaResp = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
