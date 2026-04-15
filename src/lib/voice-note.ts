@@ -120,7 +120,9 @@ function readVintRaw(data: Uint8Array, pos: number): { value: number; rawValue: 
 }
 
 function readElementId(data: Uint8Array, pos: number): { id: number; rawValue: number; length: number } | null {
-  return readVintRaw(data, pos);
+  const r = readVintRaw(data, pos);
+  if (!r) return null;
+  return { id: r.rawValue, rawValue: r.rawValue, length: r.length };
 }
 
 interface OpusPacket {
