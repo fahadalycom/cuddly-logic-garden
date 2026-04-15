@@ -262,7 +262,7 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
         {isMobile && showMobileActions && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setShowMobileActions(false)} />
-            <div className={`absolute z-50 ${isCustomer ? "left-0" : "right-0"} -top-14 animate-in fade-in scale-in-95 duration-150`}>
+            <div className={`absolute z-50 ${isCustomer ? "left-0" : "right-0"} bottom-full mb-1 animate-in fade-in scale-in-95 duration-150`}>
               <div className="flex gap-1 bg-card border border-border rounded-2xl px-2 py-1.5 shadow-xl">
                 {QUICK_REACTIONS.map(emoji => (
                   <button key={emoji} onClick={() => { onReact(msg.id, emoji); setShowMobileActions(false); }}
