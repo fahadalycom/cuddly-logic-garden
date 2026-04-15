@@ -6,6 +6,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper: get setting from DB, fallback to env var
+async function getSetting(supabase: any, key: string, envFallback?: string): Promise<string> {
+  const { data } = await supabase
+    .from("system_settings")
+    .select("value")
+    .eq("key", key)
+    .single();
+  if (data?.value) return data.value;
+  return envFallback ? (Deno.env.get(envFallback) || "") : "";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -26,6 +37,19 @@ serve(async (req) => {
   try {
     const { conversation_id, message_content, customer_phone } = await req.json();
 
+    // Check if AI is enabled
+    const aiEnabled = await getSetting(supabase, "wa_ai_enabled");
+    if (aiEnabled === "false") {
+      return new Response(JSON.stringify({ status: "ai_disabled" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Get AI model from settings
+    const aiModel = await getSetting(supabase, "wa_ai_model") || "google/gemini-3-flash-preview";
+    const autoSendHigh = await getSetting(supabase, "wa_ai_auto_send_high") !== "false";
+    const extraPrompt = await getSetting(supabase, "wa_ai_system_prompt_extra");
+
     // Get all products with variants for context
     const { data: products } = await supabase
       .from("products")
@@ -42,7 +66,6 @@ serve(async (req) => {
       })
       .join("\n");
 
-    // Get message templates for context
     const { data: templates } = await supabase
       .from("message_templates")
       .select("name, body, category")
@@ -52,7 +75,7 @@ serve(async (req) => {
       .map((t: any) => `[${t.category}] ${t.name}: ${t.body.substring(0, 100)}`)
       .join("\n");
 
-    const systemPrompt = `You are an AI assistant for a software subscription business. Your job is to analyze customer WhatsApp messages and determine if you can auto-respond.
+    let systemPrompt = `You are an AI assistant for a software subscription business. Your job is to analyze customer WhatsApp messages and determine if you can auto-respond.
 
 PRODUCTS AVAILABLE:
 ${productList}
@@ -76,7 +99,10 @@ Respond ONLY in this JSON format:
   "suggested_response": "the reply text or null"
 }`;
 
-    // Call Lovable AI
+    if (extraPrompt) {
+      systemPrompt += `\n\nADDITIONAL INSTRUCTIONS:\n${extraPrompt}`;
+    }
+
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -84,7 +110,7 @@ Respond ONLY in this JSON format:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: aiModel,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Customer message: "${message_content}"` },
@@ -133,56 +159,56 @@ Respond ONLY in this JSON format:
 
     const analysis = JSON.parse(toolCall.function.arguments);
     
-    // Log the AI response
+    const shouldAutoSend = autoSendHigh && analysis.confidence === "high";
+
     const { data: logEntry } = await supabase.from("wa_auto_response_log").insert({
       conversation_id,
       detected_intent: analysis.detected_intent,
       matched_product_id: analysis.matched_product_id || null,
       confidence: analysis.confidence,
       suggested_response: analysis.suggested_response,
-      was_sent: analysis.confidence === "high",
+      was_sent: shouldAutoSend,
     }).select().single();
 
-    // If high confidence, auto-send
-    if (analysis.confidence === "high" && analysis.suggested_response) {
-      const token = Deno.env.get("META_WHATSAPP_TOKEN")!;
-      const phoneId = Deno.env.get("META_WHATSAPP_PHONE_ID")!;
+    if (shouldAutoSend && analysis.suggested_response) {
+      const token = await getSetting(supabase, "meta_whatsapp_token", "META_WHATSAPP_TOKEN");
+      const phoneId = await getSetting(supabase, "meta_whatsapp_phone_id", "META_WHATSAPP_PHONE_ID");
 
-      const sendResp = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: customer_phone,
-          type: "text",
-          text: { body: analysis.suggested_response },
-        }),
-      });
-
-      const sendResult = await sendResp.json();
-
-      if (sendResp.ok) {
-        // Store AI message
-        await supabase.from("wa_messages").insert({
-          conversation_id,
-          sender_type: "ai",
-          content: analysis.suggested_response,
-          is_ai_generated: true,
-          whatsapp_message_id: sendResult.messages?.[0]?.id,
-          is_read: true,
+      if (token && phoneId) {
+        const sendResp = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: customer_phone,
+            type: "text",
+            text: { body: analysis.suggested_response },
+          }),
         });
 
-        // Update conversation
-        await supabase
-          .from("wa_conversations")
-          .update({
-            last_message_preview: analysis.suggested_response,
-            last_message_at: new Date().toISOString(),
-          })
-          .eq("id", conversation_id);
+        const sendResult = await sendResp.json();
+
+        if (sendResp.ok) {
+          await supabase.from("wa_messages").insert({
+            conversation_id,
+            sender_type: "ai",
+            content: analysis.suggested_response,
+            is_ai_generated: true,
+            whatsapp_message_id: sendResult.messages?.[0]?.id,
+            is_read: true,
+          });
+
+          await supabase
+            .from("wa_conversations")
+            .update({
+              last_message_preview: analysis.suggested_response,
+              last_message_at: new Date().toISOString(),
+            })
+            .eq("id", conversation_id);
+        }
       }
     }
 

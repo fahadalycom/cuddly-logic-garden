@@ -8,6 +8,17 @@ const corsHeaders = {
 
 const BUCKET = "whatsapp-media";
 
+// Helper: get setting from DB, fallback to env var
+async function getSettingValue(supabase: any, key: string, envFallback?: string): Promise<string> {
+  const { data } = await supabase
+    .from("system_settings")
+    .select("value")
+    .eq("key", key)
+    .single();
+  if (data?.value) return data.value;
+  return envFallback ? (Deno.env.get(envFallback) || "") : "";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -24,7 +35,7 @@ serve(async (req) => {
       const mode = url.searchParams.get("hub.mode");
       const token = url.searchParams.get("hub.verify_token");
       const challenge = url.searchParams.get("hub.challenge");
-      const verifyToken = Deno.env.get("META_WEBHOOK_VERIFY_TOKEN");
+      const verifyToken = await getSettingValue(supabase, "meta_webhook_verify_token", "META_WEBHOOK_VERIFY_TOKEN");
 
       if (mode === "subscribe" && token === verifyToken) {
         return new Response(challenge, { status: 200 });
@@ -231,7 +242,7 @@ async function findAvailableAgent(supabase: any): Promise<string | null> {
  */
 async function downloadAndUploadToStorage(supabase: any, mediaId: string, mimeType: string): Promise<string | null> {
   try {
-    const token = Deno.env.get("META_WHATSAPP_TOKEN")!;
+    const token = await getSettingValue(supabase, "meta_whatsapp_token", "META_WHATSAPP_TOKEN");
 
     // Step 1: Get media URL from Meta
     const mediaResp = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
