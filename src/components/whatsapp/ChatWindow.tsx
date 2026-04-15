@@ -559,7 +559,7 @@ export function ChatWindow({
   // ──────────────────────────────────────────────────────
   if (isMobile) {
     return (
-      <div className="absolute inset-0 flex flex-col overflow-hidden bg-background">
+      <div className="fixed inset-0 z-[120] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden overscroll-none bg-background">
         {/* ── HEADER ── */}
         <div className="flex-shrink-0 px-1 flex items-center justify-between border-b border-border bg-card/95 backdrop-blur-md z-20"
           style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))', paddingBottom: '0.5rem' }}>
@@ -569,7 +569,7 @@ export function ChatWindow({
                 <ArrowLeft className="h-5 w-5" />
               </button>
             )}
-            <div className="relative flex-shrink-0" onClick={onOpenContactInfo}>
+            <div className="relative flex-shrink-0">
               <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
                 <span className="text-sm font-bold text-primary-foreground">
                   {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
@@ -577,7 +577,7 @@ export function ChatWindow({
               </div>
               <div className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card ${conversation.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
             </div>
-            <div className="min-w-0 flex-1" onClick={onOpenContactInfo}>
+            <div className="min-w-0 flex-1">
               <p className="text-[14px] font-semibold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 {conversation.status === "active" && <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
@@ -587,57 +587,10 @@ export function ChatWindow({
               </div>
             </div>
           </div>
-          <div className="flex items-center flex-shrink-0 gap-0">
+          <div className="flex items-center flex-shrink-0 gap-0.5 pr-1">
             <MobileNotifButton />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="h-10 w-10 rounded-full flex items-center justify-center active:bg-muted transition-colors">
-                  <MoreVertical className="h-[18px] w-[18px]" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuItem onClick={openWhatsApp}><ExternalLink className="h-4 w-4 mr-2" /> Open in WhatsApp</DropdownMenuItem>
-                {onOpenContactInfo && <DropdownMenuItem onClick={onOpenContactInfo}><Info className="h-4 w-4 mr-2" /> Contact Info</DropdownMenuItem>}
-                <DropdownMenuItem onClick={onResolve} className="text-emerald-500"><CheckCircle className="h-4 w-4 mr-2" /> Mark Resolved</DropdownMenuItem>
-                {isAdmin && staff.length > 0 && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Assign to Agent</DropdownMenuLabel>
-                    {staff.map((s) => (
-                      <DropdownMenuItem key={s.id} onClick={() => onAssign(conversation.id, s.user_id)}>
-                        <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center mr-2 text-[10px] font-bold text-primary">{s.full_name?.charAt(0)}</div>
-                        {s.full_name}
-                      </DropdownMenuItem>
-                    ))}
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
-
-        {/* ── AI SUGGESTIONS (compact) ── */}
-        {aiSuggestions.length > 0 && (
-          <div className="flex-shrink-0 px-3 py-2 bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-amber-500/15 z-10">
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-              <div className="flex-shrink-0 flex items-center gap-1">
-                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                <span className="text-[10px] font-bold text-amber-500">AI</span>
-              </div>
-              {aiSuggestions.slice(0, 3).map((s) => (
-                <div key={s.id} className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-card/80 border border-border/50 max-w-[60vw]">
-                  <p className="text-[11px] flex-1 truncate">{s.suggested_response}</p>
-                  <button className="h-6 w-6 rounded-full flex items-center justify-center active:bg-emerald-500/20" onClick={() => onApproveAi(s.id, s.suggested_response)}>
-                    <Check className="h-3.5 w-3.5 text-emerald-500" />
-                  </button>
-                  <button className="h-6 w-6 rounded-full flex items-center justify-center active:bg-destructive/20" onClick={() => onRejectAi(s.id)}>
-                    <X className="h-3.5 w-3.5 text-destructive" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* ── MESSAGES ── */}
         <div ref={scrollRef} onScroll={handleScroll}

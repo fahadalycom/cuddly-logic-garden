@@ -312,7 +312,7 @@ export default function WhatsAppPage() {
   if (isMobile) {
     if (selectedConversation) {
       return (
-        <div className="fixed inset-0 z-[100] bg-background" style={{ height: '100dvh' }}>
+        <div className="fixed inset-0 z-[120] h-[100dvh] overflow-hidden overscroll-none bg-background">
           <ChatWindow
             conversation={selectedConversation}
             messages={messages}
@@ -326,17 +326,8 @@ export default function WhatsAppPage() {
             staff={staff}
             onAssign={handleAssign}
             onBack={handleBack}
-            onOpenContactInfo={() => setShowContactInfo(true)}
             isMobile
           />
-          {showContactInfo && (
-            <Sheet open={showContactInfo} onOpenChange={setShowContactInfo}>
-              <SheetContent side="right" className="w-full sm:max-w-sm p-0">
-                <SheetTitle className="sr-only">Contact Info</SheetTitle>
-                <ContactInfoPanel conversation={selectedConversation} onClose={() => setShowContactInfo(false)} />
-              </SheetContent>
-            </Sheet>
-          )}
         </div>
       );
     }
