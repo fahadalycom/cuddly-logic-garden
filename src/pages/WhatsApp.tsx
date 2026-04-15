@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { ConversationList } from "@/components/whatsapp/ConversationList";
 import { ChatWindow } from "@/components/whatsapp/ChatWindow";
@@ -25,12 +26,10 @@ export default function WhatsAppPage() {
   const [staff, setStaff] = useState<any[]>([]);
 
   const fetchConversations = async () => {
-    let query = supabase
+    const { data } = await supabase
       .from("wa_conversations")
       .select("*, clients(name, phone, whatsapp_number)")
       .order("last_message_at", { ascending: false });
-    if (!isAdmin && user) query = query.eq("assigned_agent_id", user.id);
-    const { data } = await query;
     setConversations(data || []);
     setLoading(false);
   };
@@ -82,7 +81,7 @@ export default function WhatsAppPage() {
     fetchConversations();
     fetchQueue();
     fetchTemplates();
-    if (isAdmin) fetchStaff();
+    fetchStaff();
 
     const convChannel = supabase
       .channel("wa-conversations")
@@ -97,7 +96,7 @@ export default function WhatsAppPage() {
       supabase.removeChannel(convChannel);
       supabase.removeChannel(queueChannel);
     };
-  }, []);
+  }, [user, isAdmin]);
 
   useEffect(() => {
     if (!selectedConversation) return;
@@ -117,10 +116,13 @@ export default function WhatsAppPage() {
 
   const handleSendMessage = async (content: string, mediaUrl?: string, mediaType?: string) => {
     if (!selectedConversation || !user) return;
-    const { error } = await supabase.functions.invoke("whatsapp-send", {
+    const { data, error } = await supabase.functions.invoke("whatsapp-send", {
       body: { conversation_id: selectedConversation.id, content, media_url: mediaUrl, media_type: mediaType || "text", sender_id: user.id },
     });
-    if (error) console.error("Send error:", error);
+    if (error) {
+      toast.error("Message send failed — saved as draft");
+      throw error;
+    }
   };
 
   const handleResolve = async () => {

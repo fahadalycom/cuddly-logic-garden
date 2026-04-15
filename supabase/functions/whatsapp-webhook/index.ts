@@ -4,7 +4,7 @@ import { AwsClient } from "https://esm.sh/aws4fetch@1.0.20";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req) => {
@@ -111,28 +111,28 @@ serve(async (req) => {
 
       if (message.type === "image") {
         mediaType = "image";
-        mediaUrl = await downloadAndUploadToR2(message.image.id, message.image.mime_type);
         mediaMimeType = message.image.mime_type;
         content = message.image.caption || null;
+        try { mediaUrl = await downloadAndUploadToR2(message.image.id, mediaMimeType); } catch (e) { console.error("Image R2 upload failed:", e); }
       } else if (message.type === "video") {
         mediaType = "video";
-        mediaUrl = await downloadAndUploadToR2(message.video.id, message.video.mime_type);
         mediaMimeType = message.video.mime_type;
         content = message.video.caption || null;
+        try { mediaUrl = await downloadAndUploadToR2(message.video.id, mediaMimeType); } catch (e) { console.error("Video R2 upload failed:", e); }
       } else if (message.type === "audio") {
         mediaType = "audio";
-        mediaUrl = await downloadAndUploadToR2(message.audio.id, message.audio.mime_type);
         mediaMimeType = message.audio.mime_type;
+        try { mediaUrl = await downloadAndUploadToR2(message.audio.id, mediaMimeType); } catch (e) { console.error("Audio R2 upload failed:", e); }
       } else if (message.type === "document") {
         mediaType = "document";
-        mediaUrl = await downloadAndUploadToR2(message.document.id, message.document.mime_type);
         mediaMimeType = message.document.mime_type;
         mediaFilename = message.document.filename;
         content = message.document.caption || null;
+        try { mediaUrl = await downloadAndUploadToR2(message.document.id, mediaMimeType); } catch (e) { console.error("Document R2 upload failed:", e); }
       } else if (message.type === "sticker") {
         mediaType = "sticker";
-        mediaUrl = await downloadAndUploadToR2(message.sticker.id, "image/webp");
         mediaMimeType = "image/webp";
+        try { mediaUrl = await downloadAndUploadToR2(message.sticker.id, "image/webp"); } catch (e) { console.error("Sticker R2 upload failed:", e); }
       }
 
       // Store message — media_url is now an R2 object key (e.g. "whatsapp/123.jpg")
