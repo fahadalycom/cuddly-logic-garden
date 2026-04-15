@@ -1,74 +1,73 @@
 
 
-# Fix WhatsApp Media System — Cloudflare R2 + Lazy Loading
+# Fix WhatsApp System — All Features Not Working
 
-## Problem
-1. **R2 upload is broken** — the `downloadAndUploadMedia` function uses a fake AWS4 auth header (just the credential prefix, no actual signature). R2's S3-compatible API requires proper AWS Signature V4.
-2. **No media upload from chat UI** — agents can't send files/images/voice from the interface.
-3. **Media auto-loads** — all images/videos/audio load immediately via `<img src>`, `<video src>`, etc., wasting R2 bandwidth.
-4. **No send-side R2 upload** — when agent sends media, there's no upload path to R2.
+## Root Cause Analysis
 
-## Solution
+I found **5 critical bugs** causing the entire WhatsApp system to be non-functional:
 
-### 1. New Edge Function: `whatsapp-media` (handles R2 operations)
-- **Upload endpoint** (`POST`): Accepts base64 file data + mime type, uploads to R2 using proper AWS Signature V4 (using `aws4fetch` library from esm.sh), returns the R2 object key (NOT a full URL).
-- **Download/proxy endpoint** (`GET ?key=...`): Fetches file from R2 using signed request, returns the binary data with correct content-type. This acts as a proxy so R2 credentials stay server-side.
-- Store only the R2 object key in `wa_messages.media_url` (e.g. `whatsapp/1234-abc.jpg`), not the full URL.
+### Bug 1: Conversation List Always Empty (MOST VISIBLE)
+The `fetchConversations()` runs inside `useEffect([], [])` on mount, but at that point `isAdmin` from `useAuth` is still `false` (roles haven't loaded yet). So the query adds `assigned_agent_id = user.id` filter — but the only conversation has `assigned_agent_id: null` (unassigned). Result: **empty list for admin**.
 
-### 2. Fix `whatsapp-webhook` — Incoming Media
-- Replace broken `downloadAndUploadMedia` to call the new `whatsapp-media` edge function for upload, or inline proper AWS4 signing using `aws4fetch`.
-- Decision: Inline `aws4fetch` in webhook for efficiency (avoid extra function call). Import `AwsClient` from `https://esm.sh/aws4fetch@1.0.20`.
-- Store R2 key in `media_url` field instead of full URL.
+**Fix**: Add `isAdmin` and `user` to the useEffect dependency array, or track a `rolesLoaded` state.
 
-### 3. Fix `whatsapp-send` — Outgoing Media
-- When agent sends media, the media is first uploaded via `whatsapp-media` edge function from the frontend, which returns the R2 key.
-- The R2 key is stored in DB. For sending to WhatsApp API, construct a public/signed URL or use the proxy endpoint.
+### Bug 2: META_WHATSAPP_TOKEN Expired
+Edge function logs show: `"Error validating access token: Session has expired"`. All outgoing messages fail with 500. This is why text sends show `FunctionsHttpError`.
 
-### 4. ChatWindow — Lazy Loading UI
-Replace direct `<img src>`, `<video src>`, `<audio src>` with placeholder components:
+**Fix**: You need to update the META_WHATSAPP_TOKEN secret with a fresh token from Meta Developer Console. I'll also add graceful error handling — on API failure, keep the message as a draft in the input box (as you requested).
 
-- **`MediaPlaceholder`** component: Shows file type icon + size + "Click to load" button.
-- On click, fetches media via `whatsapp-media?key={media_url}` edge function proxy, caches blob URL in component state.
-- Once loaded, renders the actual `<img>`, `<video>`, `<audio>` with the blob URL.
-- Use `Map<string, string>` in a React ref as a simple in-memory cache — if user navigates back, already-loaded media shows instantly.
+### Bug 3: Incoming Media Not Stored in R2
+Database shows `media_url: null` for received images. The `downloadAndUploadToR2` in the webhook failed silently (likely because the Meta token expired, so it couldn't fetch the media binary from Meta's servers).
 
-### 5. ChatWindow — File Upload UI
-- Add file input (hidden) triggered by the paperclip button.
-- On file select: read as base64, call `whatsapp-media` upload endpoint, get R2 key back.
-- Call `onSend(caption, r2Key, mediaType)` to send via WhatsApp.
+**Fix**: Already handled by updating the token. I'll also add better error logging and a fallback placeholder so messages with failed media still show something.
 
-### 6. Database — No Schema Changes
-`wa_messages.media_url` already exists as `text`. We just change what we store (R2 key instead of full URL).
+### Bug 4: Send Failure Loses the Message
+Currently when `whatsapp-send` returns a 500, the frontend clears the input and shows a console error. The message is lost.
 
-## Files to Create/Edit
+**Fix**: On send failure, keep the message text in the input box and show a toast error. Do not clear input until send succeeds.
 
-| File | Action |
-|------|--------|
-| `supabase/functions/whatsapp-media/index.ts` | **Create** — R2 upload + proxy download |
-| `supabase/functions/whatsapp-webhook/index.ts` | **Edit** — Fix `downloadAndUploadMedia` with proper AWS4 signing |
-| `supabase/functions/whatsapp-send/index.ts` | **Edit** — Support R2 proxy URL for media sends to Meta API |
-| `src/components/whatsapp/ChatWindow.tsx` | **Edit** — Add lazy media loading + file upload |
-| `src/pages/WhatsApp.tsx` | **Edit** — Pass media upload handler |
+### Bug 5: Large File Upload Can Crash
+The base64 encoding in `ChatWindow` uses a byte-by-byte loop which is slow for large files. For very large files it can also hit memory issues.
 
-## Technical Details
+**Fix**: Use chunked `String.fromCharCode` processing (8KB chunks).
 
-**AWS4 Signing for R2** (using `aws4fetch`):
-```typescript
-import { AwsClient } from "https://esm.sh/aws4fetch@1.0.20";
-const r2 = new AwsClient({
-  accessKeyId: Deno.env.get("CLOUDFLARE_R2_ACCESS_KEY"),
-  secretAccessKey: Deno.env.get("CLOUDFLARE_R2_SECRET_KEY"),
-});
-// PUT/GET to R2 endpoint with proper signing
-```
+---
 
-**Lazy loading flow**:
-```text
-Message loads → shows placeholder (icon + filename + "Load")
-User clicks → fetch(/whatsapp-media?key=whatsapp/123.jpg)
-Edge function → signs request → fetches from R2 → streams back
-Frontend → creates blob URL → renders media → caches in memory
-```
+## Implementation Plan
 
-**Media cache**: Simple `useRef(new Map<string, string>())` per ChatWindow instance. Clears when conversation changes.
+### Step 1: Fix Conversation Fetching (WhatsApp.tsx)
+- Add `isAdmin`, `user` to the useEffect dependency so conversations re-fetch when auth loads
+- Remove the `assigned_agent_id` filter entirely — all agents see all conversations (per your preference)
+
+### Step 2: Fix Send Error Handling (WhatsApp.tsx + ChatWindow.tsx)
+- `handleSendMessage`: on error, do NOT clear input; show toast with clear message
+- `ChatWindow.handleSend`: only clear `input` after `onSend` succeeds (wrap in try/catch)
+- `whatsapp-send` edge function: when WhatsApp API fails, still store the message in DB as `status: failed` (optional) OR return the error cleanly so frontend can keep draft
+
+### Step 3: Fix Media Upload Robustness (ChatWindow.tsx)
+- Use chunked base64 encoding (8KB chunks) instead of byte-by-byte loop
+- Better error messages on upload failure
+
+### Step 4: Update whatsapp-send Edge Function
+- On WhatsApp API error, return proper error JSON with details (already does this)
+- Store the message in DB regardless of WhatsApp API success, with a flag indicating delivery status
+
+### Step 5: Update whatsapp-media Edge Function
+- Add CORS header for newer Supabase client headers (`x-supabase-client-platform` etc.)
+
+### Step 6: Request Updated META_WHATSAPP_TOKEN
+- Prompt user to update the expired token
+
+## Files to Edit
+
+| File | Changes |
+|------|---------|
+| `src/pages/WhatsApp.tsx` | Fix useEffect deps; remove assigned_agent_id filter; handle send errors gracefully |
+| `src/components/whatsapp/ChatWindow.tsx` | Fix send to keep draft on failure; chunked base64; better error toasts |
+| `supabase/functions/whatsapp-send/index.ts` | Always store message in DB; mark delivery status |
+| `supabase/functions/whatsapp-media/index.ts` | Expand CORS headers |
+| `supabase/functions/whatsapp-webhook/index.ts` | Better error handling for failed media downloads |
+
+## Important Note
+Your **META_WHATSAPP_TOKEN is expired**. After I fix the code, I will ask you to update it with a fresh token from your Meta Developer Console. Without this, outgoing messages will continue to fail at the WhatsApp API level.
 
