@@ -312,25 +312,30 @@ export default function WhatsAppPage() {
   if (isMobile) {
     if (selectedConversation) {
       return (
-        <div className="fixed inset-0 z-50 flex flex-col bg-background overflow-hidden" style={{ height: '100dvh' }}>
-          <div className="flex-1 min-h-0 flex flex-col">
-            <ChatWindow
-              conversation={selectedConversation}
-              messages={messages}
-              templates={templates}
-              aiSuggestions={aiSuggestions}
-              onSend={handleSendMessage}
-              onResolve={handleResolve}
-              onApproveAi={handleApproveAi}
-              onRejectAi={handleRejectAi}
-              isAdmin={isAdmin}
-              staff={staff}
-              onAssign={handleAssign}
-              onBack={handleBack}
-              onOpenContactInfo={() => setShowContactInfo(true)}
-              isMobile
-            />
-          </div>
+        <>
+          <style>{`
+            .mobile-chat-root { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; background: hsl(var(--background)); height: 100dvh; height: 100vh; overflow: hidden; }
+            .mobile-chat-root > .chat-inner { flex: 1 1 0%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+          `}</style>
+          <div className="mobile-chat-root">
+            <div className="chat-inner">
+              <ChatWindow
+                conversation={selectedConversation}
+                messages={messages}
+                templates={templates}
+                aiSuggestions={aiSuggestions}
+                onSend={handleSendMessage}
+                onResolve={handleResolve}
+                onApproveAi={handleApproveAi}
+                onRejectAi={handleRejectAi}
+                isAdmin={isAdmin}
+                staff={staff}
+                onAssign={handleAssign}
+                onBack={handleBack}
+                onOpenContactInfo={() => setShowContactInfo(true)}
+                isMobile
+              />
+            </div>
           {showContactInfo && (
             <Sheet open={showContactInfo} onOpenChange={setShowContactInfo}>
               <SheetContent side="right" className="w-full sm:max-w-sm p-0">
