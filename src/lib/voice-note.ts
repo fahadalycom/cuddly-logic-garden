@@ -38,7 +38,7 @@ function getInputExtension(mimeType: string) {
   return "bin";
 }
 
-export async function normalizeVoiceNote(blob: Blob, mimeType: string) {
+export async function normalizeVoiceNote(blob: Blob, mimeType: string, durationSecs?: number) {
   if (await hasOggOpusSignature(blob)) {
     return {
       blob: new Blob([await blob.arrayBuffer()], { type: OUTPUT_MIME }),
@@ -57,23 +57,17 @@ export async function normalizeVoiceNote(blob: Blob, mimeType: string) {
 
   await ffmpeg.writeFile(inputName, await fetchFile(blob));
 
+  // Build args — cap duration to avoid FFmpeg misreading WebM length
+  const args = ["-i", inputName, "-vn", "-map_metadata", "-1", "-ac", "1",
+    "-c:a", "libopus", "-b:a", "32k", "-application", "voip"];
+  if (durationSecs && durationSecs > 0) {
+    // Add 1 second buffer to avoid cutting off
+    args.push("-t", String(Math.ceil(durationSecs) + 1));
+  }
+  args.push(outputName);
+
   try {
-    await ffmpeg.exec([
-      "-i",
-      inputName,
-      "-vn",
-      "-map_metadata",
-      "-1",
-      "-ac",
-      "1",
-      "-c:a",
-      "libopus",
-      "-b:a",
-      "32k",
-      "-application",
-      "voip",
-      outputName,
-    ]);
+    await ffmpeg.exec(args);
 
     const data = await ffmpeg.readFile(outputName);
     const outputBytes = typeof data === "string" ? new TextEncoder().encode(data) : new Uint8Array(data);

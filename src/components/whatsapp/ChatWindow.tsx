@@ -317,9 +317,12 @@ export function ChatWindow({
           return;
         }
 
+        // Use actual recording duration for FFmpeg cap
+        const actualDuration = recordingTimeRef.current;
+
         try {
           const { normalizeVoiceNote } = await import("@/lib/voice-note");
-          const normalized = await normalizeVoiceNote(recordedBlob, actualMime);
+          const normalized = await normalizeVoiceNote(recordedBlob, actualMime, actualDuration);
           await uploadAndSend(normalized.blob, normalized.filename, normalized.mimeType);
         } catch (err) {
           console.error("Voice note conversion error:", err);
@@ -327,7 +330,7 @@ export function ChatWindow({
         }
       };
 
-      recorder.start();
+      recorder.start(250); // Frequent chunks for better WebM metadata
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
       setRecordingTime(0);
