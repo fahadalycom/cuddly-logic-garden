@@ -114,10 +114,18 @@ export default function WhatsAppPage() {
     return () => { supabase.removeChannel(msgChannel); };
   }, [selectedConversation?.id]);
 
-  const handleSendMessage = async (content: string, mediaUrl?: string, mediaType?: string) => {
+  const handleSendMessage = async (content: string, mediaUrl?: string, mediaType?: string, mediaMimeType?: string, mediaFilename?: string) => {
     if (!selectedConversation || !user) return;
     const { data, error } = await supabase.functions.invoke("whatsapp-send", {
-      body: { conversation_id: selectedConversation.id, content, media_url: mediaUrl, media_type: mediaType || "text", sender_id: user.id },
+      body: {
+        conversation_id: selectedConversation.id,
+        content,
+        media_url: mediaUrl,
+        media_type: mediaType || "text",
+        media_mime_type: mediaMimeType,
+        media_filename: mediaFilename,
+        sender_id: user.id,
+      },
     });
     if (error) {
       toast.error("Message send failed — saved as draft");

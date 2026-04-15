@@ -24,7 +24,7 @@ interface ChatWindowProps {
   messages: any[];
   templates: any[];
   aiSuggestions: any[];
-  onSend: (content: string, mediaUrl?: string, mediaType?: string) => Promise<void>;
+  onSend: (content: string, mediaUrl?: string, mediaType?: string, mediaMimeType?: string, mediaFilename?: string) => Promise<void>;
   onResolve: () => Promise<void>;
   onApproveAi: (logId: string, response: string) => Promise<void>;
   onRejectAi: (logId: string) => Promise<void>;
@@ -252,7 +252,6 @@ export function ChatWindow({
     try {
       const arrayBuffer = await (file as Blob).arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
-      // Chunked base64 encoding (8KB chunks) to avoid call stack overflow on large files
       const chunkSize = 8192;
       let binary = "";
       for (let offset = 0; offset < bytes.length; offset += chunkSize) {
@@ -272,7 +271,7 @@ export function ChatWindow({
       if (error) throw error;
 
       const caption = input.trim() || undefined;
-      await onSend(caption || "", data.key, mediaType);
+      await onSend(caption || "", data.key, mediaType, mimeType, filename);
       setInput("");
       toast.success("Media sent");
     } catch (err: any) {
@@ -307,6 +306,7 @@ export function ChatWindow({
         ? "audio/webm;codecs=opus"
         : undefined;
       const recorder = new MediaRecorder(stream, preferredMime ? { mimeType: preferredMime } : undefined);
+      // Use the ACTUAL mime type the browser is producing — do NOT fake it
       const actualMime = recorder.mimeType || preferredMime || "audio/webm";
       audioChunksRef.current = [];
 
@@ -318,11 +318,13 @@ export function ChatWindow({
           toast.error("Recording failed — no audio captured");
           return;
         }
-        // Always upload as audio/ogg for WhatsApp voice note compatibility
-        // The server will handle the actual upload to WhatsApp Media API
-        const uploadMime = "audio/ogg;codecs=opus";
+        // Determine the correct extension and mime based on what the browser actually recorded
+        const isOgg = actualMime.includes("ogg");
+        const ext = isOgg ? "ogg" : "webm";
+        const uploadMime = actualMime; // Send the real mime — backend will handle conversion
+        const filename = `voice-${Date.now()}.${ext}`;
         try {
-          await uploadAndSend(blob, `voice-${Date.now()}.ogg`, uploadMime);
+          await uploadAndSend(blob, filename, uploadMime);
         } catch (err) {
           toast.error("Voice note failed to send. Please try again.");
         }

@@ -21,7 +21,6 @@ function getR2Url(key: string) {
   return `${endpoint}/${bucket}/${key}`;
 }
 
-// Download file from R2 and upload directly to WhatsApp Media API, return media ID
 async function uploadMediaToWhatsApp(
   r2Key: string,
   mimeType: string,
@@ -29,7 +28,6 @@ async function uploadMediaToWhatsApp(
   phoneId: string
 ): Promise<string | null> {
   try {
-    // 1. Download from R2
     const r2 = getR2Client();
     const r2Url = getR2Url(r2Key);
     const r2Response = await r2.fetch(r2Url, { method: "GET" });
@@ -38,14 +36,14 @@ async function uploadMediaToWhatsApp(
       return null;
     }
     const fileBytes = new Uint8Array(await r2Response.arrayBuffer());
-    const contentType = r2Response.headers.get("content-type") || mimeType || "application/octet-stream";
+    const contentType = mimeType || r2Response.headers.get("content-type") || "application/octet-stream";
 
-    // Determine filename extension
+    // For WebM audio, WhatsApp still accepts it as audio — use the real mime
+    const cleanMime = contentType.split(";")[0].trim();
+
     const extMap: Record<string, string> = {
       "audio/ogg": "ogg",
-      "audio/ogg;codecs=opus": "ogg",
       "audio/webm": "webm",
-      "audio/webm;codecs=opus": "webm",
       "audio/mpeg": "mp3",
       "audio/mp4": "m4a",
       "image/jpeg": "jpg",
@@ -53,31 +51,27 @@ async function uploadMediaToWhatsApp(
       "video/mp4": "mp4",
       "application/pdf": "pdf",
     };
-    const cleanMime = contentType.split(";")[0].trim();
-    const ext = extMap[contentType] || extMap[cleanMime] || cleanMime.split("/")[1] || "bin";
+    const ext = extMap[cleanMime] || cleanMime.split("/")[1] || "bin";
     const filename = `media.${ext}`;
 
-    // 2. Upload to WhatsApp Media API using multipart/form-data
+    console.log(`Uploading to WhatsApp: mime=${cleanMime}, size=${fileBytes.length}, filename=${filename}`);
+
     const boundary = `----FormBoundary${crypto.randomUUID().replace(/-/g, "")}`;
     const encoder = new TextEncoder();
 
     const parts: Uint8Array[] = [];
-    // messaging_product field
     parts.push(encoder.encode(
       `--${boundary}\r\nContent-Disposition: form-data; name="messaging_product"\r\n\r\nwhatsapp\r\n`
     ));
-    // type field
     parts.push(encoder.encode(
       `--${boundary}\r\nContent-Disposition: form-data; name="type"\r\n\r\n${cleanMime}\r\n`
     ));
-    // file field
     parts.push(encoder.encode(
       `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${cleanMime}\r\n\r\n`
     ));
     parts.push(fileBytes);
     parts.push(encoder.encode(`\r\n--${boundary}--\r\n`));
 
-    // Combine all parts
     let totalLength = 0;
     for (const p of parts) totalLength += p.length;
     const body = new Uint8Array(totalLength);
@@ -123,7 +117,7 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
-    const { conversation_id, content, media_url, media_type, sender_id } = await req.json();
+    const { conversation_id, content, media_url, media_type, media_mime_type, media_filename, sender_id } = await req.json();
 
     if (!conversation_id || (!content && !media_url)) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -132,7 +126,6 @@ serve(async (req) => {
       });
     }
 
-    // Get conversation
     const { data: conversation } = await supabase
       .from("wa_conversations")
       .select("*")
@@ -149,23 +142,26 @@ serve(async (req) => {
     const token = Deno.env.get("META_WHATSAPP_TOKEN")!;
     const phoneId = Deno.env.get("META_WHATSAPP_PHONE_ID")!;
 
-    // Build WhatsApp API message
     let messagePayload: any = {
       messaging_product: "whatsapp",
       to: conversation.customer_phone,
     };
 
     if (media_type && media_type !== "text" && media_url) {
-      // Upload media directly to WhatsApp's Media API (solves unreachable proxy URL issue)
       const waMediaType = media_type === "audio" ? "audio" : media_type;
-      const mediaId = await uploadMediaToWhatsApp(media_url, waMediaType === "audio" ? "audio/ogg" : "", token, phoneId);
+      // Use the actual mime type from the frontend, not a hardcoded one
+      const actualMime = media_mime_type || (waMediaType === "audio" ? "audio/ogg" : "application/octet-stream");
+      
+      console.log(`Sending media: type=${waMediaType}, mime=${actualMime}, r2Key=${media_url}`);
+      
+      const mediaId = await uploadMediaToWhatsApp(media_url, actualMime, token, phoneId);
 
       if (mediaId) {
         messagePayload.type = waMediaType;
         messagePayload[waMediaType] = { id: mediaId };
         if (content) messagePayload[waMediaType].caption = content;
       } else {
-        // Fallback: still try with link (less reliable)
+        // Fallback: try with link
         console.warn("Direct upload failed, falling back to link method");
         const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
         const proxyUrl = `${supabaseUrl}/functions/v1/whatsapp-media?key=${encodeURIComponent(media_url)}&apikey=${encodeURIComponent(anonKey)}`;
@@ -178,7 +174,6 @@ serve(async (req) => {
       messagePayload.text = { body: content };
     }
 
-    // Send via Meta API
     let waMessageId: string | null = null;
     let deliveryFailed = false;
 
@@ -209,7 +204,7 @@ serve(async (req) => {
       deliveryFailed = true;
     }
 
-    // Always store sent message in DB regardless of delivery status
+    // Store message with proper metadata
     const { data: storedMessage } = await supabase.from("wa_messages").insert({
       conversation_id,
       sender_type: "agent",
@@ -217,11 +212,12 @@ serve(async (req) => {
       content,
       media_url,
       media_type: media_type || "text",
+      media_mime_type: media_mime_type || null,
+      media_filename: media_filename || null,
       whatsapp_message_id: waMessageId,
       is_read: true,
     }).select().single();
 
-    // Update conversation
     await supabase
       .from("wa_conversations")
       .update({
@@ -251,7 +247,7 @@ serve(async (req) => {
     if (deliveryFailed) {
       return new Response(JSON.stringify({ 
         success: false, 
-        error: "Message saved but WhatsApp delivery failed. Check META_WHATSAPP_TOKEN.", 
+        error: "Message saved but WhatsApp delivery failed.", 
         message: storedMessage 
       }), {
         status: 207,
