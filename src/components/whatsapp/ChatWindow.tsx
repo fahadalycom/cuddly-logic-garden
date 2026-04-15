@@ -299,34 +299,31 @@ export function ChatWindow({
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Prefer ogg/opus (WhatsApp native), fall back to webm/opus
       const preferredMime = MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")
         ? "audio/ogg;codecs=opus"
         : MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
         : undefined;
       const recorder = new MediaRecorder(stream, preferredMime ? { mimeType: preferredMime } : undefined);
-      // Use the ACTUAL mime type the browser is producing — do NOT fake it
       const actualMime = recorder.mimeType || preferredMime || "audio/webm";
       audioChunksRef.current = [];
 
       recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: actualMime });
-        if (blob.size === 0) {
+        const recordedBlob = new Blob(audioChunksRef.current, { type: actualMime });
+        if (recordedBlob.size === 0) {
           toast.error("Recording failed — no audio captured");
           return;
         }
-        // Determine the correct extension and mime based on what the browser actually recorded
-        const isOgg = actualMime.includes("ogg");
-        const ext = isOgg ? "ogg" : "webm";
-        const uploadMime = actualMime; // Send the real mime — backend will handle conversion
-        const filename = `voice-${Date.now()}.${ext}`;
+
         try {
-          await uploadAndSend(blob, filename, uploadMime);
+          const { normalizeVoiceNote } = await import("@/lib/voice-note");
+          const normalized = await normalizeVoiceNote(recordedBlob, actualMime);
+          await uploadAndSend(normalized.blob, normalized.filename, normalized.mimeType);
         } catch (err) {
-          toast.error("Voice note failed to send. Please try again.");
+          console.error("Voice note conversion error:", err);
+          toast.error("Voice note convert nahi hui — please dubara try karein");
         }
       };
 
