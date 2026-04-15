@@ -596,9 +596,14 @@ export function ChatWindow({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[14px] font-semibold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
-              <p className="text-[11px] text-muted-foreground truncate">
-                {conversation.status === "active" ? "Online" : `Last seen ${conversation.last_message_at ? new Date(conversation.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "recently"}`}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <Badge variant="outline" className={`text-[8px] px-1 py-0 h-3.5 border ${status.bg} ${status.color}`}>
+                  <StatusIcon className="h-2 w-2 mr-0.5" />{conversation.status}
+                </Badge>
+                <span className="text-[10px] text-muted-foreground truncate">
+                  {conversation.status === "active" ? "online" : conversation.last_message_at ? new Date(conversation.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
+                </span>
+              </div>
             </div>
           </div>
           <div className="flex items-center flex-shrink-0 gap-0.5 pr-1">
