@@ -76,12 +76,8 @@ export async function normalizeVoiceNote(blob: Blob, mimeType: string) {
     ]);
 
     const data = await ffmpeg.readFile(outputName);
-    const outputBytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
-    const normalizedBuffer = outputBytes.buffer.slice(
-      outputBytes.byteOffset,
-      outputBytes.byteOffset + outputBytes.byteLength,
-    );
-    const normalizedBlob = new Blob([normalizedBuffer], { type: OUTPUT_MIME });
+    const outputBytes = typeof data === "string" ? new TextEncoder().encode(data) : new Uint8Array(data);
+    const normalizedBlob = new Blob([outputBytes], { type: OUTPUT_MIME });
 
     if (!(await hasOggOpusSignature(normalizedBlob))) {
       throw new Error("Voice note conversion failed");
