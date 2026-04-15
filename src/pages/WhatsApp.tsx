@@ -336,9 +336,7 @@ export default function WhatsAppPage() {
                 <ContactInfoPanel conversation={selectedConversation} onClose={() => setShowContactInfo(false)} />
               </SheetContent>
             </Sheet>
-          )}
-          </div>
-        </>
+        </div>
       );
     }
 
