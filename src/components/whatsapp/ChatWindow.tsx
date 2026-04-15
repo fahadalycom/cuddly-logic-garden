@@ -131,10 +131,10 @@ function DateSeparator({ date }: { date: Date }) {
   let label: string;
   if (isToday(date)) label = "Today";
   else if (isYesterday(date)) label = "Yesterday";
-  else label = format(date, "EEEE, MMMM d, yyyy");
+  else label = format(date, "EEEE, MMM d, yyyy");
   return (
-    <div className="flex items-center justify-center py-3">
-      <span className="text-[10px] font-semibold text-muted-foreground bg-card/80 backdrop-blur-sm px-4 py-1.5 rounded-full shadow-sm border border-border/30">{label}</span>
+    <div className="flex items-center justify-center py-3 my-1">
+      <span className="wa-date-pill">{label}</span>
     </div>
   );
 }
