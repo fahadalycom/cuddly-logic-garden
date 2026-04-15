@@ -707,7 +707,7 @@ export function ChatWindow({
       )}
 
       {/* Input Area */}
-      <div className={`${isMobile ? "px-2 py-2" : "px-4 py-3"} border-t border-border bg-card/80 backdrop-blur-sm safe-area-bottom`}>
+      <div className={`${isMobile ? "px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]" : "px-4 py-3"} border-t border-border bg-card/95 backdrop-blur-md`}>
         {uploading && (
           <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-primary/5 border border-primary/20">
             <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
@@ -717,41 +717,40 @@ export function ChatWindow({
 
         {isRecording ? (
           <div className="flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
-            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-destructive hover:bg-destructive/10" onClick={cancelRecording}>
+            <Button variant="ghost" size="icon" className="h-11 w-11 rounded-full text-destructive active:bg-destructive/10 active:scale-95 transition-transform" onClick={cancelRecording}>
               <Trash2 className="h-5 w-5" />
             </Button>
-            <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-muted/30">
+            <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-full bg-muted/30">
               <div className="flex items-center gap-1.5">
                 <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse shadow-sm shadow-red-500/50" />
                 <span className="text-sm font-semibold tabular-nums text-destructive min-w-[40px]">{formatRecordingTime(recordingTime)}</span>
               </div>
               <div className="flex items-center gap-[2px] flex-1 h-[24px]">
-                {Array.from({ length: isMobile ? 24 : 36 }).map((_, i) => (
+                {Array.from({ length: isMobile ? 20 : 36 }).map((_, i) => (
                   <div key={i} className="flex-1 rounded-full bg-destructive/60"
                     style={{ height: `${20 + Math.random() * 80}%`, minWidth: 2, animation: `pulse ${0.3 + Math.random() * 0.7}s ease-in-out infinite alternate`, animationDelay: `${i * 0.05}s` }} />
                 ))}
               </div>
-              <span className="text-[11px] text-muted-foreground whitespace-nowrap">{isMobile ? "← Cancel" : "← Slide to cancel"}</span>
             </div>
-            <Button size="icon" className="h-10 w-10 rounded-full bg-primary hover:bg-primary/90 shadow-md shadow-primary/30 transition-transform active:scale-95" onClick={stopRecording}>
+            <Button size="icon" className="h-11 w-11 rounded-full bg-primary hover:bg-primary/90 shadow-md shadow-primary/30 transition-transform active:scale-90" onClick={stopRecording}>
               <Send className="h-5 w-5" />
             </Button>
           </div>
         ) : (
-          <div className="flex items-end gap-1.5">
+          <div className="flex items-end gap-1">
             <DropdownMenu open={showAttachMenu} onOpenChange={setShowAttachMenu}>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className={`${isMobile ? "h-10 w-10" : "h-9 w-9"} flex-shrink-0 rounded-full`} disabled={uploading}>
-                  <Paperclip className="h-5 w-5 text-muted-foreground" />
+                <Button variant="ghost" size="icon" className={`${isMobile ? "h-11 w-11" : "h-9 w-9"} flex-shrink-0 rounded-full active:scale-95 transition-transform`} disabled={uploading}>
+                  <Paperclip className={`${isMobile ? "h-5.5 w-5.5" : "h-5 w-5"} text-muted-foreground`} />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48" side="top">
-                <DropdownMenuItem onClick={() => openFilePicker("image/*")}><ImageIcon className="h-4 w-4 mr-2 text-blue-500" /> Photo</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openFilePicker("video/*")}><Video className="h-4 w-4 mr-2 text-purple-500" /> Video</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openFilePicker("audio/*")}><Mic className="h-4 w-4 mr-2 text-orange-500" /> Audio File</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")}><FileText className="h-4 w-4 mr-2 text-emerald-500" /> Document</DropdownMenuItem>
+              <DropdownMenuContent align="start" className={`${isMobile ? "w-52" : "w-48"}`} side="top">
+                <DropdownMenuItem onClick={() => openFilePicker("image/*")} className={isMobile ? "py-3" : ""}><ImageIcon className="h-4 w-4 mr-2 text-blue-500" /> Photo</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker("video/*")} className={isMobile ? "py-3" : ""}><Video className="h-4 w-4 mr-2 text-purple-500" /> Video</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker("audio/*")} className={isMobile ? "py-3" : ""}><Mic className="h-4 w-4 mr-2 text-orange-500" /> Audio File</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")} className={isMobile ? "py-3" : ""}><FileText className="h-4 w-4 mr-2 text-emerald-500" /> Document</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => {
+                <DropdownMenuItem className={isMobile ? "py-3" : ""} onClick={() => {
                   setShowAttachMenu(false);
                   const input = document.createElement("input");
                   input.type = "file"; input.accept = "image/*"; input.capture = "environment";
@@ -770,24 +769,24 @@ export function ChatWindow({
             <div className="flex-1 relative">
               <Textarea
                 ref={inputRef}
-                placeholder="Type a message... (/ for quick replies)"
+                placeholder={isMobile ? "Message..." : "Type a message... (/ for quick replies)"}
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
                 rows={1}
-                className={`${isMobile ? "min-h-[42px] text-base" : "min-h-[40px] text-sm"} max-h-[120px] resize-none pr-3 rounded-2xl bg-muted/30 border-transparent focus:border-primary/30 focus:bg-background transition-colors`}
+                className={`${isMobile ? "min-h-[44px] text-[15px] py-2.5 px-4" : "min-h-[40px] text-sm"} max-h-[120px] resize-none rounded-full bg-muted/30 border-transparent focus:border-primary/30 focus:bg-background transition-colors`}
               />
             </div>
 
             {input.trim() ? (
               <Button size="icon"
-                className={`${isMobile ? "h-10 w-10" : "h-9 w-9"} flex-shrink-0 rounded-full bg-primary hover:bg-primary/90 shadow-sm shadow-primary/30`}
+                className={`${isMobile ? "h-11 w-11" : "h-9 w-9"} flex-shrink-0 rounded-full bg-primary hover:bg-primary/90 shadow-sm shadow-primary/30 active:scale-90 transition-transform`}
                 onClick={handleSend} disabled={sending}>
                 <Send className={`h-5 w-5 ${sending ? "animate-pulse" : ""}`} />
               </Button>
             ) : (
               <Button size="icon" variant="ghost"
-                className={`${isMobile ? "h-10 w-10" : "h-9 w-9"} flex-shrink-0 rounded-full text-primary hover:bg-primary/10`}
+                className={`${isMobile ? "h-11 w-11" : "h-9 w-9"} flex-shrink-0 rounded-full text-primary hover:bg-primary/10 active:scale-90 transition-transform`}
                 onClick={startRecording}>
                 <Mic className="h-5 w-5" />
               </Button>
