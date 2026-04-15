@@ -559,7 +559,7 @@ export function ChatWindow({
   // ──────────────────────────────────────────────────────
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-[120] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden overscroll-none bg-background">
+      <div className="flex h-full max-h-full flex-col overflow-hidden overscroll-none bg-background">
         {/* ── HEADER ── */}
         <div className="flex-shrink-0 px-1 flex items-center justify-between border-b border-border bg-card/95 backdrop-blur-md z-20"
           style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))', paddingBottom: '0.5rem' }}>
