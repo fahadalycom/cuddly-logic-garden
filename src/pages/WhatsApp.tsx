@@ -8,10 +8,12 @@ import { QueuePanel } from "@/components/whatsapp/QueuePanel";
 import { LoadingState } from "@/components/shared/PageStates";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Clock, Settings, Zap, Users, TrendingUp } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MessageSquare, Clock, Users, Zap, TrendingUp } from "lucide-react";
 
 export default function WhatsAppPage() {
   const { user, isAdmin } = useAuth();
+  const isMobile = useIsMobile();
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -27,11 +29,7 @@ export default function WhatsAppPage() {
       .from("wa_conversations")
       .select("*, clients(name, phone, whatsapp_number)")
       .order("last_message_at", { ascending: false });
-
-    if (!isAdmin && user) {
-      query = query.eq("assigned_agent_id", user.id);
-    }
-
+    if (!isAdmin && user) query = query.eq("assigned_agent_id", user.id);
     const { data } = await query;
     setConversations(data || []);
     setLoading(false);
@@ -44,17 +42,8 @@ export default function WhatsAppPage() {
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });
     setMessages(data || []);
-
-    await supabase
-      .from("wa_messages")
-      .update({ is_read: true })
-      .eq("conversation_id", conversationId)
-      .eq("is_read", false);
-
-    await supabase
-      .from("wa_conversations")
-      .update({ unread_count: 0 })
-      .eq("id", conversationId);
+    await supabase.from("wa_messages").update({ is_read: true }).eq("conversation_id", conversationId).eq("is_read", false);
+    await supabase.from("wa_conversations").update({ unread_count: 0 }).eq("id", conversationId);
   };
 
   const fetchQueue = async () => {
@@ -68,10 +57,7 @@ export default function WhatsAppPage() {
   };
 
   const fetchTemplates = async () => {
-    const { data } = await supabase
-      .from("message_templates")
-      .select("*")
-      .eq("is_active", true);
+    const { data } = await supabase.from("message_templates").select("*").eq("is_active", true);
     setTemplates(data || []);
   };
 
@@ -100,16 +86,11 @@ export default function WhatsAppPage() {
 
     const convChannel = supabase
       .channel("wa-conversations")
-      .on("postgres_changes", { event: "*", schema: "public", table: "wa_conversations" }, () => {
-        fetchConversations();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "wa_conversations" }, () => fetchConversations())
       .subscribe();
-
     const queueChannel = supabase
       .channel("wa-queue")
-      .on("postgres_changes", { event: "*", schema: "public", table: "wa_queue" }, () => {
-        fetchQueue();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "wa_queue" }, () => fetchQueue())
       .subscribe();
 
     return () => {
@@ -120,93 +101,150 @@ export default function WhatsAppPage() {
 
   useEffect(() => {
     if (!selectedConversation) return;
-
     fetchMessages(selectedConversation.id);
     fetchAiSuggestions(selectedConversation.id);
 
     const msgChannel = supabase
       .channel(`wa-messages-${selectedConversation.id}`)
       .on("postgres_changes", {
-        event: "INSERT",
-        schema: "public",
-        table: "wa_messages",
+        event: "INSERT", schema: "public", table: "wa_messages",
         filter: `conversation_id=eq.${selectedConversation.id}`,
-      }, (payload) => {
-        setMessages((prev) => [...prev, payload.new as any]);
-      })
+      }, (payload) => setMessages((prev) => [...prev, payload.new as any]))
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(msgChannel);
-    };
+    return () => { supabase.removeChannel(msgChannel); };
   }, [selectedConversation?.id]);
 
   const handleSendMessage = async (content: string, mediaUrl?: string, mediaType?: string) => {
     if (!selectedConversation || !user) return;
-
     const { error } = await supabase.functions.invoke("whatsapp-send", {
-      body: {
-        conversation_id: selectedConversation.id,
-        content,
-        media_url: mediaUrl,
-        media_type: mediaType || "text",
-        sender_id: user.id,
-      },
+      body: { conversation_id: selectedConversation.id, content, media_url: mediaUrl, media_type: mediaType || "text", sender_id: user.id },
     });
-
     if (error) console.error("Send error:", error);
   };
 
   const handleResolve = async () => {
     if (!selectedConversation || !user) return;
     await supabase.functions.invoke("whatsapp-queue-manager", {
-      body: {
-        action: "resolve_conversation",
-        conversation_id: selectedConversation.id,
-        agent_id: user.id,
-      },
+      body: { action: "resolve_conversation", conversation_id: selectedConversation.id, agent_id: user.id },
     });
     setSelectedConversation(null);
   };
 
   const handleAssign = async (conversationId: string, agentId: string) => {
     await supabase.functions.invoke("whatsapp-queue-manager", {
-      body: {
-        action: "assign_conversation",
-        conversation_id: conversationId,
-        agent_id: agentId,
-      },
+      body: { action: "assign_conversation", conversation_id: conversationId, agent_id: agentId },
     });
   };
 
   const handleApproveAi = async (logId: string, response: string) => {
-    await supabase
-      .from("wa_auto_response_log")
-      .update({ agent_approved: true, was_sent: true })
-      .eq("id", logId);
-    
+    await supabase.from("wa_auto_response_log").update({ agent_approved: true, was_sent: true }).eq("id", logId);
     if (selectedConversation) await handleSendMessage(response);
     fetchAiSuggestions(selectedConversation?.id);
   };
 
   const handleRejectAi = async (logId: string) => {
-    await supabase
-      .from("wa_auto_response_log")
-      .update({ agent_approved: false })
-      .eq("id", logId);
+    await supabase.from("wa_auto_response_log").update({ agent_approved: false }).eq("id", logId);
     fetchAiSuggestions(selectedConversation?.id);
   };
+
+  const handleBack = () => setSelectedConversation(null);
 
   if (loading) return <LoadingState />;
 
   const activeCount = conversations.filter((c) => c.status === "active").length;
   const unreadCount = conversations.filter((c) => c.unread_count > 0).length;
 
+  // Mobile: show chat if selected, else show list
+  if (isMobile) {
+    if (selectedConversation) {
+      return (
+        <div className="h-[calc(100vh-4rem)] flex flex-col bg-background">
+          <ChatWindow
+            conversation={selectedConversation}
+            messages={messages}
+            templates={templates}
+            aiSuggestions={aiSuggestions}
+            onSend={handleSendMessage}
+            onResolve={handleResolve}
+            onApproveAi={handleApproveAi}
+            onRejectAi={handleRejectAi}
+            isAdmin={isAdmin}
+            staff={staff}
+            onAssign={handleAssign}
+            onBack={handleBack}
+            isMobile
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="h-[calc(100vh-4rem)] flex flex-col bg-background">
+        {/* Mobile header */}
+        <div className="px-4 py-3 border-b border-border bg-card/80">
+          <h1 className="text-lg font-bold">WhatsApp</h1>
+          <div className="flex items-center gap-3 mt-1">
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-medium">{activeCount} active</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <MessageSquare className="h-3 w-3 text-primary" />
+              <span className="text-xs text-muted-foreground">{unreadCount} unread</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-3 w-3 text-amber-500" />
+              <span className="text-xs text-muted-foreground">{queue.length} queued</span>
+            </div>
+          </div>
+        </div>
+
+        <Tabs value={sideTab} onValueChange={setSideTab} className="flex flex-col flex-1 min-h-0">
+          <div className="px-3 pt-2 pb-1">
+            <TabsList className="grid w-full grid-cols-3 h-10">
+              <TabsTrigger value="chats" className="text-xs gap-1.5">
+                <MessageSquare className="h-4 w-4" />
+                Chats
+              </TabsTrigger>
+              <TabsTrigger value="queue" className="text-xs gap-1.5 relative">
+                <Clock className="h-4 w-4" />
+                Queue
+                {queue.length > 0 && (
+                  <span className="ml-0.5 bg-destructive text-destructive-foreground text-[9px] px-1.5 min-w-[16px] h-4 rounded-full flex items-center justify-center font-bold">
+                    {queue.length}
+                  </span>
+                )}
+              </TabsTrigger>
+              {isAdmin && (
+                <TabsTrigger value="agents" className="text-xs gap-1.5">
+                  <Users className="h-4 w-4" />
+                  Agents
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </div>
+
+          <TabsContent value="chats" className="flex-1 overflow-hidden mt-0">
+            <ConversationList conversations={conversations} selectedId={selectedConversation?.id} onSelect={setSelectedConversation} />
+          </TabsContent>
+          <TabsContent value="queue" className="flex-1 overflow-hidden mt-0">
+            <QueuePanel queue={queue} staff={staff} isAdmin={isAdmin} onAssign={handleAssign} />
+          </TabsContent>
+          {isAdmin && (
+            <TabsContent value="agents" className="flex-1 overflow-hidden mt-0">
+              <AgentConfigPanel staff={staff} />
+            </TabsContent>
+          )}
+        </Tabs>
+      </div>
+    );
+  }
+
+  // Desktop layout
   return (
     <div className="h-[calc(100vh-4rem)] flex bg-background overflow-hidden">
-      {/* Left Panel */}
       <div className="w-80 lg:w-96 border-r border-border flex flex-col bg-card/50">
-        {/* Stats bar */}
         <div className="px-4 py-2.5 border-b border-border bg-card/80">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5">
@@ -252,17 +290,11 @@ export default function WhatsAppPage() {
           </div>
 
           <TabsContent value="chats" className="flex-1 overflow-hidden mt-0">
-            <ConversationList
-              conversations={conversations}
-              selectedId={selectedConversation?.id}
-              onSelect={(conv) => setSelectedConversation(conv)}
-            />
+            <ConversationList conversations={conversations} selectedId={selectedConversation?.id} onSelect={setSelectedConversation} />
           </TabsContent>
-
           <TabsContent value="queue" className="flex-1 overflow-hidden mt-0">
             <QueuePanel queue={queue} staff={staff} isAdmin={isAdmin} onAssign={handleAssign} />
           </TabsContent>
-
           {isAdmin && (
             <TabsContent value="agents" className="flex-1 overflow-hidden mt-0">
               <AgentConfigPanel staff={staff} />
@@ -271,7 +303,6 @@ export default function WhatsAppPage() {
         </Tabs>
       </div>
 
-      {/* Right Panel - Chat */}
       <div className="flex-1 flex flex-col relative">
         {selectedConversation ? (
           <ChatWindow
@@ -298,9 +329,7 @@ export default function WhatsAppPage() {
               </div>
               <div>
                 <p className="text-lg font-semibold text-foreground">Select a conversation</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Choose a chat from the left panel to start messaging
-                </p>
+                <p className="text-sm text-muted-foreground mt-1">Choose a chat from the left panel to start messaging</p>
               </div>
               <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/60">
                 <span className="flex items-center gap-1"><Zap className="h-3 w-3" /> AI-powered</span>

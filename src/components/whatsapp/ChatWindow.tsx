@@ -10,10 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Send, Paperclip, MoreVertical, CheckCircle, UserPlus, Bot,
   Image as ImageIcon, Video, FileText, Mic, Sparkles, X, Check, CheckCheck,
-  Phone, ExternalLink, Smile, Reply, Copy, Clock, Search,
-  ChevronDown, ArrowDown, Shield, Zap, MessageSquare, Download, Loader2, Eye, File
+  Phone, ExternalLink, Copy, Clock, Search,
+  ArrowDown, Shield, Zap, MessageSquare, Download, Loader2, Eye, File,
+  ArrowLeft, Camera, StopCircle, Trash2
 } from "lucide-react";
-import { format, isToday, isYesterday, isSameDay } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -29,9 +30,10 @@ interface ChatWindowProps {
   isAdmin: boolean;
   staff: any[];
   onAssign: (conversationId: string, agentId: string) => Promise<void>;
+  onBack?: () => void;
+  isMobile?: boolean;
 }
 
-// In-memory blob cache to avoid re-fetching from R2
 const mediaBlobCache = new Map<string, string>();
 
 function getMediaTypeIcon(mediaType: string) {
@@ -45,11 +47,8 @@ function getMediaTypeIcon(mediaType: string) {
   }
 }
 
-function LazyMedia({ mediaKey, mediaType, mimeType, filename }: {
-  mediaKey: string;
-  mediaType: string;
-  mimeType?: string;
-  filename?: string;
+function LazyMedia({ mediaKey, mediaType, mimeType, filename, isMobile }: {
+  mediaKey: string; mediaType: string; mimeType?: string; filename?: string; isMobile?: boolean;
 }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(mediaBlobCache.get(mediaKey) || null);
   const [loading, setLoading] = useState(false);
@@ -59,18 +58,14 @@ function LazyMedia({ mediaKey, mediaType, mimeType, filename }: {
     if (blobUrl || loading) return;
     setLoading(true);
     setError(false);
-
     try {
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
       const url = `https://${projectId}.supabase.co/functions/v1/whatsapp-media?key=${encodeURIComponent(mediaKey)}`;
       const { data: { session } } = await supabase.auth.getSession();
-
       const resp = await fetch(url, {
         headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
       });
-
       if (!resp.ok) throw new Error("Failed to load");
-
       const blob = await resp.blob();
       const objectUrl = URL.createObjectURL(blob);
       mediaBlobCache.set(mediaKey, objectUrl);
@@ -85,80 +80,44 @@ function LazyMedia({ mediaKey, mediaType, mimeType, filename }: {
 
   const TypeIcon = getMediaTypeIcon(mediaType);
 
-  // If loaded, show the actual media
   if (blobUrl) {
     if (mediaType === "image" || mediaType === "sticker") {
       return (
-        <div className="rounded-lg overflow-hidden mb-2 -mx-1 -mt-0.5 relative group/media">
-          <img src={blobUrl} alt="" className="max-w-full object-cover" />
-          <a
-            href={blobUrl}
-            download={filename || `media.${mimeType?.split("/")[1] || "jpg"}`}
-            className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity"
-          >
-            <Download className="h-3.5 w-3.5 text-white" />
+        <div className="rounded-lg overflow-hidden mb-1.5 -mx-1 -mt-0.5 relative group/media">
+          <img src={blobUrl} alt="" className="max-w-full object-cover" style={{ maxHeight: isMobile ? 200 : 280 }} />
+          <a href={blobUrl} download={filename || `media.${mimeType?.split("/")[1] || "jpg"}`}
+            className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover/media:opacity-100 active:opacity-100 transition-opacity">
+            <Download className="h-4 w-4 text-white" />
           </a>
         </div>
       );
     }
     if (mediaType === "video") {
-      return (
-        <div className="rounded-lg overflow-hidden mb-2 -mx-1 -mt-0.5">
-          <video src={blobUrl} controls className="max-w-full" />
-        </div>
-      );
+      return <div className="rounded-lg overflow-hidden mb-1.5 -mx-1 -mt-0.5"><video src={blobUrl} controls className="max-w-full" style={{ maxHeight: isMobile ? 200 : 280 }} /></div>;
     }
     if (mediaType === "audio") {
-      return (
-        <div className="py-1">
-          <audio src={blobUrl} controls className="w-full h-8" />
-        </div>
-      );
+      return <div className="py-1"><audio src={blobUrl} controls className="w-full h-10" /></div>;
     }
-    // Document or other
     return (
-      <a
-        href={blobUrl}
-        download={filename || "document"}
-        className="flex items-center gap-3 p-2.5 bg-background/10 rounded-lg mb-2 hover:bg-background/20 transition-colors"
-      >
-        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <FileText className="h-5 w-5 text-primary" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium truncate">{filename || "Document"}</p>
-          <p className="text-[10px] opacity-60">{mimeType || "file"}</p>
-        </div>
+      <a href={blobUrl} download={filename || "document"} className="flex items-center gap-3 p-2.5 bg-background/10 rounded-lg mb-1.5 hover:bg-background/20 active:bg-background/30 transition-colors">
+        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0"><FileText className="h-5 w-5 text-primary" /></div>
+        <div className="min-w-0 flex-1"><p className="text-xs font-medium truncate">{filename || "Document"}</p><p className="text-[10px] opacity-60">{mimeType || "file"}</p></div>
         <Download className="h-4 w-4 opacity-50" />
       </a>
     );
   }
 
-  // Placeholder — click to load
   return (
-    <button
-      onClick={loadMedia}
-      disabled={loading}
-      className="flex items-center gap-3 p-3 rounded-lg mb-2 w-full text-left transition-all border border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 disabled:opacity-60"
-    >
+    <button onClick={loadMedia} disabled={loading}
+      className="flex items-center gap-3 p-3 rounded-lg mb-1.5 w-full text-left transition-all border border-dashed border-border/60 hover:border-primary/40 active:border-primary/60 hover:bg-primary/5 disabled:opacity-60">
       <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0">
-        {loading ? (
-          <Loader2 className="h-5 w-5 text-primary animate-spin" />
-        ) : (
-          <TypeIcon className="h-5 w-5 text-muted-foreground" />
-        )}
+        {loading ? <Loader2 className="h-5 w-5 text-primary animate-spin" /> : <TypeIcon className="h-5 w-5 text-muted-foreground" />}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium truncate">
-          {loading ? "Loading..." : filename || `${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)} file`}
-        </p>
-        <p className="text-[10px] text-muted-foreground">
-          {loading ? "Fetching from storage..." : "Click to load"}
-        </p>
+        <p className="text-xs font-medium truncate">{loading ? "Loading..." : filename || `${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)} file`}</p>
+        <p className="text-[10px] text-muted-foreground">{loading ? "Fetching from storage..." : "Tap to load"}</p>
       </div>
-      {!loading && (
-        <Eye className="h-4 w-4 text-muted-foreground" />
-      )}
+      {!loading && <Eye className="h-4 w-4 text-muted-foreground" />}
     </button>
   );
 }
@@ -168,19 +127,16 @@ function DateSeparator({ date }: { date: Date }) {
   if (isToday(date)) label = "Today";
   else if (isYesterday(date)) label = "Yesterday";
   else label = format(date, "EEEE, MMMM d, yyyy");
-
   return (
     <div className="flex items-center gap-3 py-3">
       <div className="flex-1 h-px bg-border/50" />
-      <span className="text-[10px] font-semibold text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
-        {label}
-      </span>
+      <span className="text-[10px] font-semibold text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">{label}</span>
       <div className="flex-1 h-px bg-border/50" />
     </div>
   );
 }
 
-function MessageBubble({ msg, isGrouped }: { msg: any; isGrouped: boolean }) {
+function MessageBubble({ msg, isGrouped, isMobile }: { msg: any; isGrouped: boolean; isMobile?: boolean }) {
   const isCustomer = msg.sender_type === "customer";
   const isAi = msg.sender_type === "ai";
   const isSystem = msg.sender_type === "system";
@@ -188,73 +144,46 @@ function MessageBubble({ msg, isGrouped }: { msg: any; isGrouped: boolean }) {
   if (isSystem) {
     return (
       <div className="flex justify-center py-1">
-        <span className="text-[10px] text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
-          {msg.content}
-        </span>
+        <span className="text-[10px] text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">{msg.content}</span>
       </div>
     );
   }
 
   const handleCopy = () => {
-    if (msg.content) {
-      navigator.clipboard.writeText(msg.content);
-      toast.success("Copied to clipboard");
-    }
+    if (msg.content) { navigator.clipboard.writeText(msg.content); toast.success("Copied"); }
   };
 
   const hasMedia = msg.media_url && msg.media_type !== "text";
+  const maxW = isMobile ? "max-w-[85%]" : "max-w-[70%]";
 
   return (
     <div className={`flex ${isCustomer ? "justify-start" : "justify-end"} ${isGrouped ? "mt-0.5" : "mt-3"} group`}>
-      <div className="relative max-w-[70%]">
-        <div
-          className={`rounded-2xl px-4 py-2.5 relative shadow-sm ${
-            isCustomer
-              ? "bg-card border border-border/60 rounded-tl-sm"
-              : isAi
-              ? "bg-gradient-to-br from-amber-500/15 to-amber-600/10 border border-amber-500/20 text-foreground rounded-tr-sm"
-              : "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-tr-sm shadow-primary/20"
-          }`}
-        >
+      <div className={`relative ${maxW}`}>
+        <div className={`rounded-2xl px-3.5 py-2 relative shadow-sm ${
+          isCustomer
+            ? "bg-card border border-border/60 rounded-tl-sm"
+            : isAi
+            ? "bg-gradient-to-br from-amber-500/15 to-amber-600/10 border border-amber-500/20 text-foreground rounded-tr-sm"
+            : "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-tr-sm shadow-primary/20"
+        }`}>
           {isAi && !isGrouped && (
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <div className="h-4 w-4 rounded-full bg-amber-500/20 flex items-center justify-center">
-                <Bot className="h-2.5 w-2.5 text-amber-500" />
-              </div>
-              <span className="text-[10px] font-semibold text-amber-500">AI Assistant</span>
+            <div className="flex items-center gap-1.5 mb-1">
+              <div className="h-4 w-4 rounded-full bg-amber-500/20 flex items-center justify-center"><Bot className="h-2.5 w-2.5 text-amber-500" /></div>
+              <span className="text-[10px] font-semibold text-amber-500">AI</span>
             </div>
           )}
-
-          {/* Lazy-loaded media */}
-          {hasMedia && (
-            <LazyMedia
-              mediaKey={msg.media_url}
-              mediaType={msg.media_type}
-              mimeType={msg.media_mime_type}
-              filename={msg.media_filename}
-            />
-          )}
-
-          {msg.content && (
-            <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
-          )}
-
-          <div className="flex items-center justify-end gap-1 mt-1">
-            <span className={`text-[10px] ${isCustomer ? "text-muted-foreground" : "opacity-60"}`}>
-              {format(new Date(msg.created_at), "HH:mm")}
-            </span>
-            {!isCustomer && !isAi && (
-              <CheckCheck className={`h-3 w-3 ${msg.is_read ? "text-blue-400" : "opacity-50"}`} />
-            )}
+          {hasMedia && <LazyMedia mediaKey={msg.media_url} mediaType={msg.media_type} mimeType={msg.media_mime_type} filename={msg.media_filename} isMobile={isMobile} />}
+          {msg.content && <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>}
+          <div className="flex items-center justify-end gap-1 mt-0.5">
+            <span className={`text-[10px] ${isCustomer ? "text-muted-foreground" : "opacity-60"}`}>{format(new Date(msg.created_at), "HH:mm")}</span>
+            {!isCustomer && !isAi && <CheckCheck className={`h-3 w-3 ${msg.is_read ? "text-blue-400" : "opacity-50"}`} />}
           </div>
         </div>
-
-        {/* Hover actions */}
-        <div className={`absolute top-0 ${isCustomer ? "-right-8" : "-left-8"} hidden group-hover:flex flex-col gap-0.5`}>
-          <button onClick={handleCopy} className="h-6 w-6 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted transition-colors">
-            <Copy className="h-3 w-3 text-muted-foreground" />
-          </button>
-        </div>
+        {!isMobile && (
+          <div className={`absolute top-0 ${isCustomer ? "-right-8" : "-left-8"} hidden group-hover:flex`}>
+            <button onClick={handleCopy} className="h-6 w-6 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted"><Copy className="h-3 w-3 text-muted-foreground" /></button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -263,6 +192,7 @@ function MessageBubble({ msg, isGrouped }: { msg: any; isGrouped: boolean }) {
 export function ChatWindow({
   conversation, messages, templates, aiSuggestions,
   onSend, onResolve, onApproveAi, onRejectAi, isAdmin, staff, onAssign,
+  onBack, isMobile,
 }: ChatWindowProps) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -270,19 +200,20 @@ export function ChatWindow({
   const [templateSearch, setTemplateSearch] = useState("");
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [fileAccept, setFileAccept] = useState("*/*");
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  useEffect(() => { scrollToBottom(); }, [messages]);
 
-  const scrollToBottom = () => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  };
+  const scrollToBottom = () => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; };
 
   const handleScroll = () => {
     if (scrollRef.current) {
@@ -302,53 +233,102 @@ export function ChatWindow({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  };
+
+  const uploadAndSend = async (file: File | Blob, filename: string, mimeType: string) => {
+    setUploading(true);
+    try {
+      const arrayBuffer = await (file as Blob).arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const base64 = btoa(binary);
+
+      let mediaType = "document";
+      if (mimeType.startsWith("image/")) mediaType = "image";
+      else if (mimeType.startsWith("video/")) mediaType = "video";
+      else if (mimeType.startsWith("audio/")) mediaType = "audio";
+
+      const { data, error } = await supabase.functions.invoke("whatsapp-media", {
+        body: { data: base64, mime_type: mimeType, filename },
+      });
+      if (error) throw error;
+
+      const caption = input.trim() || undefined;
+      await onSend(caption || "", data.key, mediaType);
+      setInput("");
+      toast.success("Media sent");
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      toast.error("Failed to upload");
+    } finally {
+      setUploading(false);
     }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    await uploadAndSend(file, file.name, file.type);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
-    setUploading(true);
+  const openFilePicker = (accept: string) => {
+    setFileAccept(accept);
+    setShowAttachMenu(false);
+    setTimeout(() => fileInputRef.current?.click(), 100);
+  };
+
+  // Voice recording
+  const startRecording = async () => {
     try {
-      // Read file as base64
-      const arrayBuffer = await file.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      let binary = "";
-      for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      const base64 = btoa(binary);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+      audioChunksRef.current = [];
 
-      // Determine media type
-      let mediaType = "document";
-      if (file.type.startsWith("image/")) mediaType = "image";
-      else if (file.type.startsWith("video/")) mediaType = "video";
-      else if (file.type.startsWith("audio/")) mediaType = "audio";
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        if (blob.size > 0) {
+          await uploadAndSend(blob, `voice-${Date.now()}.webm`, "audio/webm");
+        }
+      };
 
-      // Upload to R2 via edge function
-      const { data, error } = await supabase.functions.invoke("whatsapp-media", {
-        body: { data: base64, mime_type: file.type, filename: file.name },
-      });
-
-      if (error) throw error;
-
-      // Send the message with the R2 key
-      const caption = input.trim() || undefined;
-      await onSend(caption || "", data.key, mediaType);
-      setInput("");
-      toast.success("Media sent successfully");
-    } catch (err: any) {
-      console.error("Upload error:", err);
-      toast.error("Failed to upload file");
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      setRecordingTime(0);
+      recordingTimerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
+    } catch (err) {
+      toast.error("Microphone access denied");
     }
   };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = () => {
+        mediaRecorderRef.current?.stream?.getTracks().forEach(t => t.stop());
+      };
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    setRecordingTime(0);
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+    audioChunksRef.current = [];
+  };
+
+  const formatRecordingTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
   const handleTemplateSelect = (template: any) => {
     setInput(template.body);
@@ -363,30 +343,17 @@ export function ChatWindow({
   };
 
   const filteredTemplates = templates.filter(
-    (t) =>
-      t.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
-      t.body.toLowerCase().includes(templateSearch.toLowerCase())
+    (t) => t.name.toLowerCase().includes(templateSearch.toLowerCase()) || t.body.toLowerCase().includes(templateSearch.toLowerCase())
   );
 
-  // Group messages by date
   const messagesWithDates: { type: "date" | "message"; date?: Date; msg?: any; isGrouped?: boolean }[] = [];
   let lastDate: string | null = null;
   let lastSender: string | null = null;
-
   messages.forEach((msg, i) => {
     const msgDate = new Date(msg.created_at);
     const dateKey = format(msgDate, "yyyy-MM-dd");
-
-    if (dateKey !== lastDate) {
-      messagesWithDates.push({ type: "date", date: msgDate });
-      lastDate = dateKey;
-      lastSender = null;
-    }
-
-    const isGrouped = lastSender === msg.sender_type &&
-      i > 0 &&
-      (msgDate.getTime() - new Date(messages[i - 1].created_at).getTime()) < 60000;
-
+    if (dateKey !== lastDate) { messagesWithDates.push({ type: "date", date: msgDate }); lastDate = dateKey; lastSender = null; }
+    const isGrouped = lastSender === msg.sender_type && i > 0 && (msgDate.getTime() - new Date(messages[i - 1].created_at).getTime()) < 60000;
     messagesWithDates.push({ type: "message", msg, isGrouped });
     lastSender = msg.sender_type;
   });
@@ -397,71 +364,69 @@ export function ChatWindow({
     resolved: { color: "text-muted-foreground", bg: "bg-muted/50 border-border", icon: CheckCircle },
     archived: { color: "text-muted-foreground", bg: "bg-muted/50 border-border", icon: Shield },
   };
-
   const status = statusConfig[conversation.status] || statusConfig.active;
   const StatusIcon = status.icon;
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-5 py-3 border-b border-border flex items-center justify-between bg-card/80 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-sm">
-              <span className="text-sm font-bold text-primary-foreground">
+      <div className={`${isMobile ? "px-3 py-2.5" : "px-5 py-3"} border-b border-border flex items-center justify-between bg-card/80 backdrop-blur-sm`}>
+        <div className="flex items-center gap-2.5 min-w-0">
+          {onBack && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 rounded-lg -ml-1" onClick={onBack}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          )}
+          <div className="relative flex-shrink-0">
+            <div className={`${isMobile ? "h-9 w-9" : "h-10 w-10"} rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-sm`}>
+              <span className={`${isMobile ? "text-xs" : "text-sm"} font-bold text-primary-foreground`}>
                 {(conversation.customer_name || conversation.customer_phone || "?").charAt(0).toUpperCase()}
               </span>
             </div>
-            <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${
-              conversation.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/40"
-            }`} />
+            <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${conversation.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold">{conversation.customer_name || conversation.customer_phone}</p>
-              <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 border ${status.bg} ${status.color}`}>
-                <StatusIcon className="h-2.5 w-2.5 mr-0.5" />
-                {conversation.status}
-              </Badge>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <p className={`${isMobile ? "text-sm" : "text-sm"} font-semibold truncate`}>{conversation.customer_name || conversation.customer_phone}</p>
+              {!isMobile && (
+                <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 border ${status.bg} ${status.color}`}>
+                  <StatusIcon className="h-2.5 w-2.5 mr-0.5" />{conversation.status}
+                </Badge>
+              )}
             </div>
-            <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-              <Phone className="h-3 w-3" />
-              {conversation.customer_phone}
+            <p className="text-[11px] text-muted-foreground truncate">
+              {isMobile ? (conversation.status === "active" ? "Online" : conversation.customer_phone) : (
+                <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{conversation.customer_phone}</span>
+              )}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={openWhatsApp}>
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Open in WhatsApp</TooltipContent>
-          </Tooltip>
-
+        <div className="flex items-center gap-0.5 flex-shrink-0">
+          {!isMobile && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={openWhatsApp}><ExternalLink className="h-4 w-4" /></Button>
+              </TooltipTrigger>
+              <TooltipContent>Open in WhatsApp</TooltipContent>
+            </Tooltip>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg"><MoreVertical className="h-4 w-4" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={onResolve} className="text-emerald-500">
-                <CheckCircle className="h-4 w-4 mr-2" /> Mark Resolved
-              </DropdownMenuItem>
+              {isMobile && (
+                <DropdownMenuItem onClick={openWhatsApp}><ExternalLink className="h-4 w-4 mr-2" /> Open in WhatsApp</DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={onResolve} className="text-emerald-500"><CheckCircle className="h-4 w-4 mr-2" /> Mark Resolved</DropdownMenuItem>
               {isAdmin && staff.length > 0 && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                    Assign to Agent
-                  </DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Assign to Agent</DropdownMenuLabel>
                   {staff.map((s) => (
                     <DropdownMenuItem key={s.id} onClick={() => onAssign(conversation.id, s.user_id)}>
-                      <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center mr-2 text-[10px] font-bold text-primary">
-                        {s.full_name?.charAt(0)}
-                      </div>
+                      <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center mr-2 text-[10px] font-bold text-primary">{s.full_name?.charAt(0)}</div>
                       {s.full_name}
                     </DropdownMenuItem>
                   ))}
@@ -472,46 +437,26 @@ export function ChatWindow({
         </div>
       </div>
 
-      {/* AI Suggestions Bar */}
+      {/* AI Suggestions */}
       {aiSuggestions.length > 0 && (
-        <div className="px-5 py-3 bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-amber-500/15">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="h-5 w-5 rounded-full bg-amber-500/15 flex items-center justify-center">
-              <Sparkles className="h-3 w-3 text-amber-500" />
-            </div>
+        <div className={`${isMobile ? "px-3 py-2" : "px-5 py-3"} bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-amber-500/15`}>
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="h-5 w-5 rounded-full bg-amber-500/15 flex items-center justify-center"><Sparkles className="h-3 w-3 text-amber-500" /></div>
             <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">AI Suggestions</span>
-            <Badge variant="outline" className="text-[9px] border-amber-500/30 text-amber-500">
-              {aiSuggestions.length}
-            </Badge>
+            <Badge variant="outline" className="text-[9px] border-amber-500/30 text-amber-500">{aiSuggestions.length}</Badge>
           </div>
-          <div className="space-y-2">
-            {aiSuggestions.map((s) => (
-              <div key={s.id} className="flex items-start gap-3 p-2.5 rounded-lg bg-card/60 border border-border/50">
-                <p className="text-xs flex-1 text-foreground/80 leading-relaxed">{s.suggested_response}</p>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <Badge variant="outline" className={`text-[9px] px-1.5 ${
-                    s.confidence === "high" ? "border-emerald-500/50 text-emerald-500" :
-                    s.confidence === "medium" ? "border-amber-500/50 text-amber-500" :
-                    "border-red-500/50 text-red-500"
-                  }`}>
-                    {s.confidence}
-                  </Badge>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button size="icon" variant="ghost" className="h-6 w-6 rounded-full hover:bg-emerald-500/10" onClick={() => onApproveAi(s.id, s.suggested_response)}>
-                        <Check className="h-3.5 w-3.5 text-emerald-500" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Send this response</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button size="icon" variant="ghost" className="h-6 w-6 rounded-full hover:bg-destructive/10" onClick={() => onRejectAi(s.id)}>
-                        <X className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Dismiss</TooltipContent>
-                  </Tooltip>
+          <div className="space-y-1.5">
+            {aiSuggestions.slice(0, isMobile ? 2 : 5).map((s) => (
+              <div key={s.id} className="flex items-start gap-2 p-2 rounded-lg bg-card/60 border border-border/50">
+                <p className="text-xs flex-1 text-foreground/80 leading-relaxed line-clamp-2">{s.suggested_response}</p>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <Badge variant="outline" className={`text-[9px] px-1.5 ${s.confidence === "high" ? "border-emerald-500/50 text-emerald-500" : s.confidence === "medium" ? "border-amber-500/50 text-amber-500" : "border-red-500/50 text-red-500"}`}>{s.confidence}</Badge>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full hover:bg-emerald-500/10" onClick={() => onApproveAi(s.id, s.suggested_response)}>
+                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full hover:bg-destructive/10" onClick={() => onRejectAi(s.id)}>
+                    <X className="h-3.5 w-3.5 text-destructive" />
+                  </Button>
                 </div>
               </div>
             ))}
@@ -520,30 +465,18 @@ export function ChatWindow({
       )}
 
       {/* Messages */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-5 py-2 bg-gradient-to-b from-muted/10 to-muted/5"
-        style={{
-          backgroundImage: "radial-gradient(circle at 20% 80%, hsl(var(--primary) / 0.02) 0%, transparent 50%), radial-gradient(circle at 80% 20%, hsl(var(--primary) / 0.02) 0%, transparent 50%)"
-        }}
-      >
+      <div ref={scrollRef} onScroll={handleScroll}
+        className={`flex-1 overflow-y-auto ${isMobile ? "px-3" : "px-5"} py-2 bg-gradient-to-b from-muted/10 to-muted/5`}
+        style={{ backgroundImage: "radial-gradient(circle at 20% 80%, hsl(var(--primary) / 0.02) 0%, transparent 50%), radial-gradient(circle at 80% 20%, hsl(var(--primary) / 0.02) 0%, transparent 50%)" }}>
         {messagesWithDates.map((item, i) => {
-          if (item.type === "date" && item.date) {
-            return <DateSeparator key={`date-${i}`} date={item.date} />;
-          }
-          if (item.type === "message" && item.msg) {
-            return <MessageBubble key={item.msg.id} msg={item.msg} isGrouped={!!item.isGrouped} />;
-          }
+          if (item.type === "date" && item.date) return <DateSeparator key={`date-${i}`} date={item.date} />;
+          if (item.type === "message" && item.msg) return <MessageBubble key={item.msg.id} msg={item.msg} isGrouped={!!item.isGrouped} isMobile={isMobile} />;
           return null;
         })}
-
         {messages.length === 0 && (
           <div className="flex-1 flex items-center justify-center h-full">
             <div className="text-center space-y-2 py-20">
-              <div className="h-16 w-16 rounded-2xl bg-muted/30 flex items-center justify-center mx-auto">
-                <MessageSquare className="h-7 w-7 text-muted-foreground/30" />
-              </div>
+              <div className="h-16 w-16 rounded-2xl bg-muted/30 flex items-center justify-center mx-auto"><MessageSquare className="h-7 w-7 text-muted-foreground/30" /></div>
               <p className="text-sm font-medium text-muted-foreground">No messages yet</p>
               <p className="text-xs text-muted-foreground/60">Send a message to start the conversation</p>
             </div>
@@ -553,127 +486,135 @@ export function ChatWindow({
 
       {/* Scroll to bottom */}
       {showScrollDown && (
-        <div className="absolute bottom-24 right-8">
-          <Button
-            size="icon"
-            variant="secondary"
-            className="h-9 w-9 rounded-full shadow-lg"
-            onClick={scrollToBottom}
-          >
-            <ArrowDown className="h-4 w-4" />
-          </Button>
+        <div className={`absolute ${isMobile ? "bottom-20 right-4" : "bottom-24 right-8"}`}>
+          <Button size="icon" variant="secondary" className="h-9 w-9 rounded-full shadow-lg" onClick={scrollToBottom}><ArrowDown className="h-4 w-4" /></Button>
         </div>
       )}
 
       {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"
-        onChange={handleFileSelect}
-      />
+      <input ref={fileInputRef} type="file" className="hidden" accept={fileAccept} onChange={handleFileSelect} />
 
       {/* Input Area */}
-      <div className="px-4 py-3 border-t border-border bg-card/80 backdrop-blur-sm">
+      <div className={`${isMobile ? "px-2 py-2" : "px-4 py-3"} border-t border-border bg-card/80 backdrop-blur-sm safe-area-bottom`}>
         {uploading && (
           <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-primary/5 border border-primary/20">
             <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
-            <span className="text-xs text-primary font-medium">Uploading file...</span>
+            <span className="text-xs text-primary font-medium">Uploading...</span>
           </div>
         )}
-        <div className="flex items-end gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-lg" onClick={() => setShowTemplates(true)}>
+
+        {isRecording ? (
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-destructive" onClick={cancelRecording}>
+              <Trash2 className="h-5 w-5" />
+            </Button>
+            <div className="flex-1 flex items-center justify-center gap-2">
+              <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-sm font-medium text-destructive">{formatRecordingTime(recordingTime)}</span>
+              <span className="text-xs text-muted-foreground">Recording...</span>
+            </div>
+            <Button size="icon" className="h-10 w-10 rounded-full bg-primary hover:bg-primary/90 shadow-sm" onClick={stopRecording}>
+              <Send className="h-5 w-5" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-end gap-1.5">
+            {/* Attachment menu */}
+            <DropdownMenu open={showAttachMenu} onOpenChange={setShowAttachMenu}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className={`${isMobile ? "h-10 w-10" : "h-9 w-9"} flex-shrink-0 rounded-full`} disabled={uploading}>
+                  <Paperclip className="h-5 w-5 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48" side="top">
+                <DropdownMenuItem onClick={() => openFilePicker("image/*")}>
+                  <ImageIcon className="h-4 w-4 mr-2 text-blue-500" /> Photo
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker("video/*")}>
+                  <Video className="h-4 w-4 mr-2 text-purple-500" /> Video
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker("audio/*")}>
+                  <Mic className="h-4 w-4 mr-2 text-orange-500" /> Audio File
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.csv")}>
+                  <FileText className="h-4 w-4 mr-2 text-emerald-500" /> Document
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => {
+                  setShowAttachMenu(false);
+                  setFileAccept("image/*");
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = "image/*";
+                  input.capture = "environment";
+                  input.onchange = (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (file) uploadAndSend(file, file.name, file.type);
+                  };
+                  input.click();
+                }}>
+                  <Camera className="h-4 w-4 mr-2 text-pink-500" /> Camera
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Templates button */}
+            {!isMobile && (
+              <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 rounded-full" onClick={() => setShowTemplates(true)}>
                 <FileText className="h-4 w-4 text-muted-foreground" />
               </Button>
-            </TooltipTrigger>
-            <TooltipContent>Templates</TooltipContent>
-          </Tooltip>
+            )}
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 flex-shrink-0 rounded-lg"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-              >
-                <Paperclip className="h-4 w-4 text-muted-foreground" />
+            <div className="flex-1 relative">
+              <Textarea
+                ref={inputRef}
+                placeholder="Type a message..."
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                rows={1}
+                className={`${isMobile ? "min-h-[42px] text-base" : "min-h-[40px] text-sm"} max-h-[120px] resize-none pr-3 rounded-2xl bg-muted/30 border-transparent focus:border-primary/30 focus:bg-background transition-colors`}
+              />
+            </div>
+
+            {input.trim() ? (
+              <Button size="icon"
+                className={`${isMobile ? "h-10 w-10" : "h-9 w-9"} flex-shrink-0 rounded-full bg-primary hover:bg-primary/90 shadow-sm shadow-primary/30`}
+                onClick={handleSend} disabled={sending}>
+                <Send className={`h-5 w-5 ${sending ? "animate-pulse" : ""}`} />
               </Button>
-            </TooltipTrigger>
-            <TooltipContent>Attach file</TooltipContent>
-          </Tooltip>
-
-          <div className="flex-1 relative">
-            <Textarea
-              ref={inputRef}
-              placeholder="Type a message..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              rows={1}
-              className="min-h-[40px] max-h-[120px] resize-none pr-3 rounded-xl bg-muted/30 border-transparent focus:border-primary/30 focus:bg-background transition-colors text-sm"
-            />
+            ) : (
+              <Button size="icon" variant="ghost"
+                className={`${isMobile ? "h-10 w-10" : "h-9 w-9"} flex-shrink-0 rounded-full text-primary hover:bg-primary/10`}
+                onClick={startRecording}>
+                <Mic className="h-5 w-5" />
+              </Button>
+            )}
           </div>
-
-          <Button
-            size="icon"
-            className={`h-9 w-9 flex-shrink-0 rounded-xl transition-all ${
-              input.trim()
-                ? "bg-primary hover:bg-primary/90 shadow-sm shadow-primary/30"
-                : "bg-muted text-muted-foreground"
-            }`}
-            onClick={handleSend}
-            disabled={!input.trim() || sending}
-          >
-            <Send className={`h-4 w-4 ${sending ? "animate-pulse" : ""}`} />
-          </Button>
-        </div>
+        )}
       </div>
 
       {/* Templates Dialog */}
       <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className={isMobile ? "max-w-[95vw] rounded-2xl" : "max-w-lg"}>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              Message Templates
-            </DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> Templates</DialogTitle>
           </DialogHeader>
-
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search templates..."
-              value={templateSearch}
-              onChange={(e) => setTemplateSearch(e.target.value)}
-              className="pl-9 h-9 text-sm"
-            />
+            <Input placeholder="Search templates..." value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)} className="pl-9 h-9 text-sm" />
           </div>
-
           <ScrollArea className="max-h-[400px]">
             <div className="space-y-2">
               {filteredTemplates.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => handleTemplateSelect(t)}
-                  className="w-full text-left p-3.5 rounded-xl border border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all duration-200 group"
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm font-semibold group-hover:text-primary transition-colors">{t.name}</span>
-                    <Badge variant="outline" className="text-[10px]">{t.category}</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{t.body}</p>
+                <button key={t.id} onClick={() => handleTemplateSelect(t)}
+                  className="w-full text-left p-3 rounded-xl border border-border/50 hover:border-primary/30 active:bg-primary/10 hover:bg-primary/5 transition-all group">
+                  <div className="flex items-center justify-between mb-1"><span className="text-sm font-semibold group-hover:text-primary">{t.name}</span><Badge variant="outline" className="text-[10px]">{t.category}</Badge></div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{t.body}</p>
                 </button>
               ))}
               {filteredTemplates.length === 0 && (
-                <div className="text-center py-8">
-                  <FileText className="h-8 w-8 mx-auto text-muted-foreground/30 mb-2" />
-                  <p className="text-sm text-muted-foreground">No templates found</p>
-                </div>
+                <div className="text-center py-8"><FileText className="h-8 w-8 mx-auto text-muted-foreground/30 mb-2" /><p className="text-sm text-muted-foreground">No templates found</p></div>
               )}
             </div>
           </ScrollArea>
