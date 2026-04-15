@@ -155,6 +155,10 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
   const isFailed = msg._failed;
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Check if message is emoji-only (1-3 emojis, no other text)
+  const emojiRegex = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\u{FE0F}\u{200D}]{1,6}$/u;
+  const isEmojiOnly = msg.content && emojiRegex.test(msg.content.trim()) && !msg.media_url;
+
   if (isSystem) {
     return (
       <div className="flex justify-center py-1">
@@ -187,6 +191,9 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
   };
   const handleTouchEnd = () => { if (longPressRef.current) clearTimeout(longPressRef.current); };
 
+  // Show tail on first message of a group
+  const showTail = !isGrouped;
+
   return (
     <div className={`flex ${isCustomer ? "justify-start" : "justify-end"} ${isGrouped ? "mt-0.5" : isMobile ? "mt-2" : "mt-3"} group animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ${isSending ? "opacity-70" : ""}`}>
       <div className={`relative ${maxW}`}
@@ -200,14 +207,15 @@ function MessageBubble({ msg, isGrouped, isMobile, allMessages, onReply, onReact
         )}
 
         <div className={`${isMobile ? "rounded-[18px] px-3 py-2" : "rounded-2xl px-3.5 py-2"} relative shadow-sm ${
+          isEmojiOnly ? "wa-emoji-only" :
           isFailed
             ? "bg-destructive/10 border border-destructive/30 text-foreground rounded-tr-sm"
             : isCustomer
-            ? "bg-card border border-border/60 rounded-tl-sm"
+            ? `bg-card border border-border/60 ${showTail ? "rounded-tl-sm" : ""}`
             : isAi
-            ? "bg-gradient-to-br from-amber-500/15 to-amber-600/10 border border-amber-500/20 text-foreground rounded-tr-sm"
-            : "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-tr-sm shadow-primary/20"
-        }`}>
+            ? `bg-gradient-to-br from-amber-500/15 to-amber-600/10 border border-amber-500/20 text-foreground ${showTail ? "rounded-tr-sm" : ""}`
+            : `bg-gradient-to-br from-primary to-primary/90 text-primary-foreground ${showTail ? "rounded-tr-sm" : ""} shadow-primary/20`
+        } ${showTail && isCustomer && !isEmojiOnly ? "wa-bubble-tail-left" : ""} ${showTail && !isCustomer && !isAi && !isEmojiOnly ? "wa-bubble-tail-right" : ""}`}>
           {isAi && !isGrouped && (
             <div className="flex items-center gap-1.5 mb-1">
               <div className="h-4 w-4 rounded-full bg-amber-500/20 flex items-center justify-center"><Bot className="h-2.5 w-2.5 text-amber-500" /></div>
@@ -579,22 +587,49 @@ export function ChatWindow({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[14px] font-semibold truncate leading-tight">{conversation.customer_name || conversation.customer_phone}</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                {conversation.status === "active" && <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
-                <span className="text-[11px] text-muted-foreground truncate">
-                  {conversation.assigned_agent_name ? `Agent: ${conversation.assigned_agent_name}` : conversation.status === "active" ? "Online" : conversation.customer_phone}
-                </span>
-              </div>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {conversation.status === "active" ? "Online" : `Last seen ${conversation.last_message_at ? new Date(conversation.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "recently"}`}
+              </p>
             </div>
           </div>
           <div className="flex items-center flex-shrink-0 gap-0.5 pr-1">
             <MobileNotifButton />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="h-10 w-10 rounded-full flex items-center justify-center active:bg-muted transition-colors">
+                  <MoreVertical className="h-[18px] w-[18px]" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem onClick={onOpenContactInfo} className="py-2.5">
+                  <Info className="h-4 w-4 mr-2" /> Contact Info
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onResolve} className="py-2.5 text-emerald-500">
+                  <CheckCircle className="h-4 w-4 mr-2" /> Mark Resolved
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={openWhatsApp} className="py-2.5">
+                  <ExternalLink className="h-4 w-4 mr-2" /> Open in WhatsApp
+                </DropdownMenuItem>
+                {isAdmin && staff.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Assign Agent</DropdownMenuLabel>
+                    {staff.map((s) => (
+                      <DropdownMenuItem key={s.id} onClick={() => onAssign(conversation.id, s.user_id)} className="py-2">
+                        <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center mr-2 text-[10px] font-bold text-primary">{s.full_name?.charAt(0)}</div>
+                        {s.full_name}
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
         {/* ── MESSAGES ── */}
         <div ref={scrollRef} onScroll={handleScroll}
-          className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-3 py-2 z-0"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-3 py-2 z-0 wa-chat-bg relative"
           style={{ WebkitOverflowScrolling: 'touch' }}>
           {messagesWithDates.map((item, i) => {
             if (item.type === "date" && item.date) return <DateSeparator key={`date-${i}`} date={item.date} />;
@@ -846,8 +881,7 @@ export function ChatWindow({
 
       {/* Messages */}
       <div ref={scrollRef} onScroll={handleScroll}
-        className="flex-1 min-h-0 overflow-y-auto px-5 py-2 bg-gradient-to-b from-muted/10 to-muted/5"
-        style={{ backgroundImage: "radial-gradient(circle at 20% 80%, hsl(var(--primary) / 0.02) 0%, transparent 50%), radial-gradient(circle at 80% 20%, hsl(var(--primary) / 0.02) 0%, transparent 50%)" }}>
+        className="flex-1 min-h-0 overflow-y-auto px-5 py-2 wa-chat-bg relative">
         {messagesWithDates.map((item, i) => {
           if (item.type === "date" && item.date) return <DateSeparator key={`date-${i}`} date={item.date} />;
           if (item.type === "message" && item.msg) return (

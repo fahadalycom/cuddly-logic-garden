@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -18,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   MessageSquare, Clock, Users, Zap, TrendingUp, Search, Bell, BellOff,
-  Volume2, VolumeX, Info, Settings2
+  Volume2, VolumeX, Info, Settings2, ArrowLeft, Home, MessageCircle, Headphones
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -29,6 +30,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 export default function WhatsAppPage() {
   const { user, isAdmin } = useAuth();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const { notify, soundEnabled, notifEnabled, toggleSound, toggleNotif, requestPermission, permission } = useNotifications();
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<any | null>(null);
@@ -408,22 +410,28 @@ export default function WhatsAppPage() {
   return (
     <div className="fixed inset-0 flex bg-background overflow-hidden" style={{ height: '100dvh' }}>
       <div className="w-80 lg:w-96 border-r border-border flex flex-col bg-card/50">
-        <div className="px-4 py-2.5 border-b border-border bg-card/80">
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-xs font-medium">{activeCount} active</span>
-              </div>
-              <div className="w-px h-3 bg-border" />
-              <div className="flex items-center gap-1.5">
-                <MessageSquare className="h-3 w-3 text-primary" />
-                <span className="text-xs text-muted-foreground">{unreadCount} unread</span>
-              </div>
-              <div className="w-px h-3 bg-border" />
-              <div className="flex items-center gap-1.5">
-                <Clock className="h-3 w-3 text-amber-500" />
-                <span className="text-xs text-muted-foreground">{queue.length} queued</span>
+        {/* Branded header */}
+        <div className="px-4 py-3 border-b border-border bg-card/80">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-muted transition-colors"
+                title="Back to Dashboard"
+              >
+                <Home className="h-4 w-4 text-muted-foreground" />
+              </button>
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <MessageCircle className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold leading-tight">WhatsApp</h2>
+                  <div className="flex items-center gap-1">
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span className="text-[10px] text-muted-foreground">Connected</span>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-0.5">
@@ -436,6 +444,22 @@ export default function WhatsAppPage() {
                 <TooltipContent>Search messages</TooltipContent>
               </Tooltip>
               <NotifSettings />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[11px] font-medium">{activeCount} active</span>
+            </div>
+            <div className="w-px h-3 bg-border" />
+            <div className="flex items-center gap-1.5">
+              <MessageSquare className="h-3 w-3 text-primary" />
+              <span className="text-[11px] text-muted-foreground">{unreadCount} unread</span>
+            </div>
+            <div className="w-px h-3 bg-border" />
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-3 w-3 text-amber-500" />
+              <span className="text-[11px] text-muted-foreground">{queue.length} queued</span>
             </div>
           </div>
         </div>
@@ -492,22 +516,31 @@ export default function WhatsAppPage() {
             )}
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center space-y-4">
-              <div className="relative mx-auto w-24 h-24">
-                <div className="absolute inset-0 rounded-3xl bg-primary/5 animate-pulse" />
-                <div className="absolute inset-3 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <MessageSquare className="h-10 w-10 text-primary/40" />
+          <div className="flex-1 flex items-center justify-center wa-chat-bg relative">
+            <div className="text-center space-y-5 relative z-10">
+              <div className="relative mx-auto w-28 h-28">
+                <div className="absolute inset-0 rounded-3xl bg-primary/5 animate-float" />
+                <div className="absolute inset-4 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <MessageCircle className="h-12 w-12 text-primary/30" />
                 </div>
               </div>
               <div>
-                <p className="text-lg font-semibold text-foreground">Select a conversation</p>
-                <p className="text-sm text-muted-foreground mt-1">Choose a chat from the left panel to start messaging</p>
+                <p className="text-xl font-bold text-foreground">WhatsApp Workspace</p>
+                <p className="text-sm text-muted-foreground mt-1.5 max-w-sm">Select a conversation to start messaging, or check the queue for pending chats</p>
               </div>
-              <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/60">
-                <span className="flex items-center gap-1"><Zap className="h-3 w-3" /> AI-powered</span>
-                <span className="flex items-center gap-1"><Users className="h-3 w-3" /> Multi-agent</span>
-                <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Real-time</span>
+              <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground/60 pt-2">
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="h-10 w-10 rounded-xl bg-muted/30 flex items-center justify-center"><Zap className="h-4 w-4" /></div>
+                  <span>AI-powered</span>
+                </div>
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="h-10 w-10 rounded-xl bg-muted/30 flex items-center justify-center"><Headphones className="h-4 w-4" /></div>
+                  <span>Multi-agent</span>
+                </div>
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="h-10 w-10 rounded-xl bg-muted/30 flex items-center justify-center"><TrendingUp className="h-4 w-4" /></div>
+                  <span>Real-time</span>
+                </div>
               </div>
             </div>
           </div>

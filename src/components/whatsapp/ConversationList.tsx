@@ -1,11 +1,9 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Search, Bot, Pin, Archive, Filter, MessageSquare, Clock, CheckCheck, Check } from "lucide-react";
+import { Search, MessageSquare, Clock, CheckCheck, Check, Pin } from "lucide-react";
 import { useState, useMemo } from "react";
-import { formatDistanceToNow } from "date-fns";
+import { format, isToday, isYesterday, differenceInMinutes, differenceInHours } from "date-fns";
 
 interface ConversationListProps {
   conversations: any[];
@@ -14,6 +12,19 @@ interface ConversationListProps {
 }
 
 type FilterType = "all" | "unread" | "waiting" | "active" | "resolved";
+
+function smartTime(dateStr: string) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMin = differenceInMinutes(now, date);
+  const diffHr = differenceInHours(now, date);
+  
+  if (diffMin < 1) return "Just now";
+  if (diffMin < 60) return `${diffMin}m`;
+  if (diffHr < 24 && isToday(date)) return format(date, "HH:mm");
+  if (isYesterday(date)) return "Yesterday";
+  return format(date, "dd/MM/yy");
+}
 
 export function ConversationList({ conversations, selectedId, onSelect }: ConversationListProps) {
   const [search, setSearch] = useState("");
@@ -84,6 +95,83 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
     return colors[Math.abs(hash) % colors.length];
   };
 
+  // Separate today vs older conversations
+  const todayConvs = filtered.filter(c => c.last_message_at && isToday(new Date(c.last_message_at)));
+  const olderConvs = filtered.filter(c => !c.last_message_at || !isToday(new Date(c.last_message_at)));
+
+  const renderConversation = (conv: any) => {
+    const isSelected = selectedId === conv.id;
+    const hasUnread = conv.unread_count > 0;
+
+    return (
+      <button
+        key={conv.id}
+        onClick={() => onSelect(conv)}
+        className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl text-left transition-all duration-150 mb-0.5 group relative active:scale-[0.98] ${
+          isSelected
+            ? "bg-primary/10 border border-primary/20 shadow-sm"
+            : hasUnread
+            ? "bg-accent/30 active:bg-accent/50 border border-transparent"
+            : "active:bg-accent/40 border border-transparent"
+        }`}
+      >
+        {/* Avatar */}
+        <div className="relative flex-shrink-0">
+          <div className={`h-12 w-12 rounded-full bg-gradient-to-br ${getAvatarColor(conv)} flex items-center justify-center shadow-sm`}>
+            <span className="text-sm font-bold text-white">
+              {getInitials(conv)}
+            </span>
+          </div>
+          <div className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card ${getStatusColor(conv.status)}`} />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className={`text-[15px] truncate ${hasUnread ? "font-bold text-foreground" : "font-medium text-foreground/90"}`}>
+              {conv.customer_name || conv.customer_phone}
+            </span>
+            {conv.last_message_at && (
+              <span className={`text-[11px] flex-shrink-0 ${hasUnread ? "text-primary font-semibold" : "text-muted-foreground"}`}>
+                {smartTime(conv.last_message_at)}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between mt-0.5 gap-2">
+            <div className="flex items-center min-w-0 flex-1 gap-1">
+              {/* Delivery status for outgoing */}
+              {conv.last_message_preview && conv.assigned_agent_id && (
+                <CheckCheck className="h-3.5 w-3.5 flex-shrink-0 text-blue-400" />
+              )}
+              <p className={`text-[13px] truncate ${hasUnread ? "text-foreground/80 font-medium" : "text-muted-foreground"}`}>
+                {conv.last_message_preview || "No messages yet"}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {conv.status === "waiting" && (
+                <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-amber-500/50 text-amber-500 bg-amber-500/10">
+                  <Clock className="h-2.5 w-2.5 mr-0.5" />
+                  Queue
+                </Badge>
+              )}
+              {hasUnread && (
+                <span className="bg-primary text-primary-foreground text-[11px] font-bold min-w-[22px] h-[22px] rounded-full flex items-center justify-center px-1.5 shadow-sm shadow-primary/30">
+                  {conv.unread_count > 99 ? "99+" : conv.unread_count}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {conv.assigned_agent_name && (
+            <span className="text-[11px] text-muted-foreground/70 truncate mt-0.5 block">
+              👤 {conv.assigned_agent_name}
+            </span>
+          )}
+        </div>
+      </button>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Search */}
@@ -125,78 +213,28 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
 
       <ScrollArea className="flex-1">
         <div className="px-2 pb-2">
-          {filtered.map((conv) => {
-            const isSelected = selectedId === conv.id;
-            const hasUnread = conv.unread_count > 0;
-
-            return (
-              <button
-                key={conv.id}
-                onClick={() => onSelect(conv)}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl text-left transition-all duration-150 mb-0.5 group relative active:scale-[0.98] ${
-                  isSelected
-                    ? "bg-primary/10 border border-primary/20 shadow-sm"
-                    : hasUnread
-                    ? "bg-accent/30 active:bg-accent/50 border border-transparent"
-                    : "active:bg-accent/40 border border-transparent"
-                }`}
-              >
-                {/* Avatar */}
-                <div className="relative flex-shrink-0">
-                  <div className={`h-12 w-12 rounded-full bg-gradient-to-br ${getAvatarColor(conv)} flex items-center justify-center shadow-sm`}>
-                    <span className="text-sm font-bold text-white">
-                      {getInitials(conv)}
-                    </span>
-                  </div>
-                  <div className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card ${getStatusColor(conv.status)}`} />
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={`text-[15px] truncate ${hasUnread ? "font-bold text-foreground" : "font-medium text-foreground/90"}`}>
-                      {conv.customer_name || conv.customer_phone}
-                    </span>
-                    {conv.last_message_at && (
-                      <span className={`text-[11px] flex-shrink-0 ${hasUnread ? "text-primary font-semibold" : "text-muted-foreground"}`}>
-                        {formatDistanceToNow(new Date(conv.last_message_at), { addSuffix: false })}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between mt-0.5 gap-2">
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <p className={`text-[13px] truncate pr-1 ${hasUnread ? "text-foreground/80 font-medium" : "text-muted-foreground"}`}>
-                        {conv.last_message_preview || "No messages yet"}
-                      </p>
-                      {conv.assigned_agent_name && (
-                        <span className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
-                          👤 {conv.assigned_agent_name}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {conv.status === "waiting" && (
-                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-amber-500/50 text-amber-500 bg-amber-500/10">
-                          <Clock className="h-2.5 w-2.5 mr-0.5" />
-                          Queue
-                        </Badge>
-                      )}
-                      {hasUnread && (
-                        <span className="bg-primary text-primary-foreground text-[11px] font-bold min-w-[22px] h-[22px] rounded-full flex items-center justify-center px-1.5 shadow-sm shadow-primary/30">
-                          {conv.unread_count > 99 ? "99+" : conv.unread_count}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
+          {/* Today section */}
+          {todayConvs.length > 0 && olderConvs.length > 0 && (
+            <div className="px-3 py-1.5">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Today</span>
+            </div>
+          )}
+          {todayConvs.map(renderConversation)}
+          
+          {/* Divider */}
+          {todayConvs.length > 0 && olderConvs.length > 0 && (
+            <div className="flex items-center gap-3 px-3 py-2">
+              <div className="flex-1 h-px bg-border/50" />
+              <span className="text-[10px] text-muted-foreground/50">Earlier</span>
+              <div className="flex-1 h-px bg-border/50" />
+            </div>
+          )}
+          {olderConvs.map(renderConversation)}
 
           {filtered.length === 0 && (
             <div className="p-8 text-center">
-              <div className="h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
-                <MessageSquare className="h-6 w-6 text-muted-foreground/50" />
+              <div className="h-16 w-16 rounded-2xl bg-muted/30 flex items-center justify-center mx-auto mb-3">
+                <MessageSquare className="h-7 w-7 text-muted-foreground/30" />
               </div>
               <p className="text-sm font-medium text-muted-foreground">No conversations found</p>
               <p className="text-xs text-muted-foreground/60 mt-1">
