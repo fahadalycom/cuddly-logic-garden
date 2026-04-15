@@ -17,6 +17,7 @@ import {
 import { format, isToday, isYesterday } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { VoiceNotePlayer } from "./VoiceNotePlayer";
 
 interface ChatWindowProps {
   conversation: any;
@@ -96,7 +97,7 @@ function LazyMedia({ mediaKey, mediaType, mimeType, filename, isMobile }: {
       return <div className="rounded-lg overflow-hidden mb-1.5 -mx-1 -mt-0.5"><video src={blobUrl} controls className="max-w-full" style={{ maxHeight: isMobile ? 200 : 280 }} /></div>;
     }
     if (mediaType === "audio") {
-      return <div className="py-1"><audio src={blobUrl} controls className="w-full h-10" /></div>;
+      return null; // Handled by VoiceNotePlayer in MessageBubble
     }
     return (
       <a href={blobUrl} download={filename || "document"} className="flex items-center gap-3 p-2.5 bg-background/10 rounded-lg mb-1.5 hover:bg-background/20 active:bg-background/30 transition-colors">
@@ -154,6 +155,7 @@ function MessageBubble({ msg, isGrouped, isMobile }: { msg: any; isGrouped: bool
   };
 
   const hasMedia = msg.media_url && msg.media_type !== "text";
+  const isVoiceNote = msg.media_type === "audio";
   const maxW = isMobile ? "max-w-[85%]" : "max-w-[70%]";
 
   return (
@@ -172,8 +174,12 @@ function MessageBubble({ msg, isGrouped, isMobile }: { msg: any; isGrouped: bool
               <span className="text-[10px] font-semibold text-amber-500">AI</span>
             </div>
           )}
-          {hasMedia && <LazyMedia mediaKey={msg.media_url} mediaType={msg.media_type} mimeType={msg.media_mime_type} filename={msg.media_filename} isMobile={isMobile} />}
-          {msg.content && <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>}
+          {isVoiceNote && msg.media_url ? (
+            <VoiceNotePlayer mediaKey={msg.media_url} mimeType={msg.media_mime_type} isOutgoing={!isCustomer && !isAi} isMobile={isMobile} />
+          ) : hasMedia ? (
+            <LazyMedia mediaKey={msg.media_url} mediaType={msg.media_type} mimeType={msg.media_mime_type} filename={msg.media_filename} isMobile={isMobile} />
+          ) : null}
+          {msg.content && !isVoiceNote && <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>}
           <div className="flex items-center justify-end gap-1 mt-0.5">
             <span className={`text-[10px] ${isCustomer ? "text-muted-foreground" : "opacity-60"}`}>{format(new Date(msg.created_at), "HH:mm")}</span>
             {!isCustomer && !isAi && <CheckCheck className={`h-3 w-3 ${msg.is_read ? "text-blue-400" : "opacity-50"}`} />}
@@ -294,15 +300,23 @@ export function ChatWindow({
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+      // Prefer ogg/opus (WhatsApp native), fall back to webm/opus
+      const preferredMime = MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")
+        ? "audio/ogg;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : undefined;
+      const recorder = new MediaRecorder(stream, preferredMime ? { mimeType: preferredMime } : undefined);
+      const actualMime = recorder.mimeType || preferredMime || "audio/webm";
       audioChunksRef.current = [];
 
       recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const ext = actualMime.includes("ogg") ? "ogg" : "webm";
+        const blob = new Blob(audioChunksRef.current, { type: actualMime });
         if (blob.size > 0) {
-          await uploadAndSend(blob, `voice-${Date.now()}.webm`, "audio/webm");
+          await uploadAndSend(blob, `voice-${Date.now()}.${ext}`, actualMime);
         }
       };
 
