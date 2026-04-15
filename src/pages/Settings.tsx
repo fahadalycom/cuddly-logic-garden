@@ -13,12 +13,13 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Settings, Plus, Trash2, Clock, Tag, Percent, MessageSquare, Bot, Users, Bell, Palette, Globe } from "lucide-react";
+import { Settings, Plus, Trash2, Clock, Tag, Percent, MessageSquare, Bot, Users, Bell, Palette, Globe, Database } from "lucide-react";
 import { WhatsAppApiSettings } from "@/components/settings/WhatsAppApiSettings";
 import { WhatsAppAiSettings } from "@/components/settings/WhatsAppAiSettings";
 import { WhatsAppAgentSettings } from "@/components/settings/WhatsAppAgentSettings";
 import { WhatsAppNotificationSettings } from "@/components/settings/WhatsAppNotificationSettings";
 import { WhatsAppThemeSettings } from "@/components/settings/WhatsAppThemeSettings";
+import { SystemSettingsManager } from "@/components/settings/SystemSettingsManager";
 import type { Product, ProductDuration, ProductVariant } from "@/types/database";
 
 export default function SettingsPage() {
