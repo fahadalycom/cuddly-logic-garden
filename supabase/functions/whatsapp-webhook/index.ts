@@ -8,6 +8,17 @@ const corsHeaders = {
 
 const BUCKET = "whatsapp-media";
 
+// Helper: get setting from DB, fallback to env var
+async function getSettingValue(supabase: any, key: string, envFallback?: string): Promise<string> {
+  const { data } = await supabase
+    .from("system_settings")
+    .select("value")
+    .eq("key", key)
+    .single();
+  if (data?.value) return data.value;
+  return envFallback ? (Deno.env.get(envFallback) || "") : "";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });

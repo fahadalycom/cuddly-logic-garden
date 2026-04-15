@@ -8,6 +8,16 @@ const corsHeaders = {
 
 const BUCKET = "whatsapp-media";
 
+// Helper: get setting from DB, fallback to env var
+async function getSettingValue(supabase: any, key: string, envFallback?: string): Promise<string> {
+  const { data } = await supabase
+    .from("system_settings")
+    .select("value")
+    .eq("key", key)
+    .single();
+  if (data?.value) return data.value;
+  return envFallback ? (Deno.env.get(envFallback) || "") : "";
+}
 async function uploadMediaToWhatsApp(
   supabase: any,
   storageKey: string,
@@ -124,8 +134,8 @@ serve(async (req) => {
       });
     }
 
-    const token = Deno.env.get("META_WHATSAPP_TOKEN")!;
-    const phoneId = Deno.env.get("META_WHATSAPP_PHONE_ID")!;
+    const token = await getSettingValue(supabase, "meta_whatsapp_token", "META_WHATSAPP_TOKEN");
+    const phoneId = await getSettingValue(supabase, "meta_whatsapp_phone_id", "META_WHATSAPP_PHONE_ID");
 
     let messagePayload: any = {
       messaging_product: "whatsapp",
