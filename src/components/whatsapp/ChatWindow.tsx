@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Send, Paperclip, MoreVertical, CheckCircle, UserPlus, Bot,
-  Image as ImageIcon, Video, FileText, Mic, Sparkles, X, Check,
+  Image as ImageIcon, Video, FileText, Mic, Sparkles, X, Check, CheckCheck,
   Phone, ExternalLink, Smile, Reply, Copy, Clock, Search,
   ChevronDown, ArrowDown, Shield, Zap, MessageSquare
 } from "lucide-react";
