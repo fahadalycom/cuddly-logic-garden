@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { FullBleedLayout } from "@/components/layout/FullBleedLayout";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import LoginPage from "./pages/Login";
 import DashboardPage from "./pages/Dashboard";
@@ -54,7 +55,6 @@ const App = () => (
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/conversations" element={<ConversationsPage />} />
               <Route path="/leads" element={<LeadsPage />} />
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/orders" element={<OrdersPage />} />
@@ -83,6 +83,9 @@ const App = () => (
               <Route path="/settings/roles" element={<RolesPage />} />
               <Route path="/settings/templates" element={<TemplatesPage />} />
               <Route path="/settings/audit" element={<AuditLogsPage />} />
+            </Route>
+            <Route element={<ProtectedRoute><FullBleedLayout /></ProtectedRoute>}>
+              <Route path="/conversations" element={<ConversationsPage />} />
             </Route>
             <Route path="/whatsapp" element={<ProtectedRoute><WhatsAppPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
