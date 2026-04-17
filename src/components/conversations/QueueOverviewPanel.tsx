@@ -104,7 +104,7 @@ export function QueueOverviewPanel() {
                 )}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                      <ChannelIcon channel={item.channel} className="mt-0.5" />
+                      <div className="mt-0.5"><ChannelIcon channel={item.channel} /></div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold truncate">{item.customerName}</p>
                         <p className="text-xs text-muted-foreground truncate">{item.preview}</p>
@@ -122,9 +122,14 @@ export function QueueOverviewPanel() {
                         {agents.map((a) => {
                           const lvl = loadLevel(a.active, a.maxActive);
                           const disabled = a.status === "offline" || (a.active >= a.maxActive && a.queued >= a.maxQueue);
+                          const dotCls =
+                            a.status === "available" ? "bg-emerald-500" :
+                            a.status === "busy" ? "bg-amber-500" :
+                            a.status === "at_capacity" ? "bg-destructive" :
+                            "bg-muted-foreground/40";
                           return (
                             <DropdownMenuItem key={a.id} disabled={disabled} onClick={() => assign(item, a.id)}>
-                              <span className={cn("h-1.5 w-1.5 rounded-full mr-2", a.status === "available" ? "bg-emerald-500" : a.status === "busy" ? "bg-amber-500" : a.status === "at_capacity" ? "bg-destructive" : "bg-muted-foreground/40")} />
+                              <span className={cn("h-1.5 w-1.5 rounded-full mr-2", dotCls)} />
                               <span className="flex-1">{a.name}</span>
                               <span className={cn("text-[10px] ml-2", loadColor(lvl))}>{a.active}/{a.maxActive}</span>
                             </DropdownMenuItem>
