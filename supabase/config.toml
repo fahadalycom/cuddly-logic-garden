@@ -1,1 +1,4 @@
 project_id = "kttjzcchajxxntxivldh"
+
+[functions.whatsapp-routing-scanner]
+verify_jwt = false

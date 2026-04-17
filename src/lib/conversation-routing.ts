@@ -45,3 +45,25 @@ export async function getAssignmentHistory(conversationId: string, limit = 10) {
   if (error) return [];
   return data ?? [];
 }
+
+/** Release a conversation back into routing (manual handoff). */
+export async function releaseConversation(
+  conversationId: string,
+  reason = "manual_release",
+): Promise<RoutingResult> {
+  const { data, error } = await (supabase.rpc as any)("release_conversation", {
+    _conversation_id: conversationId,
+    _reason: reason,
+  });
+  if (error) return { ok: false, error: error.message };
+  return (data ?? { ok: false }) as RoutingResult;
+}
+
+/** Manually trigger the stale-conversation scanner (admin tool). */
+export async function runReassignmentScan() {
+  const [{ data: stale }, { data: redist }] = await Promise.all([
+    (supabase.rpc as any)("reassign_stale_conversations"),
+    (supabase.rpc as any)("redistribute_overflow"),
+  ]);
+  return { stale, redist };
+}
