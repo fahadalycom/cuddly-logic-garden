@@ -112,8 +112,13 @@ export function SmartAssistPanel({ conversation, onUseDraft, enabled }: Props) {
     setClassifyLoading(true);
     const r = await aiAssist.classify({ transcript, customer_name: conversation.customerName });
     setClassifyLoading(false);
-    if (!r.ok) { toast.error(r.error); return; }
-    setAiHints(r.data.result as ConversationHints);
+    if (r.ok) {
+      setAiHints(r.data.result as ConversationHints);
+      toast.success("AI classification applied");
+    } else {
+      toast.error(r.error);
+    }
+    return;
     toast.success("AI classification applied");
   };
 
