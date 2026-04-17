@@ -1908,13 +1908,22 @@ export type Database = {
       }
       vendor_deals: {
         Row: {
+          assigned_to: string | null
           coupon_code: string | null
           created_at: string
           created_by: string
+          deal_type: Database["public"]["Enums"]["deal_type"]
           description: string | null
           discount_details: string | null
+          estimated_margin: number | null
+          expected_cost: number | null
+          expected_selling_price: number | null
           expires_at: string | null
+          follow_up_date: string | null
           id: string
+          notes: string | null
+          priority: Database["public"]["Enums"]["priority_level"]
+          related_research_id: string | null
           starts_at: string | null
           status: Database["public"]["Enums"]["deal_status"]
           title: string
@@ -1922,13 +1931,22 @@ export type Database = {
           vendor_id: string
         }
         Insert: {
+          assigned_to?: string | null
           coupon_code?: string | null
           created_at?: string
           created_by: string
+          deal_type?: Database["public"]["Enums"]["deal_type"]
           description?: string | null
           discount_details?: string | null
+          estimated_margin?: number | null
+          expected_cost?: number | null
+          expected_selling_price?: number | null
           expires_at?: string | null
+          follow_up_date?: string | null
           id?: string
+          notes?: string | null
+          priority?: Database["public"]["Enums"]["priority_level"]
+          related_research_id?: string | null
           starts_at?: string | null
           status?: Database["public"]["Enums"]["deal_status"]
           title: string
@@ -1936,13 +1954,22 @@ export type Database = {
           vendor_id: string
         }
         Update: {
+          assigned_to?: string | null
           coupon_code?: string | null
           created_at?: string
           created_by?: string
+          deal_type?: Database["public"]["Enums"]["deal_type"]
           description?: string | null
           discount_details?: string | null
+          estimated_margin?: number | null
+          expected_cost?: number | null
+          expected_selling_price?: number | null
           expires_at?: string | null
+          follow_up_date?: string | null
           id?: string
+          notes?: string | null
+          priority?: Database["public"]["Enums"]["priority_level"]
+          related_research_id?: string | null
           starts_at?: string | null
           status?: Database["public"]["Enums"]["deal_status"]
           title?: string
@@ -1951,7 +1978,71 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "vendor_deals_related_research_id_fkey"
+            columns: ["related_research_id"]
+            isOneToOne: false
+            referencedRelation: "research_records"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "vendor_deals_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendor_outreach: {
+        Row: {
+          contact_date: string
+          created_at: string
+          deal_id: string
+          id: string
+          logged_by: string | null
+          message_summary: string | null
+          method: Database["public"]["Enums"]["outreach_method"]
+          next_follow_up_date: string | null
+          response_summary: string | null
+          status: Database["public"]["Enums"]["outreach_status"]
+          vendor_id: string | null
+        }
+        Insert: {
+          contact_date?: string
+          created_at?: string
+          deal_id: string
+          id?: string
+          logged_by?: string | null
+          message_summary?: string | null
+          method?: Database["public"]["Enums"]["outreach_method"]
+          next_follow_up_date?: string | null
+          response_summary?: string | null
+          status?: Database["public"]["Enums"]["outreach_status"]
+          vendor_id?: string | null
+        }
+        Update: {
+          contact_date?: string
+          created_at?: string
+          deal_id?: string
+          id?: string
+          logged_by?: string | null
+          message_summary?: string | null
+          method?: Database["public"]["Enums"]["outreach_method"]
+          next_follow_up_date?: string | null
+          response_summary?: string | null
+          status?: Database["public"]["Enums"]["outreach_status"]
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_outreach_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_outreach_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
@@ -1971,8 +2062,10 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          source_type: Database["public"]["Enums"]["vendor_source_type"]
           status: Database["public"]["Enums"]["vendor_status"]
           updated_at: string
+          website: string | null
         }
         Insert: {
           category?: string | null
@@ -1985,8 +2078,10 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          source_type?: Database["public"]["Enums"]["vendor_source_type"]
           status?: Database["public"]["Enums"]["vendor_status"]
           updated_at?: string
+          website?: string | null
         }
         Update: {
           category?: string | null
@@ -1999,8 +2094,10 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          source_type?: Database["public"]["Enums"]["vendor_source_type"]
           status?: Database["public"]["Enums"]["vendor_status"]
           updated_at?: string
+          website?: string | null
         }
         Relationships: []
       }
@@ -2591,7 +2688,21 @@ export type Database = {
         | "renewal"
         | "general"
         | "overflow"
-      deal_status: "active" | "negotiation" | "expired" | "rejected"
+      deal_status:
+        | "active"
+        | "negotiation"
+        | "expired"
+        | "rejected"
+        | "new"
+        | "contacted"
+        | "in_negotiation"
+        | "agreed"
+      deal_type:
+        | "coupon"
+        | "bulk_discount"
+        | "partnership"
+        | "reseller"
+        | "trial_offer"
       duration_type: "day" | "week" | "month" | "year"
       feedback_type: "review" | "feedback" | "follow_up"
       invoice_discount_type: "none" | "fixed" | "percent"
@@ -2648,6 +2759,8 @@ export type Database = {
         | "confirmed"
         | "in_progress"
         | "completed"
+      outreach_method: "email" | "linkedin" | "whatsapp" | "phone" | "other"
+      outreach_status: "no_response" | "replied" | "follow_up" | "closed"
       payment_status: "pending" | "verified" | "rejected"
       priority_level: "low" | "medium" | "high" | "urgent"
       product_type: "shared" | "private" | "invite_based" | "custom"
@@ -2715,6 +2828,7 @@ export type Database = {
         | "launched"
         | "revisit_later"
       trust_tag: "not_trusted" | "trusted" | "super_client"
+      vendor_source_type: "direct_company" | "reseller" | "marketplace"
       vendor_status: "active" | "inactive" | "blacklisted"
       wa_ai_confidence: "high" | "medium" | "low"
       wa_conversation_status: "active" | "waiting" | "resolved" | "archived"
@@ -2895,7 +3009,23 @@ export const Constants = {
         "general",
         "overflow",
       ],
-      deal_status: ["active", "negotiation", "expired", "rejected"],
+      deal_status: [
+        "active",
+        "negotiation",
+        "expired",
+        "rejected",
+        "new",
+        "contacted",
+        "in_negotiation",
+        "agreed",
+      ],
+      deal_type: [
+        "coupon",
+        "bulk_discount",
+        "partnership",
+        "reseller",
+        "trial_offer",
+      ],
       duration_type: ["day", "week", "month", "year"],
       feedback_type: ["review", "feedback", "follow_up"],
       invoice_discount_type: ["none", "fixed", "percent"],
@@ -2958,6 +3088,8 @@ export const Constants = {
         "in_progress",
         "completed",
       ],
+      outreach_method: ["email", "linkedin", "whatsapp", "phone", "other"],
+      outreach_status: ["no_response", "replied", "follow_up", "closed"],
       payment_status: ["pending", "verified", "rejected"],
       priority_level: ["low", "medium", "high", "urgent"],
       product_type: ["shared", "private", "invite_based", "custom"],
@@ -3033,6 +3165,7 @@ export const Constants = {
         "revisit_later",
       ],
       trust_tag: ["not_trusted", "trusted", "super_client"],
+      vendor_source_type: ["direct_company", "reseller", "marketplace"],
       vendor_status: ["active", "inactive", "blacklisted"],
       wa_ai_confidence: ["high", "medium", "low"],
       wa_conversation_status: ["active", "waiting", "resolved", "archived"],
