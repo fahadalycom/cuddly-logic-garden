@@ -238,19 +238,28 @@ export function ConversationContextPanel({ conversation, onClose }: Props) {
             </div>
           </Section>
 
-          {/* Open tickets */}
-          <Section title="Open Tickets" icon={Ticket} count={ctx.openTickets.length}>
-            {ctx.openTickets.length === 0 ? (
+          {/* Open tickets (real) */}
+          <Section title="Open Tickets" icon={Ticket} count={openTickets.length}>
+            {openTickets.length === 0 ? (
               <Empty text="No open tickets" />
             ) : (
               <ul className="space-y-1.5">
-                {ctx.openTickets.map((t) => (
-                  <li key={t.id} className="rounded-md border border-border/30 bg-background/30 p-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono text-muted-foreground">{t.id}</span>
-                      <Badge variant="outline" className="text-[10px] capitalize">{t.priority}</Badge>
+                {openTickets.map((t) => (
+                  <li
+                    key={t.id}
+                    className="rounded-md border border-border/30 bg-background/30 p-2 cursor-pointer hover:bg-background/50 transition-colors"
+                    onClick={() => setActiveTicketId(t.id)}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-mono text-muted-foreground">{t.ticket_number ?? t.id.slice(0, 8)}</span>
+                      <div className="flex gap-1">
+                        <Badge variant="outline" className={cn("text-[9px] capitalize", TICKET_PRIORITY_STYLE[t.priority])}>{t.priority}</Badge>
+                        <Badge variant="outline" className={cn("text-[9px] capitalize", TICKET_STATUS_STYLE[t.status])}>
+                          {labelFor(TICKET_STATUSES, t.status)}
+                        </Badge>
+                      </div>
                     </div>
-                    <p className="text-xs text-foreground mt-0.5">{t.subject}</p>
+                    {t.summary && <p className="text-xs text-foreground mt-0.5 truncate">{t.summary}</p>}
                   </li>
                 ))}
               </ul>
@@ -263,6 +272,13 @@ export function ConversationContextPanel({ conversation, onClose }: Props) {
           </Section>
         </div>
       </ScrollArea>
+
+      <TicketDialog
+        open={!!activeTicketId}
+        onOpenChange={(o) => { if (!o) setActiveTicketId(null); }}
+        ticketId={activeTicketId}
+        onSaved={() => conversation?.id && loadAll(conversation.id)}
+      />
     </aside>
   );
 }
