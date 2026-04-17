@@ -1072,9 +1072,95 @@ export function ProductSelectorPanel({
           </ScrollArea>
         )}
 
+        {/* STEP: ORDER */}
+        {step === "order" && (
+          <ScrollArea className="flex-1">
+            <div className="p-3 space-y-3">
+              {savingOrder && !savedOrder && (
+                <p className="text-xs text-muted-foreground py-6 text-center">Creating order…</p>
+              )}
+              {savedOrder && (
+                <>
+                  <OrderPreview data={savedOrder} />
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-[9px] uppercase tracking-wider text-muted-foreground">Order</Label>
+                      <Select
+                        value={savedOrder.status}
+                        onValueChange={(v) => saveOrder(v as OrderStatusVal, savedOrder.paymentStatus, savedOrder.fulfillmentStatus)}
+                      >
+                        <SelectTrigger className="h-8 text-[11px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="draft" className="text-xs">Draft</SelectItem>
+                          <SelectItem value="pending_payment" className="text-xs">Pending Payment</SelectItem>
+                          <SelectItem value="confirmed" className="text-xs">Confirmed</SelectItem>
+                          <SelectItem value="in_progress" className="text-xs">In Progress</SelectItem>
+                          <SelectItem value="completed" className="text-xs">Completed</SelectItem>
+                          <SelectItem value="cancelled" className="text-xs">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[9px] uppercase tracking-wider text-muted-foreground">Payment</Label>
+                      <Select
+                        value={savedOrder.paymentStatus}
+                        onValueChange={(v) => saveOrder(savedOrder.status, v as PaymentStatusVal, savedOrder.fulfillmentStatus)}
+                      >
+                        <SelectTrigger className="h-8 text-[11px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unpaid" className="text-xs">Unpaid</SelectItem>
+                          <SelectItem value="pending_verification" className="text-xs">Pending Verification</SelectItem>
+                          <SelectItem value="paid" className="text-xs">Paid</SelectItem>
+                          <SelectItem value="rejected" className="text-xs">Rejected</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[9px] uppercase tracking-wider text-muted-foreground">Fulfillment</Label>
+                      <Select
+                        value={savedOrder.fulfillmentStatus}
+                        onValueChange={(v) => saveOrder(savedOrder.status, savedOrder.paymentStatus, v as FulfillmentStatusVal)}
+                      >
+                        <SelectTrigger className="h-8 text-[11px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="not_started" className="text-xs">Not Started</SelectItem>
+                          <SelectItem value="ready" className="text-xs">Ready</SelectItem>
+                          <SelectItem value="in_progress" className="text-xs">In Progress</SelectItem>
+                          <SelectItem value="delivered" className="text-xs">Delivered</SelectItem>
+                          <SelectItem value="failed" className="text-xs">Failed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Internal notes (optional)</Label>
+                    <Textarea
+                      value={orderNotes}
+                      onChange={(e) => setOrderNotes(e.target.value)}
+                      placeholder="Delivery / provisioning instructions…"
+                      className="text-xs resize-none bg-background/60 min-h-[60px]"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[11px] gap-1.5"
+                      onClick={() => saveOrder(savedOrder.status, savedOrder.paymentStatus, savedOrder.fulfillmentStatus)}
+                      disabled={savingOrder}
+                    >
+                      Save Notes
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </ScrollArea>
+        )}
+
         {/* Actions */}
         <div className="border-t border-border/40 p-3 flex items-center gap-2 bg-background/60">
-          <Button variant="ghost" size="sm" onClick={clearAll} disabled={totalSelected === 0 && !generated && !savedInvoice} className="gap-1.5">
+          <Button variant="ghost" size="sm" onClick={clearAll} disabled={totalSelected === 0 && !generated && !savedInvoice && !savedOrder} className="gap-1.5">
             <Trash2 className="h-3.5 w-3.5" /> Clear
           </Button>
           <div className="flex-1" />
@@ -1108,7 +1194,18 @@ export function ProductSelectorPanel({
           )}
 
           {step === "invoice" && (
-            <Button size="sm" onClick={handleSendInvoiceToChat} disabled={!savedInvoice || savingInvoice} className="gap-1.5">
+            <>
+              <Button variant="outline" size="sm" onClick={handleOpenOrder} disabled={lineItems.length === 0 || savingOrder} className="gap-1.5">
+                <ShoppingCart className="h-3.5 w-3.5" /> Create Order
+              </Button>
+              <Button size="sm" onClick={handleSendInvoiceToChat} disabled={!savedInvoice || savingInvoice} className="gap-1.5">
+                <Send className="h-3.5 w-3.5" /> Send to Chat
+              </Button>
+            </>
+          )}
+
+          {step === "order" && (
+            <Button size="sm" onClick={handleSendOrderToChat} disabled={!savedOrder || savingOrder} className="gap-1.5">
               <Send className="h-3.5 w-3.5" /> Send to Chat
             </Button>
           )}
