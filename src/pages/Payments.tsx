@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingState, EmptyState } from "@/components/shared/PageStates";
-import { StatusBadge } from "@/components/shared/StatusBadge";
 import { formatCurrency } from "@/lib/template-engine";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Search, CheckCircle, XCircle, CreditCard } from "lucide-react";
+import { Search, CheckCircle, XCircle, CreditCard, Loader2 } from "lucide-react";
 import type { Order, Client } from "@/types/database";
 
 export default function PaymentsPage() {
@@ -17,32 +17,80 @@ export default function PaymentsPage() {
   const [search, setSearch] = useState("");
   const [paymentAmount, setPaymentAmount] = useState<Record<string, number>>({});
   const { user } = useAuth();
+  const { submitting, run } = useSubmitGuard();
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   const fetchOrders = async () => {
-    const { data } = await supabase.from("orders").select("*, clients(*)").in("status", ["paid_unverified"]).order("created_at", { ascending: false });
+    const { data } = await supabase
+      .from("orders").select("*, clients(*)")
+      .in("status", ["paid_unverified"])
+      .order("created_at", { ascending: false });
     setOrders((data as any) || []);
     setLoading(false);
   };
 
   useEffect(() => { fetchOrders(); }, []);
 
-  const verifyPayment = async (order: Order & { clients: Client }) => {
-    const amount = paymentAmount[order.id] || Number(order.remaining_due);
-    await supabase.from("payments").insert({ order_id: order.id, amount, status: "verified", verified_by: user!.id, verified_at: new Date().toISOString() });
-    const newPaid = Number(order.paid_amount) + amount;
-    const newRemaining = Number(order.total_amount) - Number(order.discount_amount) - newPaid;
-    await supabase.from("orders").update({ status: "paid_verified", paid_amount: newPaid, remaining_due: Math.max(0, newRemaining) }).eq("id", order.id);
-    await supabase.from("order_status_history").insert({ order_id: order.id, from_status: "paid_unverified", to_status: "paid_verified", changed_by: user!.id });
-    toast.success("Payment verified!");
-    fetchOrders();
-  };
+  const verifyPayment = (order: Order & { clients: Client }) => run(async () => {
+    setActiveId(order.id);
+    try {
+      const remaining = Number(order.remaining_due);
+      const requested = Number(paymentAmount[order.id] ?? remaining);
+      if (requested <= 0) { toast.error("Amount must be greater than zero"); return; }
+      if (requested > remaining + 0.001) {
+        toast.error(`Amount exceeds remaining due (${formatCurrency(remaining)})`);
+        return;
+      }
+      const { error: payErr } = await supabase.from("payments").insert({
+        order_id: order.id, amount: requested, status: "verified",
+        verified_by: user!.id, verified_at: new Date().toISOString(),
+      });
+      if (payErr) { toast.error(payErr.message); return; }
 
-  const rejectPayment = async (order: Order & { clients: Client }) => {
-    await supabase.from("orders").update({ status: "pending_payment" }).eq("id", order.id);
-    await supabase.from("order_status_history").insert({ order_id: order.id, from_status: "paid_unverified", to_status: "pending_payment", changed_by: user!.id, notes: "Payment rejected" });
-    toast.info("Payment rejected, moved back to pending");
-    fetchOrders();
-  };
+      const newPaid = Number(order.paid_amount) + requested;
+      const totalDue = Number(order.total_amount) - Number(order.discount_amount);
+      const newRemaining = Math.max(0, totalDue - newPaid);
+      const fullyPaid = newRemaining < 0.01;
+      const nextStatus = fullyPaid ? "paid_verified" : "pending_payment";
+
+      const { error: updErr } = await supabase.from("orders").update({
+        status: nextStatus,
+        payment_status: fullyPaid ? "paid" : "unpaid",
+        paid_amount: newPaid,
+        remaining_due: newRemaining,
+      }).eq("id", order.id);
+      if (updErr) { toast.error(updErr.message); return; }
+
+      await supabase.from("order_status_history").insert({
+        order_id: order.id,
+        from_status: "paid_unverified",
+        to_status: nextStatus,
+        changed_by: user!.id,
+        notes: fullyPaid ? "Payment fully verified" : `Partial payment: ${formatCurrency(requested)}`,
+      });
+      toast.success(fullyPaid ? "Payment verified!" : "Partial payment recorded");
+      fetchOrders();
+    } finally {
+      setActiveId(null);
+    }
+  });
+
+  const rejectPayment = (order: Order & { clients: Client }) => run(async () => {
+    setActiveId(order.id);
+    try {
+      const { error } = await supabase.from("orders")
+        .update({ status: "pending_payment" }).eq("id", order.id);
+      if (error) { toast.error(error.message); return; }
+      await supabase.from("order_status_history").insert({
+        order_id: order.id, from_status: "paid_unverified", to_status: "pending_payment",
+        changed_by: user!.id, notes: "Payment rejected",
+      });
+      toast.info("Payment rejected, moved back to pending");
+      fetchOrders();
+    } finally {
+      setActiveId(null);
+    }
+  });
 
   const filtered = orders.filter((o) => o.clients?.name?.toLowerCase().includes(search.toLowerCase()) || o.id.includes(search));
 
@@ -87,10 +135,24 @@ export default function PaymentsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1.5">
-                      <Button size="sm" onClick={() => verifyPayment(order)} className="rounded-lg text-xs h-8 gradient-primary text-white border-0">
-                        <CheckCircle className="h-3.5 w-3.5 mr-1" /> Verify
+                      <Button
+                        size="sm"
+                        disabled={submitting && activeId === order.id}
+                        onClick={() => verifyPayment(order)}
+                        className="rounded-lg text-xs h-8 gradient-primary text-white border-0"
+                      >
+                        {submitting && activeId === order.id
+                          ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                          : <CheckCircle className="h-3.5 w-3.5 mr-1" />}
+                        Verify
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => rejectPayment(order)} className="rounded-lg text-xs h-8 border-destructive/20 text-destructive hover:bg-destructive/10">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={submitting && activeId === order.id}
+                        onClick={() => rejectPayment(order)}
+                        className="rounded-lg text-xs h-8 border-destructive/20 text-destructive hover:bg-destructive/10"
+                      >
                         <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
                       </Button>
                     </div>
