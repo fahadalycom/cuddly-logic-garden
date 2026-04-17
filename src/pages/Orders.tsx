@@ -27,6 +27,9 @@ export default function OrdersPage() {
   const { user } = useAuth();
   const { copy } = useClipboard();
 
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [fulfillFilter, setFulfillFilter] = useState("all");
+
   const fetchOrders = async () => {
     const { data } = await supabase.from("orders").select("*, clients(*)").eq("is_archived", false).order("created_at", { ascending: false });
     setOrders((data as any) || []);
@@ -76,10 +79,12 @@ export default function OrdersPage() {
     setSelectedIds(next);
   };
 
-  const filtered = orders.filter((o) => {
-    const matchSearch = o.clients?.name?.toLowerCase().includes(search.toLowerCase()) || o.id.includes(search);
+  const filtered = orders.filter((o: any) => {
+    const matchSearch = o.clients?.name?.toLowerCase().includes(search.toLowerCase()) || o.id.includes(search) || (o.order_number || "").toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchPay = paymentFilter === "all" || o.payment_status === paymentFilter;
+    const matchFul = fulfillFilter === "all" || o.fulfillment_status === fulfillFilter;
+    return matchSearch && matchStatus && matchPay && matchFul;
   });
 
   const selectedOrderData = orders.find(o => o.id === selectedOrder);

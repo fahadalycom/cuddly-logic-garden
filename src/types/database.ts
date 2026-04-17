@@ -2,6 +2,8 @@ import type { Tables, Enums } from "@/integrations/supabase/types";
 
 export type AppRole = Enums<"app_role">;
 export type OrderStatus = Enums<"order_status">;
+export type OrderPaymentStatus = "unpaid" | "pending_verification" | "paid" | "rejected";
+export type OrderFulfillmentStatus = "not_started" | "ready" | "in_progress" | "delivered" | "failed";
 export type PaymentStatus = Enums<"payment_status">;
 export type AccountStatus = Enums<"account_status">;
 export type SubscriptionStatus = Enums<"subscription_status">;
