@@ -79,6 +79,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
 
         {/* Actions bar */}
         <div className="px-3 pb-2 flex items-center gap-1 overflow-x-auto scrollbar-none">
+          <ActionBtn icon={Package} label="Products" onClick={() => setProductPanelOpen(true)} />
           <ActionBtn icon={UserPlus} label="Assign" />
           <ActionBtn icon={Tag} label="Status" />
           <ActionBtn icon={Flag} label="Priority" />
