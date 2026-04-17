@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Package, Layers, Sparkles, Trash2, Pencil, Send, Calculator, Minus, Plus, ArrowLeft, FileText, Copy, CheckCheck, CheckCircle2 } from "lucide-react";
+import { Search, Package, Layers, Sparkles, Trash2, Pencil, Send, Calculator, Minus, Plus, ArrowLeft, FileText, Copy, CheckCheck, CheckCircle2, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { PRODUCT_TYPE_COLOR, PRODUCT_TYPE_LABEL, type ProductFull, type Plan, ty
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/template-engine";
 import { InvoicePreview, type InvoicePreviewData } from "./InvoicePreview";
+import { OrderPreview, type OrderPreviewData, type OrderStatusVal, type PaymentStatusVal, type FulfillmentStatusVal } from "./OrderPreview";
 import { toast } from "@/hooks/use-toast";
 
 interface Props {
@@ -37,7 +38,7 @@ interface SelectedProduct {
   priceOverride?: number | null;
 }
 
-type Step = "select" | "pricing" | "preview" | "invoice";
+type Step = "select" | "pricing" | "preview" | "invoice" | "order";
 type DiscountMode = "none" | "fixed" | "percent";
 
 export function ProductSelectorPanel({
@@ -74,6 +75,11 @@ export function ProductSelectorPanel({
   const [savedInvoice, setSavedInvoice] = useState<InvoicePreviewData | null>(null);
   const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(null);
 
+  // Order
+  const [orderNotes, setOrderNotes] = useState("");
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [savedOrder, setSavedOrder] = useState<OrderPreviewData | null>(null);
+  const [savedOrderId, setSavedOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -152,6 +158,9 @@ export function ProductSelectorPanel({
     setInvoiceNotes("");
     setSavedInvoice(null);
     setSavedInvoiceId(null);
+    setOrderNotes("");
+    setSavedOrder(null);
+    setSavedOrderId(null);
     setStep("select");
   }
 
@@ -457,6 +466,207 @@ export function ProductSelectorPanel({
     clearAll();
   }
 
+  // ===== Order =====
+  function buildOrderPreviewData(
+    orderNumber: string,
+    status: OrderStatusVal,
+    paymentStatus: PaymentStatusVal,
+    fulfillmentStatus: FulfillmentStatusVal,
+    createdAt: string,
+  ): OrderPreviewData {
+    return {
+      orderNumber,
+      status,
+      paymentStatus,
+      fulfillmentStatus,
+      customerName: customerName || "Customer",
+      customerPhone,
+      customerEmail,
+      conversationLabel: conversationId ? `Chat #${conversationId.slice(0, 6)}` : null,
+      invoiceNumber: savedInvoice?.invoiceNumber ?? null,
+      items: lineItems.map((it) => ({
+        name: it.name,
+        meta: it.meta,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        lineTotal: it.lineTotal,
+      })),
+      subtotal,
+      discountLabel:
+        discountAmount > 0 ? (discountMode === "percent" ? `${discountValue}%` : "fixed") : null,
+      discountAmount,
+      finalTotal,
+      notes: orderNotes || null,
+      currency: "PKR",
+      createdAt,
+    };
+  }
+
+  function buildOrderMessage(data: OrderPreviewData): string {
+    const lines: string[] = [
+      "Your order has been created ✅",
+      "",
+      `Order No: ${data.orderNumber}`,
+      `Status: ${data.status.replace(/_/g, " ")}`,
+      "",
+      "Items:",
+    ];
+    data.items.forEach((it) => {
+      const qty = it.quantity > 1 ? ` ×${it.quantity}` : "";
+      lines.push(`• ${it.name}${qty}: ${formatCurrency(it.lineTotal)}`);
+    });
+    lines.push("");
+    lines.push(`Subtotal: ${formatCurrency(data.subtotal)}`);
+    if (data.discountAmount > 0) {
+      const dl = data.discountLabel ? ` (${data.discountLabel})` : "";
+      lines.push(`Discount${dl}: -${formatCurrency(data.discountAmount)}`);
+    }
+    lines.push(`*Total: ${formatCurrency(data.finalTotal)} ${data.currency ?? "PKR"}*`);
+    lines.push("");
+    lines.push("We'll keep you posted on the next step 👍");
+    return lines.join("\n");
+  }
+
+  async function handleOpenOrder() {
+    if (lineItems.length === 0) return;
+    setStep("order");
+    if (!savedOrder) await saveOrder("draft", "unpaid", "not_started");
+  }
+
+  async function saveOrder(
+    status: OrderStatusVal,
+    paymentStatus: PaymentStatusVal,
+    fulfillmentStatus: FulfillmentStatusVal,
+  ) {
+    if (savingOrder) return; // Prevent duplicate clicks
+    setSavingOrder(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
+      if (!userId) {
+        toast({ title: "Sign in required", description: "Please sign in to create orders.", variant: "destructive" });
+        return;
+      }
+      if (!clientId) {
+        toast({ title: "Customer required", description: "This conversation isn't linked to a client yet.", variant: "destructive" });
+        return;
+      }
+
+      const payload: any = {
+        client_id: clientId,
+        conversation_id: conversationId,
+        invoice_id: savedInvoiceId,
+        created_by: userId,
+        status,
+        payment_status: paymentStatus,
+        fulfillment_status: fulfillmentStatus,
+        total_amount: finalTotal,
+        discount_type: discountMode,
+        discount_value: discountValue,
+        discount_amount: discountAmount,
+        paid_amount: paymentStatus === "paid" ? finalTotal : 0,
+        remaining_due: paymentStatus === "paid" ? 0 : finalTotal,
+        notes: orderNotes || null,
+      };
+
+      let orderId = savedOrderId;
+      let orderNumber: string;
+      let createdAt: string;
+
+      if (orderId) {
+        const { data, error } = await (supabase as any)
+          .from("orders")
+          .update(payload)
+          .eq("id", orderId)
+          .select("id, order_number, created_at")
+          .single();
+        if (error) throw error;
+        orderNumber = data.order_number;
+        createdAt = data.created_at;
+      } else {
+        const { data, error } = await (supabase as any)
+          .from("orders")
+          .insert(payload)
+          .select("id, order_number, created_at")
+          .single();
+        if (error) throw error;
+        orderId = data.id as string;
+        orderNumber = data.order_number as string;
+        createdAt = data.created_at as string;
+
+        // Insert order item snapshots only on first save
+        const itemPayloads: any[] = [];
+        Object.values(selected).forEach((sel) => {
+          const p = products.find((x) => x.id === sel.productId);
+          if (!p) return;
+          const plan = p.plans?.find((pl) => pl.id === sel.planId);
+          const baseUnit = plan ? Number(plan.price) : Number(p.base_price);
+          const unit = sel.priceOverride != null ? Number(sel.priceOverride) : baseUnit;
+          itemPayloads.push({
+            order_id: orderId,
+            product_id: p.id,
+            plan_id: plan?.id ?? null,
+            product_name: p.name,
+            plan_name: plan?.name ?? null,
+            quantity: sel.quantity,
+            unit_price: unit,
+            line_total: unit * sel.quantity,
+          });
+        });
+        selectedBundles.forEach((bid) => {
+          const b = bundles.find((x) => x.id === bid);
+          if (!b) return;
+          const baseUnit = b.bundle_price ?? b.bundle_items?.reduce((s, it) => s + (Number(it.product?.base_price) || 0) * (it.quantity || 1), 0) ?? 0;
+          const unit = bundlePriceOverride[bid] != null ? bundlePriceOverride[bid] : Number(baseUnit);
+          const qty = bundleQty[bid] ?? 1;
+          // Bundles are synthesized as a line item using the first bundled product as anchor
+          const anchor = b.bundle_items?.[0]?.product;
+          if (!anchor) return;
+          itemPayloads.push({
+            order_id: orderId,
+            product_id: anchor.id,
+            plan_id: null,
+            product_name: b.name,
+            plan_name: "Bundle",
+            quantity: qty,
+            unit_price: unit,
+            line_total: unit * qty,
+          });
+        });
+        if (itemPayloads.length > 0) {
+          const { error: itemsError } = await (supabase as any).from("order_items").insert(itemPayloads);
+          if (itemsError) throw itemsError;
+        }
+
+        // Status history entry
+        await (supabase as any).from("order_status_history").insert({
+          order_id: orderId,
+          from_status: null,
+          to_status: status,
+          changed_by: userId,
+          notes: "Order created from chat",
+        });
+      }
+
+      setSavedOrderId(orderId);
+      setSavedOrder(buildOrderPreviewData(orderNumber, status, paymentStatus, fulfillmentStatus, createdAt));
+      toast({ title: `Order ${orderNumber} saved`, description: status.replace(/_/g, " ") });
+    } catch (err: any) {
+      console.error("[order]", err);
+      toast({ title: "Failed to save order", description: err?.message ?? "Unknown error", variant: "destructive" });
+    } finally {
+      setSavingOrder(false);
+    }
+  }
+
+  function handleSendOrderToChat() {
+    if (!savedOrder) return;
+    const msg = buildOrderMessage(savedOrder);
+    onInsert(msg);
+    onOpenChange(false);
+    clearAll();
+  }
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl p-0 flex flex-col">
@@ -466,16 +676,21 @@ export function ProductSelectorPanel({
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => {
                 if (step === "preview") setStep("pricing");
                 else if (step === "invoice") setStep("pricing");
+                else if (step === "order") setStep("invoice");
                 else if (step === "pricing") setStep("select");
               }}>
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             )}
-            {step === "pricing" ? <Calculator className="h-4 w-4 text-primary" /> : step === "invoice" ? <FileText className="h-4 w-4 text-primary" /> : <Package className="h-4 w-4 text-primary" />}
+            {step === "pricing" ? <Calculator className="h-4 w-4 text-primary" />
+              : step === "invoice" ? <FileText className="h-4 w-4 text-primary" />
+              : step === "order" ? <ShoppingCart className="h-4 w-4 text-primary" />
+              : <Package className="h-4 w-4 text-primary" />}
             {step === "select" && "Product Selector"}
             {step === "pricing" && "Pricing Calculator"}
             {step === "preview" && "Message Preview"}
             {step === "invoice" && "Invoice"}
+            {step === "order" && "Create Order"}
             {totalSelected > 0 && step === "select" && (
               <Badge variant="secondary" className="ml-auto h-5 text-[10px]">{totalSelected} selected</Badge>
             )}
@@ -857,9 +1072,95 @@ export function ProductSelectorPanel({
           </ScrollArea>
         )}
 
+        {/* STEP: ORDER */}
+        {step === "order" && (
+          <ScrollArea className="flex-1">
+            <div className="p-3 space-y-3">
+              {savingOrder && !savedOrder && (
+                <p className="text-xs text-muted-foreground py-6 text-center">Creating order…</p>
+              )}
+              {savedOrder && (
+                <>
+                  <OrderPreview data={savedOrder} />
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-[9px] uppercase tracking-wider text-muted-foreground">Order</Label>
+                      <Select
+                        value={savedOrder.status}
+                        onValueChange={(v) => saveOrder(v as OrderStatusVal, savedOrder.paymentStatus, savedOrder.fulfillmentStatus)}
+                      >
+                        <SelectTrigger className="h-8 text-[11px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="draft" className="text-xs">Draft</SelectItem>
+                          <SelectItem value="pending_payment" className="text-xs">Pending Payment</SelectItem>
+                          <SelectItem value="confirmed" className="text-xs">Confirmed</SelectItem>
+                          <SelectItem value="in_progress" className="text-xs">In Progress</SelectItem>
+                          <SelectItem value="completed" className="text-xs">Completed</SelectItem>
+                          <SelectItem value="cancelled" className="text-xs">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[9px] uppercase tracking-wider text-muted-foreground">Payment</Label>
+                      <Select
+                        value={savedOrder.paymentStatus}
+                        onValueChange={(v) => saveOrder(savedOrder.status, v as PaymentStatusVal, savedOrder.fulfillmentStatus)}
+                      >
+                        <SelectTrigger className="h-8 text-[11px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unpaid" className="text-xs">Unpaid</SelectItem>
+                          <SelectItem value="pending_verification" className="text-xs">Pending Verification</SelectItem>
+                          <SelectItem value="paid" className="text-xs">Paid</SelectItem>
+                          <SelectItem value="rejected" className="text-xs">Rejected</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[9px] uppercase tracking-wider text-muted-foreground">Fulfillment</Label>
+                      <Select
+                        value={savedOrder.fulfillmentStatus}
+                        onValueChange={(v) => saveOrder(savedOrder.status, savedOrder.paymentStatus, v as FulfillmentStatusVal)}
+                      >
+                        <SelectTrigger className="h-8 text-[11px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="not_started" className="text-xs">Not Started</SelectItem>
+                          <SelectItem value="ready" className="text-xs">Ready</SelectItem>
+                          <SelectItem value="in_progress" className="text-xs">In Progress</SelectItem>
+                          <SelectItem value="delivered" className="text-xs">Delivered</SelectItem>
+                          <SelectItem value="failed" className="text-xs">Failed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Internal notes (optional)</Label>
+                    <Textarea
+                      value={orderNotes}
+                      onChange={(e) => setOrderNotes(e.target.value)}
+                      placeholder="Delivery / provisioning instructions…"
+                      className="text-xs resize-none bg-background/60 min-h-[60px]"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[11px] gap-1.5"
+                      onClick={() => saveOrder(savedOrder.status, savedOrder.paymentStatus, savedOrder.fulfillmentStatus)}
+                      disabled={savingOrder}
+                    >
+                      Save Notes
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </ScrollArea>
+        )}
+
         {/* Actions */}
         <div className="border-t border-border/40 p-3 flex items-center gap-2 bg-background/60">
-          <Button variant="ghost" size="sm" onClick={clearAll} disabled={totalSelected === 0 && !generated && !savedInvoice} className="gap-1.5">
+          <Button variant="ghost" size="sm" onClick={clearAll} disabled={totalSelected === 0 && !generated && !savedInvoice && !savedOrder} className="gap-1.5">
             <Trash2 className="h-3.5 w-3.5" /> Clear
           </Button>
           <div className="flex-1" />
@@ -893,7 +1194,18 @@ export function ProductSelectorPanel({
           )}
 
           {step === "invoice" && (
-            <Button size="sm" onClick={handleSendInvoiceToChat} disabled={!savedInvoice || savingInvoice} className="gap-1.5">
+            <>
+              <Button variant="outline" size="sm" onClick={handleOpenOrder} disabled={lineItems.length === 0 || savingOrder} className="gap-1.5">
+                <ShoppingCart className="h-3.5 w-3.5" /> Create Order
+              </Button>
+              <Button size="sm" onClick={handleSendInvoiceToChat} disabled={!savedInvoice || savingInvoice} className="gap-1.5">
+                <Send className="h-3.5 w-3.5" /> Send to Chat
+              </Button>
+            </>
+          )}
+
+          {step === "order" && (
+            <Button size="sm" onClick={handleSendOrderToChat} disabled={!savedOrder || savingOrder} className="gap-1.5">
               <Send className="h-3.5 w-3.5" /> Send to Chat
             </Button>
           )}

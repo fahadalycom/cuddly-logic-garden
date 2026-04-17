@@ -27,6 +27,9 @@ export default function OrdersPage() {
   const { user } = useAuth();
   const { copy } = useClipboard();
 
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [fulfillFilter, setFulfillFilter] = useState("all");
+
   const fetchOrders = async () => {
     const { data } = await supabase.from("orders").select("*, clients(*)").eq("is_archived", false).order("created_at", { ascending: false });
     setOrders((data as any) || []);
@@ -76,10 +79,12 @@ export default function OrdersPage() {
     setSelectedIds(next);
   };
 
-  const filtered = orders.filter((o) => {
-    const matchSearch = o.clients?.name?.toLowerCase().includes(search.toLowerCase()) || o.id.includes(search);
+  const filtered = orders.filter((o: any) => {
+    const matchSearch = o.clients?.name?.toLowerCase().includes(search.toLowerCase()) || o.id.includes(search) || (o.order_number || "").toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchPay = paymentFilter === "all" || o.payment_status === paymentFilter;
+    const matchFul = fulfillFilter === "all" || o.fulfillment_status === fulfillFilter;
+    return matchSearch && matchStatus && matchPay && matchFul;
   });
 
   const selectedOrderData = orders.find(o => o.id === selectedOrder);
@@ -116,16 +121,36 @@ export default function OrdersPage() {
           <Input className="pl-10 bg-card/40 border-border/20 rounded-xl h-11" placeholder="Search orders..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-48 bg-card/40 border-border/20 rounded-xl h-11"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-44 bg-card/40 border-border/20 rounded-xl h-11"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent className="glass-strong rounded-xl border-border/30">
             <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="draft">Draft</SelectItem>
             <SelectItem value="pending_payment">Pending Payment</SelectItem>
-            <SelectItem value="paid_unverified">Paid (Unverified)</SelectItem>
-            <SelectItem value="paid_verified">Verified</SelectItem>
-            <SelectItem value="to_deliver">To Deliver</SelectItem>
-            <SelectItem value="delivered">Delivered</SelectItem>
+            <SelectItem value="confirmed">Confirmed</SelectItem>
+            <SelectItem value="in_progress">In Progress</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
             <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+          <SelectTrigger className="w-40 bg-card/40 border-border/20 rounded-xl h-11"><SelectValue placeholder="Payment" /></SelectTrigger>
+          <SelectContent className="glass-strong rounded-xl border-border/30">
+            <SelectItem value="all">All Payments</SelectItem>
+            <SelectItem value="unpaid">Unpaid</SelectItem>
+            <SelectItem value="pending_verification">Pending Verification</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={fulfillFilter} onValueChange={setFulfillFilter}>
+          <SelectTrigger className="w-40 bg-card/40 border-border/20 rounded-xl h-11"><SelectValue placeholder="Fulfillment" /></SelectTrigger>
+          <SelectContent className="glass-strong rounded-xl border-border/30">
+            <SelectItem value="all">All Fulfillment</SelectItem>
+            <SelectItem value="not_started">Not Started</SelectItem>
+            <SelectItem value="ready">Ready</SelectItem>
+            <SelectItem value="in_progress">In Progress</SelectItem>
+            <SelectItem value="delivered">Delivered</SelectItem>
+            <SelectItem value="failed">Failed</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -149,7 +174,7 @@ export default function OrdersPage() {
               {filtered.map((order) => (
                 <TableRow key={order.id} className="border-border/10 hover:bg-card/40 transition-colors">
                   <TableCell><input type="checkbox" checked={selectedIds.has(order.id)} onChange={() => toggleSelect(order.id)} className="rounded border-border/40" /></TableCell>
-                  <TableCell className="mono text-xs text-muted-foreground">{order.id.slice(0, 8)}</TableCell>
+                  <TableCell className="mono text-xs font-semibold text-foreground">{(order as any).order_number || order.id.slice(0, 8)}</TableCell>
                   <TableCell className="font-medium text-sm">{order.clients?.name || "—"}</TableCell>
                   <TableCell><StatusBadge status={order.status} /></TableCell>
                   <TableCell className="mono text-sm font-medium">{formatCurrency(Number(order.total_amount))}</TableCell>

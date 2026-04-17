@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, Phone, Mail, Package, RefreshCw, CreditCard, Ticket, StickyNote, FileText } from "lucide-react";
+import { X, Phone, Mail, Package, RefreshCw, CreditCard, Ticket, StickyNote, FileText, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,16 @@ interface LatestInvoice {
   created_at: string;
 }
 
+interface LatestOrder {
+  id: string;
+  order_number: string;
+  status: string;
+  payment_status: "unpaid" | "pending_verification" | "paid" | "rejected";
+  fulfillment_status: "not_started" | "ready" | "in_progress" | "delivered" | "failed";
+  total_amount: number;
+  created_at: string;
+}
+
 const INVOICE_STATUS_STYLE: Record<LatestInvoice["status"], string> = {
   draft: "bg-muted/40 text-muted-foreground border-border/40",
   sent: "bg-blue-500/10 text-blue-400 border-blue-500/20",
@@ -29,21 +39,40 @@ const INVOICE_STATUS_STYLE: Record<LatestInvoice["status"], string> = {
   cancelled: "bg-rose-500/10 text-rose-400 border-rose-500/20",
 };
 
+const ORDER_STATUS_STYLE: Record<string, string> = {
+  draft: "bg-muted/40 text-muted-foreground border-border/40",
+  pending_payment: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  confirmed: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  in_progress: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+  completed: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  cancelled: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+};
+
 export function ConversationContextPanel({ conversation, onClose }: Props) {
   const [latestInvoice, setLatestInvoice] = useState<LatestInvoice | null>(null);
+  const [latestOrder, setLatestOrder] = useState<LatestOrder | null>(null);
 
   useEffect(() => {
-    if (!conversation?.id) { setLatestInvoice(null); return; }
+    if (!conversation?.id) { setLatestInvoice(null); setLatestOrder(null); return; }
     let cancelled = false;
     (async () => {
-      const { data } = await (supabase as any)
-        .from("invoices")
-        .select("id, invoice_number, status, final_total, currency, created_at")
-        .eq("conversation_id", conversation.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (!cancelled) setLatestInvoice((data as LatestInvoice) ?? null);
+      const [invRes, ordRes] = await Promise.all([
+        (supabase as any).from("invoices")
+          .select("id, invoice_number, status, final_total, currency, created_at")
+          .eq("conversation_id", conversation.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        (supabase as any).from("orders")
+          .select("id, order_number, status, payment_status, fulfillment_status, total_amount, created_at")
+          .eq("conversation_id", conversation.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      if (cancelled) return;
+      setLatestInvoice((invRes.data as LatestInvoice) ?? null);
+      setLatestOrder((ordRes.data as LatestOrder) ?? null);
     })();
     return () => { cancelled = true; };
   }, [conversation?.id]);
@@ -107,6 +136,38 @@ export function ConversationContextPanel({ conversation, onClose }: Props) {
                   </span>
                   <span className="text-xs font-semibold">
                     {formatCurrency(Number(latestInvoice.final_total))} {latestInvoice.currency}
+                  </span>
+                </div>
+              </div>
+            )}
+          </Section>
+
+          {/* Latest order */}
+          <Section title="Latest Order" icon={ShoppingCart}>
+            {!latestOrder ? (
+              <Empty text="No orders yet" />
+            ) : (
+              <div className="rounded-md border border-border/30 bg-background/30 p-2 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-mono font-semibold">{latestOrder.order_number}</span>
+                  <Badge variant="outline" className={cn("text-[10px] capitalize", ORDER_STATUS_STYLE[latestOrder.status] ?? ORDER_STATUS_STYLE.draft)}>
+                    {latestOrder.status.replace(/_/g, " ")}
+                  </Badge>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <Badge variant="outline" className="text-[9px] capitalize border-border/40">
+                    Pay: {latestOrder.payment_status.replace(/_/g, " ")}
+                  </Badge>
+                  <Badge variant="outline" className="text-[9px] capitalize border-border/40">
+                    Fulfill: {latestOrder.fulfillment_status.replace(/_/g, " ")}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground">
+                    {new Date(latestOrder.created_at).toLocaleDateString()}
+                  </span>
+                  <span className="text-xs font-semibold">
+                    {formatCurrency(Number(latestOrder.total_amount))} PKR
                   </span>
                 </div>
               </div>
