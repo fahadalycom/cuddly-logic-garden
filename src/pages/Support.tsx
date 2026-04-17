@@ -51,13 +51,13 @@ export default function SupportPage() {
 
     const clientMap = new Map((clientsRes.data || []).map((c: any) => [c.id, c.name]));
     const agentMap = new Map((agentsRes.data || []).map((a: any) => [a.user_id, a.full_name]));
-    const orderMap = new Map((ordersRes.data || []).map((o: any) => [o.id, o.order_number]));
+    const orderMap = new Map<string, string>((ordersRes.data || []).map((o: any) => [o.id as string, (o.order_number ?? "") as string]));
 
-    setRows(list.map((t) => ({
+    setRows(list.map<Row>((t) => ({
       ...t,
-      client_name: t.client_id ? clientMap.get(t.client_id) ?? null : null,
-      agent_name: t.assigned_to ? agentMap.get(t.assigned_to) ?? null : null,
-      order_number: t.order_id ? orderMap.get(t.order_id) ?? null : null,
+      client_name: t.client_id ? (clientMap.get(t.client_id) as string | undefined) ?? null : null,
+      agent_name: t.assigned_to ? (agentMap.get(t.assigned_to) as string | undefined) ?? null : null,
+      order_number: t.order_id ? (orderMap.get(t.order_id) ?? null) : null,
     })));
     setLoading(false);
   };
