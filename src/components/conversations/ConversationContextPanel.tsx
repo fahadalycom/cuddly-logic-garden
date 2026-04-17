@@ -13,6 +13,7 @@ import {
   type TicketStatus, type TicketPriority,
 } from "@/lib/support-tickets";
 import { getHandoffHistory, QUEUE_LABEL, QUEUE_COLOR, type HandoffLogEntry } from "@/lib/handoff";
+import { RelatedTasks } from "@/components/tasks/RelatedTasks";
 import type { MockConversation } from "@/lib/conversations-mock";
 
 interface Props {
@@ -310,6 +311,11 @@ export function ConversationContextPanel({ conversation, onClose }: Props) {
               </ul>
             )}
           </Section>
+
+          {/* Related tasks */}
+          {conversation?.id && (
+            <RelatedTasks relatedType="conversation" relatedId={conversation.id} defaultDepartment="sales" compact />
+          )}
 
           {/* Internal notes placeholder */}
           <Section title="Internal Notes" icon={StickyNote}>
