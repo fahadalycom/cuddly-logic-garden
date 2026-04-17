@@ -1,9 +1,11 @@
 import { useState } from "react";
 import {
-  ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, CheckCheck, RefreshCw, AlertTriangle, Package,
+  ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, CheckCheck, RefreshCw, AlertTriangle, Package, ArrowRightLeft,
 } from "lucide-react";
 import { ProductSelectorPanel } from "./ProductSelectorPanel";
 import { TicketDialog } from "@/components/support/TicketDialog";
+import { HandoffDialog } from "./HandoffDialog";
+import type { HandoffQueue } from "@/lib/handoff";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,6 +31,8 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const [note, setNote] = useState("");
   const [productPanelOpen, setProductPanelOpen] = useState(false);
   const [ticketOpen, setTicketOpen] = useState(false);
+  const [handoffOpen, setHandoffOpen] = useState(false);
+  const [handoffSuggestion, setHandoffSuggestion] = useState<{ queue: HandoffQueue; reason: string } | undefined>();
 
   if (!conversation) {
     return (
@@ -82,11 +86,24 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
         {/* Actions bar */}
         <div className="px-3 pb-2 flex items-center gap-1 overflow-x-auto scrollbar-none">
           <ActionBtn icon={Package} label="Products" onClick={() => setProductPanelOpen(true)} />
+          <ActionBtn
+            icon={ArrowRightLeft}
+            label="Transfer"
+            onClick={() => { setHandoffSuggestion(undefined); setHandoffOpen(true); }}
+          />
           <ActionBtn icon={UserPlus} label="Assign" />
           <ActionBtn icon={Tag} label="Status" />
           <ActionBtn icon={Flag} label="Priority" />
           <ActionBtn icon={StickyNote} label="Add Note" onClick={() => setTab("notes")} />
-          <ActionBtn icon={Ticket} label="Create Ticket" onClick={() => setTicketOpen(true)} />
+          <ActionBtn
+            icon={Ticket}
+            label="Create Ticket"
+            onClick={() => {
+              setTicketOpen(true);
+              // Suggest support handoff after ticket creation
+              setHandoffSuggestion({ queue: "support", reason: "Ticket created — route to support team" });
+            }}
+          />
           <ActionBtn icon={User} label="View Customer" />
         </div>
 
@@ -213,7 +230,13 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
 
       <TicketDialog
         open={ticketOpen}
-        onOpenChange={setTicketOpen}
+        onOpenChange={(o) => {
+          setTicketOpen(o);
+          // After ticket dialog closes, prompt for support handoff
+          if (!o && handoffSuggestion) {
+            setTimeout(() => setHandoffOpen(true), 300);
+          }
+        }}
         prefill={{
           conversationId: conversation.id,
           clientId: null,
@@ -221,6 +244,16 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
           customerPhone: conversation.customerPhone,
           summary: conversation.lastMessage?.slice(0, 120) ?? null,
         }}
+      />
+
+      <HandoffDialog
+        open={handoffOpen}
+        onOpenChange={(o) => { setHandoffOpen(o); if (!o) setHandoffSuggestion(undefined); }}
+        conversationId={conversation.id}
+        currentQueue={conversation.queue}
+        customerName={conversation.customerName}
+        suggestedQueue={handoffSuggestion?.queue}
+        suggestedReason={handoffSuggestion?.reason}
       />
     </div>
   );
