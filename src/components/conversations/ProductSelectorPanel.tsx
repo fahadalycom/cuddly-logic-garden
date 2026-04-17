@@ -149,6 +149,9 @@ export function ProductSelectorPanel({
     setEditing(false);
     setDiscountMode("none");
     setDiscountValue(0);
+    setInvoiceNotes("");
+    setSavedInvoice(null);
+    setSavedInvoiceId(null);
     setStep("select");
   }
 
