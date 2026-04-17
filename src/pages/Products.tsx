@@ -2,162 +2,283 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useClipboard } from "@/hooks/useClipboard";
-import { formatWhatsAppProductInfo, formatCurrency } from "@/lib/template-engine";
+import { formatCurrency, formatWhatsAppProductInfo } from "@/lib/template-engine";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LoadingState, EmptyState } from "@/components/shared/PageStates";
-import { Plus, Copy, ShoppingCart, Search, Grid3X3, List, Package } from "lucide-react";
+import { Plus, Copy, Search, Grid3X3, List, Package, Pencil, Layers, Settings2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type { Product, ProductVariant } from "@/types/database";
+import { ProductFormDialog } from "@/components/products/ProductFormDialog";
+import { PlansManager } from "@/components/products/PlansManager";
+import { BundleFormDialog } from "@/components/products/BundleFormDialog";
+import { PRODUCT_TYPE_COLOR, PRODUCT_TYPE_LABEL, type ProductFull, type ProductType, type BundleWithItems, type Plan } from "@/types/products";
+
+type ProductWithPlans = ProductFull & { plans: Plan[] };
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<(Product & { variants: ProductVariant[] })[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [showAdd, setShowAdd] = useState(false);
-  const [newProduct, setNewProduct] = useState({ name: "", description: "", base_price: 0, category: "", faq_content: "" });
   const { isAdmin } = useAuth();
   const { copy } = useClipboard();
 
-  const fetchProducts = async () => {
-    const { data } = await supabase.from("products").select("*, product_variants(*)").eq("is_active", true).order("sort_order");
-    setProducts((data as any) || []);
+  const [products, setProducts] = useState<ProductWithPlans[]>([]);
+  const [bundles, setBundles] = useState<BundleWithItems[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [search, setSearch] = useState("");
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [filterType, setFilterType] = useState<ProductType | "all">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("active");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  const [showProductForm, setShowProductForm] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ProductFull | null>(null);
+  const [plansFor, setPlansFor] = useState<{ id: string; name: string } | null>(null);
+
+  const [showBundleForm, setShowBundleForm] = useState(false);
+  const [editingBundle, setEditingBundle] = useState<BundleWithItems | null>(null);
+
+  const fetchAll = async () => {
+    const [prodRes, bundleRes] = await Promise.all([
+      supabase.from("products").select("*, plans(*)").order("sort_order").order("name"),
+      supabase.from("product_bundles").select("*, bundle_items(*, product:products(id, name, base_price))").order("sort_order"),
+    ]);
+    setProducts((prodRes.data as any) ?? []);
+    setBundles((bundleRes.data as any) ?? []);
     setLoading(false);
   };
 
-  useEffect(() => { fetchProducts(); }, []);
+  useEffect(() => { fetchAll(); }, []);
 
-  const toggleSelect = (id: string) => {
-    setSelected((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
-  };
+  const categories = Array.from(new Set(products.map((p) => p.category).filter(Boolean))) as string[];
 
-  const copySelectedInfo = () => {
-    const selectedProducts = products.filter((p) => selected.has(p.id));
-    const msg = selectedProducts.map((p) => formatWhatsAppProductInfo(p, p.variants)).join("\n\n---\n\n");
-    copy(msg, "Product info");
-  };
+  const filtered = products.filter((p) => {
+    if (filterStatus === "active" && !p.is_active) return false;
+    if (filterStatus === "inactive" && p.is_active) return false;
+    if (filterCategory !== "all" && p.category !== filterCategory) return false;
+    if (filterType !== "all" && p.product_type !== filterType) return false;
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !(p.category ?? "").toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
 
-  const handleAddProduct = async () => {
-    const { error } = await supabase.from("products").insert({
-      name: newProduct.name, description: newProduct.description, base_price: newProduct.base_price, category: newProduct.category, faq_content: newProduct.faq_content,
-    });
+  const handleDeleteBundle = async (id: string) => {
+    if (!confirm("Delete this bundle?")) return;
+    const { error } = await supabase.from("product_bundles").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Product added!");
-    setShowAdd(false);
-    setNewProduct({ name: "", description: "", base_price: 0, category: "", faq_content: "" });
-    fetchProducts();
+    toast.success("Bundle deleted");
+    fetchAll();
   };
 
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) || p.category?.toLowerCase().includes(search.toLowerCase())
-  );
+  const handleToggleActive = async (p: ProductFull) => {
+    const { error } = await supabase.from("products").update({ is_active: !p.is_active }).eq("id", p.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(p.is_active ? "Hidden from sales" : "Activated");
+    fetchAll();
+  };
 
   if (loading) return <LoadingState />;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="page-header mb-0">
           <h1 className="page-title flex items-center gap-2">
             <Package className="h-6 w-6 text-primary" />
-            Products
+            Product Management
           </h1>
-          <p className="page-subtitle">{products.length} active products in your catalog</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {selected.size > 0 && (
-            <>
-              <Button size="sm" variant="outline" onClick={copySelectedInfo} className="rounded-xl border-border/30 bg-card/40 backdrop-blur-xl hover:bg-card/60">
-                <Copy className="h-4 w-4 mr-1.5" /> Copy ({selected.size})
-              </Button>
-              <Button size="sm" onClick={() => toast.info("Buy flow coming soon")} className="rounded-xl gradient-primary text-white border-0 shadow-lg shadow-primary/20">
-                <ShoppingCart className="h-4 w-4 mr-1.5" /> Buy ({selected.size})
-              </Button>
-            </>
-          )}
-          {isAdmin && (
-            <Dialog open={showAdd} onOpenChange={setShowAdd}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="rounded-xl gradient-primary text-white border-0 shadow-lg shadow-primary/20">
-                  <Plus className="h-4 w-4 mr-1.5" /> Add Product
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="glass-strong rounded-2xl border-border/30">
-                <DialogHeader><DialogTitle>Add Product</DialogTitle></DialogHeader>
-                <div className="space-y-4">
-                  <div><Label className="text-xs uppercase tracking-wider text-muted-foreground">Name</Label><Input value={newProduct.name} onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })} className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl" /></div>
-                  <div><Label className="text-xs uppercase tracking-wider text-muted-foreground">Category</Label><Input value={newProduct.category} onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })} className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl" /></div>
-                  <div><Label className="text-xs uppercase tracking-wider text-muted-foreground">Base Price</Label><Input type="number" value={newProduct.base_price} onChange={(e) => setNewProduct({ ...newProduct, base_price: Number(e.target.value) })} className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl" /></div>
-                  <div><Label className="text-xs uppercase tracking-wider text-muted-foreground">Description</Label><Textarea value={newProduct.description} onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })} className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl" /></div>
-                  <Button onClick={handleAddProduct} className="w-full rounded-xl gradient-primary text-white border-0">Save Product</Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
+          <p className="page-subtitle">{products.length} products · {bundles.length} bundles</p>
         </div>
       </div>
 
-      {/* Search & Filters */}
-      <div className="flex items-center gap-3">
-        <div className="search-premium flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40 z-10" />
-          <Input className="pl-10 bg-card/40 border-border/20 rounded-xl h-11" placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-        <Button variant="outline" size="icon" onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")} className="rounded-xl border-border/20 bg-card/40 h-11 w-11">
-          {viewMode === "grid" ? <List className="h-4 w-4" /> : <Grid3X3 className="h-4 w-4" />}
-        </Button>
-      </div>
+      <Tabs defaultValue="products" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="products"><Package className="h-4 w-4 mr-1.5" />Products</TabsTrigger>
+          <TabsTrigger value="bundles"><Layers className="h-4 w-4 mr-1.5" />Bundles</TabsTrigger>
+        </TabsList>
 
-      {/* Products */}
-      {filtered.length === 0 ? (
-        <EmptyState title="No products found" description="Add your first product to get started." />
-      ) : (
-        <div className={`${viewMode === "grid" ? "grid gap-4 md:grid-cols-2 lg:grid-cols-3" : "space-y-3"} stagger-children`}>
-          {filtered.map((product) => (
-            <div
-              key={product.id}
-              className={`premium-card cursor-pointer ${selected.has(product.id) ? "ring-1 ring-primary/50 border-primary/30" : ""}`}
-              onClick={() => toggleSelect(product.id)}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className={`h-4 w-4 rounded border-2 flex items-center justify-center transition-all duration-200 ${selected.has(product.id) ? 'bg-primary border-primary' : 'border-border/40'}`}>
-                    {selected.has(product.id) && <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                  </div>
-                  <h3 className="text-sm font-semibold text-foreground">{product.name}</h3>
-                </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground/40 hover:text-foreground" onClick={(e) => { e.stopPropagation(); copy(formatWhatsAppProductInfo(product, product.variants), product.name); }}>
-                  <Copy className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              {product.category && <Badge variant="outline" className="mb-3 text-[10px] uppercase tracking-wider font-medium bg-secondary/30 border-border/20 text-muted-foreground rounded-lg">{product.category}</Badge>}
-              {product.description && <p className="text-xs text-muted-foreground/60 mb-4 line-clamp-2 leading-relaxed">{product.description}</p>}
-              <div className="flex items-end justify-between">
-                <p className="text-xl font-bold text-foreground tracking-tight">{formatCurrency(Number(product.base_price))}</p>
-                {product.variants?.length > 0 && (
-                  <span className="text-[10px] text-muted-foreground/40 font-medium">{product.variants.length} variant{product.variants.length > 1 ? 's' : ''}</span>
-                )}
-              </div>
-              {product.variants?.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-border/20 flex flex-wrap gap-1.5">
-                  {product.variants.map((v) => (
-                    <Badge key={v.id} variant="outline" className="text-[10px] bg-primary/5 text-primary/70 border-primary/10 rounded-lg font-medium">
-                      {v.name}: {formatCurrency(Number(v.price))}
-                    </Badge>
-                  ))}
-                </div>
-              )}
+        {/* PRODUCTS TAB */}
+        <TabsContent value="products" className="space-y-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+              <Input className="pl-10 h-10" placeholder="Search products…" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
-          ))}
-        </div>
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger className="w-[150px] h-10"><SelectValue placeholder="Category" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All categories</SelectItem>
+                {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filterType} onValueChange={(v) => setFilterType(v as any)}>
+              <SelectTrigger className="w-[140px] h-10"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All types</SelectItem>
+                <SelectItem value="shared">Shared</SelectItem>
+                <SelectItem value="private">Private</SelectItem>
+                <SelectItem value="invite_based">Invite-based</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
+              <SelectTrigger className="w-[120px] h-10"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="icon" onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")} className="h-10 w-10">
+              {viewMode === "grid" ? <List className="h-4 w-4" /> : <Grid3X3 className="h-4 w-4" />}
+            </Button>
+            {isAdmin && (
+              <Button onClick={() => { setEditingProduct(null); setShowProductForm(true); }}>
+                <Plus className="h-4 w-4 mr-1.5" />New product
+              </Button>
+            )}
+          </div>
+
+          {filtered.length === 0 ? (
+            <EmptyState title="No products match" description="Try adjusting filters or add a new product." />
+          ) : viewMode === "grid" ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((p) => (
+                <div key={p.id} className="premium-card flex flex-col">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold truncate">{p.name}</h3>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                        {p.category && <Badge variant="outline" className="text-[10px]">{p.category}</Badge>}
+                        <Badge variant="outline" className={`text-[10px] ${PRODUCT_TYPE_COLOR[p.product_type]}`}>{PRODUCT_TYPE_LABEL[p.product_type]}</Badge>
+                        {!p.is_active && <Badge variant="outline" className="text-[10px] bg-muted">Inactive</Badge>}
+                      </div>
+                    </div>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => copy(formatWhatsAppProductInfo(p, p.plans), p.name)}>
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  {p.short_description && <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{p.short_description}</p>}
+                  <div className="flex items-end justify-between mt-auto">
+                    <p className="text-lg font-bold">{formatCurrency(Number(p.base_price))}</p>
+                    <span className="text-[10px] text-muted-foreground">{p.plans?.length ?? 0} plan{(p.plans?.length ?? 0) === 1 ? "" : "s"}</span>
+                  </div>
+                  {isAdmin && (
+                    <div className="flex items-center gap-1 mt-3 pt-3 border-t border-border/20">
+                      <Button size="sm" variant="ghost" className="flex-1 h-8" onClick={() => { setEditingProduct(p); setShowProductForm(true); }}>
+                        <Pencil className="h-3 w-3 mr-1" />Edit
+                      </Button>
+                      <Button size="sm" variant="ghost" className="flex-1 h-8" onClick={() => setPlansFor({ id: p.id, name: p.name })}>
+                        <Settings2 className="h-3 w-3 mr-1" />Plans
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-8" onClick={() => handleToggleActive(p)}>
+                        {p.is_active ? "Hide" : "Show"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border/30 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-card/40 text-xs uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th className="text-left p-3">Name</th>
+                    <th className="text-left p-3">Category</th>
+                    <th className="text-left p-3">Type</th>
+                    <th className="text-right p-3">Base price</th>
+                    <th className="text-center p-3">Plans</th>
+                    <th className="text-center p-3">Status</th>
+                    {isAdmin && <th className="text-right p-3">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((p) => (
+                    <tr key={p.id} className="border-t border-border/20 hover:bg-card/30">
+                      <td className="p-3 font-medium">{p.name}</td>
+                      <td className="p-3 text-muted-foreground">{p.category ?? "—"}</td>
+                      <td className="p-3"><Badge variant="outline" className={`text-[10px] ${PRODUCT_TYPE_COLOR[p.product_type]}`}>{PRODUCT_TYPE_LABEL[p.product_type]}</Badge></td>
+                      <td className="p-3 text-right font-semibold">{formatCurrency(Number(p.base_price))}</td>
+                      <td className="p-3 text-center text-muted-foreground">{p.plans?.length ?? 0}</td>
+                      <td className="p-3 text-center">
+                        <Badge variant={p.is_active ? "default" : "outline"} className="text-[10px]">{p.is_active ? "Active" : "Inactive"}</Badge>
+                      </td>
+                      {isAdmin && (
+                        <td className="p-3 text-right">
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setEditingProduct(p); setShowProductForm(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setPlansFor({ id: p.id, name: p.name })}><Settings2 className="h-3.5 w-3.5" /></Button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* BUNDLES TAB */}
+        <TabsContent value="bundles" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">{bundles.length} bundle{bundles.length === 1 ? "" : "s"}</p>
+            {isAdmin && (
+              <Button onClick={() => { setEditingBundle(null); setShowBundleForm(true); }}>
+                <Plus className="h-4 w-4 mr-1.5" />New bundle
+              </Button>
+            )}
+          </div>
+
+          {bundles.length === 0 ? (
+            <EmptyState title="No bundles yet" description="Group multiple products into a bundle deal." />
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {bundles.map((b) => {
+                const sum = b.bundle_items.reduce((s, bi) => s + Number(bi.product?.base_price ?? 0), 0);
+                const finalPrice = b.bundle_price !== null ? Number(b.bundle_price) : sum;
+                const savings = b.bundle_price !== null ? sum - Number(b.bundle_price) : 0;
+                return (
+                  <div key={b.id} className="premium-card flex flex-col">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold truncate flex items-center gap-1.5"><Layers className="h-4 w-4 text-primary" />{b.name}</h3>
+                        {!b.is_active && <Badge variant="outline" className="text-[10px] mt-1">Inactive</Badge>}
+                      </div>
+                    </div>
+                    {b.description && <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{b.description}</p>}
+                    <div className="space-y-1 mb-3">
+                      {b.bundle_items.map((bi) => (
+                        <div key={bi.id} className="flex items-center justify-between text-xs">
+                          <span className="text-foreground/80">• {bi.product?.name ?? "—"}</span>
+                          <span className="text-muted-foreground">{formatCurrency(Number(bi.product?.base_price ?? 0))}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-auto pt-3 border-t border-border/20 flex items-end justify-between">
+                      <div>
+                        <p className="text-lg font-bold">{formatCurrency(finalPrice)}</p>
+                        {savings > 0 && <p className="text-[10px] text-emerald-400">Save {formatCurrency(savings)}</p>}
+                      </div>
+                      {isAdmin && (
+                        <div className="flex gap-1">
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setEditingBundle(b); setShowBundleForm(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDeleteBundle(b.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      <ProductFormDialog open={showProductForm} onOpenChange={setShowProductForm} product={editingProduct} onSaved={fetchAll} />
+      {plansFor && (
+        <PlansManager open={!!plansFor} onOpenChange={(v) => !v && setPlansFor(null)} productId={plansFor.id} productName={plansFor.name} />
       )}
+      <BundleFormDialog open={showBundleForm} onOpenChange={setShowBundleForm} bundle={editingBundle} onSaved={fetchAll} />
     </div>
   );
 }
