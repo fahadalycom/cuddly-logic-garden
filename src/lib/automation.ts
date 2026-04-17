@@ -198,7 +198,7 @@ export async function loadSmartHighlights(): Promise<SmartHighlight[]> {
   const { data: hotTickets } = await supabase
     .from("support_issues")
     .select("id, summary, ticket_number, priority")
-    .in("status", ["open", "in_progress", "waiting_internal"])
+    .in("status", ["open", "in_review", "waiting_internal", "waiting_customer", "reopened"])
     .in("priority", ["high", "urgent"])
     .limit(5);
   hotTickets?.forEach((t) =>
