@@ -54,33 +54,44 @@ const ORDER_STATUS_STYLE: Record<string, string> = {
   cancelled: "bg-rose-500/10 text-rose-400 border-rose-500/20",
 };
 
+interface OpenTicket {
+  id: string;
+  ticket_number: string | null;
+  status: TicketStatus;
+  priority: TicketPriority;
+  summary: string | null;
+}
+
 export function ConversationContextPanel({ conversation, onClose }: Props) {
   const [latestInvoice, setLatestInvoice] = useState<LatestInvoice | null>(null);
   const [latestOrder, setLatestOrder] = useState<LatestOrder | null>(null);
+  const [openTickets, setOpenTickets] = useState<OpenTicket[]>([]);
+  const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
+
+  const loadAll = async (convId: string) => {
+    const [invRes, ordRes, tixRes] = await Promise.all([
+      (supabase as any).from("invoices")
+        .select("id, invoice_number, status, final_total, currency, created_at")
+        .eq("conversation_id", convId)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      (supabase as any).from("orders")
+        .select("id, order_number, status, payment_status, fulfillment_status, total_amount, created_at")
+        .eq("conversation_id", convId)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      (supabase as any).from("support_issues")
+        .select("id, ticket_number, status, priority, summary")
+        .eq("conversation_id", convId)
+        .neq("status", "closed")
+        .order("created_at", { ascending: false }).limit(5),
+    ]);
+    setLatestInvoice((invRes.data as LatestInvoice) ?? null);
+    setLatestOrder((ordRes.data as LatestOrder) ?? null);
+    setOpenTickets((tixRes.data as OpenTicket[]) ?? []);
+  };
 
   useEffect(() => {
-    if (!conversation?.id) { setLatestInvoice(null); setLatestOrder(null); return; }
-    let cancelled = false;
-    (async () => {
-      const [invRes, ordRes] = await Promise.all([
-        (supabase as any).from("invoices")
-          .select("id, invoice_number, status, final_total, currency, created_at")
-          .eq("conversation_id", conversation.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        (supabase as any).from("orders")
-          .select("id, order_number, status, payment_status, fulfillment_status, total_amount, created_at")
-          .eq("conversation_id", conversation.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ]);
-      if (cancelled) return;
-      setLatestInvoice((invRes.data as LatestInvoice) ?? null);
-      setLatestOrder((ordRes.data as LatestOrder) ?? null);
-    })();
-    return () => { cancelled = true; };
+    if (!conversation?.id) { setLatestInvoice(null); setLatestOrder(null); setOpenTickets([]); return; }
+    loadAll(conversation.id);
   }, [conversation?.id]);
 
   if (!conversation) return null;
