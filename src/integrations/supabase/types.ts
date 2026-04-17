@@ -323,6 +323,173 @@ export type Database = {
           },
         ]
       }
+      invoice_items: {
+        Row: {
+          bundle_id: string | null
+          created_at: string
+          discount: number
+          id: string
+          invoice_id: string
+          line_total: number
+          plan_id: string | null
+          plan_name: string | null
+          product_id: string | null
+          product_name: string
+          quantity: number
+          sort_order: number
+          unit_price: number
+        }
+        Insert: {
+          bundle_id?: string | null
+          created_at?: string
+          discount?: number
+          id?: string
+          invoice_id: string
+          line_total?: number
+          plan_id?: string | null
+          plan_name?: string | null
+          product_id?: string | null
+          product_name: string
+          quantity?: number
+          sort_order?: number
+          unit_price?: number
+        }
+        Update: {
+          bundle_id?: string | null
+          created_at?: string
+          discount?: number
+          id?: string
+          invoice_id?: string
+          line_total?: number
+          plan_id?: string | null
+          plan_name?: string | null
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          sort_order?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "product_bundles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          cancelled_at: string | null
+          client_id: string | null
+          conversation_id: string | null
+          created_at: string
+          created_by: string
+          currency: string
+          customer_email: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          discount_amount: number
+          discount_type: Database["public"]["Enums"]["invoice_discount_type"]
+          discount_value: number
+          final_total: number
+          id: string
+          invoice_number: string
+          issue_date: string
+          notes: string | null
+          paid_at: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          subtotal: number
+          updated_at: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          client_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          created_by: string
+          currency?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          discount_amount?: number
+          discount_type?: Database["public"]["Enums"]["invoice_discount_type"]
+          discount_value?: number
+          final_total?: number
+          id?: string
+          invoice_number: string
+          issue_date?: string
+          notes?: string | null
+          paid_at?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal?: number
+          updated_at?: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          client_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string
+          currency?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          discount_amount?: number
+          discount_type?: Database["public"]["Enums"]["invoice_discount_type"]
+          discount_value?: number
+          final_total?: number
+          id?: string
+          invoice_number?: string
+          issue_date?: string
+          notes?: string | null
+          paid_at?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           assigned_to: string | null
@@ -2132,6 +2299,8 @@ export type Database = {
       deal_status: "active" | "negotiation" | "expired" | "rejected"
       duration_type: "day" | "week" | "month" | "year"
       feedback_type: "review" | "feedback" | "follow_up"
+      invoice_discount_type: "none" | "fixed" | "percent"
+      invoice_status: "draft" | "sent" | "paid" | "cancelled"
       issue_status: "open" | "in_review" | "approved" | "resolved" | "rejected"
       lead_source:
         | "whatsapp"
@@ -2366,6 +2535,8 @@ export const Constants = {
       deal_status: ["active", "negotiation", "expired", "rejected"],
       duration_type: ["day", "week", "month", "year"],
       feedback_type: ["review", "feedback", "follow_up"],
+      invoice_discount_type: ["none", "fixed", "percent"],
+      invoice_status: ["draft", "sent", "paid", "cancelled"],
       issue_status: ["open", "in_review", "approved", "resolved", "rejected"],
       lead_source: [
         "whatsapp",

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Package, Layers, Sparkles, Trash2, Pencil, Send, Calculator, Minus, Plus, ArrowLeft } from "lucide-react";
+import { Search, Package, Layers, Sparkles, Trash2, Pencil, Send, Calculator, Minus, Plus, ArrowLeft, FileText, Copy, CheckCheck, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,11 +14,18 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PRODUCT_TYPE_COLOR, PRODUCT_TYPE_LABEL, type ProductFull, type Plan, type BundleWithItems } from "@/types/products";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/template-engine";
+import { InvoicePreview, type InvoicePreviewData } from "./InvoicePreview";
+import { toast } from "@/hooks/use-toast";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onInsert: (text: string) => void;
+  conversationId?: string | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
+  clientId?: string | null;
 }
 
 type ProductWithPlans = ProductFull & { plans: Plan[] };
@@ -30,10 +37,19 @@ interface SelectedProduct {
   priceOverride?: number | null;
 }
 
-type Step = "select" | "pricing" | "preview";
+type Step = "select" | "pricing" | "preview" | "invoice";
 type DiscountMode = "none" | "fixed" | "percent";
 
-export function ProductSelectorPanel({ open, onOpenChange, onInsert }: Props) {
+export function ProductSelectorPanel({
+  open,
+  onOpenChange,
+  onInsert,
+  conversationId = null,
+  customerName = null,
+  customerPhone = null,
+  customerEmail = null,
+  clientId = null,
+}: Props) {
   const [products, setProducts] = useState<ProductWithPlans[]>([]);
   const [bundles, setBundles] = useState<BundleWithItems[]>([]);
   const [loading, setLoading] = useState(false);
@@ -51,6 +67,13 @@ export function ProductSelectorPanel({ open, onOpenChange, onInsert }: Props) {
   // Discount
   const [discountMode, setDiscountMode] = useState<DiscountMode>("none");
   const [discountValue, setDiscountValue] = useState<number>(0);
+
+  // Invoice
+  const [invoiceNotes, setInvoiceNotes] = useState("");
+  const [savingInvoice, setSavingInvoice] = useState(false);
+  const [savedInvoice, setSavedInvoice] = useState<InvoicePreviewData | null>(null);
+  const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (!open) return;
@@ -126,6 +149,9 @@ export function ProductSelectorPanel({ open, onOpenChange, onInsert }: Props) {
     setEditing(false);
     setDiscountMode("none");
     setDiscountValue(0);
+    setInvoiceNotes("");
+    setSavedInvoice(null);
+    setSavedInvoiceId(null);
     setStep("select");
   }
 
@@ -238,20 +264,218 @@ export function ProductSelectorPanel({ open, onOpenChange, onInsert }: Props) {
     onOpenChange(false);
   }
 
+  // ===== Invoice =====
+  function buildInvoicePreviewData(invoiceNumber: string, status: InvoicePreviewData["status"]): InvoicePreviewData {
+    return {
+      invoiceNumber,
+      status,
+      issueDate: new Date().toISOString(),
+      customerName: customerName || "Customer",
+      customerPhone,
+      customerEmail,
+      items: lineItems.map((it) => ({
+        name: it.name,
+        meta: it.meta,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        lineTotal: it.lineTotal,
+      })),
+      subtotal,
+      discountLabel:
+        discountAmount > 0
+          ? discountMode === "percent"
+            ? `${discountValue}%`
+            : "fixed"
+          : null,
+      discountAmount,
+      finalTotal,
+      notes: invoiceNotes || null,
+      currency: "PKR",
+    };
+  }
+
+  function buildInvoiceMessage(data: InvoicePreviewData): string {
+    const lines: string[] = [
+      "Your invoice is ready 📄",
+      "",
+      `Invoice No: ${data.invoiceNumber}`,
+      `Date: ${new Date(data.issueDate).toLocaleDateString()}`,
+      "",
+      "Items:",
+    ];
+    data.items.forEach((it) => {
+      const qty = it.quantity > 1 ? ` ×${it.quantity}` : "";
+      lines.push(`• ${it.name}${qty}: ${formatCurrency(it.lineTotal)}`);
+    });
+    lines.push("");
+    lines.push(`Subtotal: ${formatCurrency(data.subtotal)}`);
+    if (data.discountAmount > 0) {
+      const dl = data.discountLabel ? ` (${data.discountLabel})` : "";
+      lines.push(`Discount${dl}: -${formatCurrency(data.discountAmount)}`);
+    }
+    lines.push(`*Final Total: ${formatCurrency(data.finalTotal)} ${data.currency ?? "PKR"}*`);
+    if (data.notes) {
+      lines.push("");
+      lines.push(`Notes: ${data.notes}`);
+    }
+    lines.push("");
+    lines.push("Please review and confirm to proceed 👍");
+    return lines.join("\n");
+  }
+
+  async function handleGenerateInvoice() {
+    if (lineItems.length === 0) return;
+    setStep("invoice");
+    if (savedInvoice) return; // already generated
+    await saveInvoice("draft");
+  }
+
+  async function saveInvoice(status: InvoicePreviewData["status"]) {
+    setSavingInvoice(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
+      if (!userId) {
+        toast({ title: "Sign in required", description: "Please sign in to save invoices.", variant: "destructive" });
+        return;
+      }
+
+      const insertPayload: any = {
+        conversation_id: conversationId,
+        client_id: clientId,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        customer_email: customerEmail,
+        created_by: userId,
+        status,
+        subtotal,
+        discount_type: discountMode,
+        discount_value: discountValue,
+        discount_amount: discountAmount,
+        final_total: finalTotal,
+        notes: invoiceNotes || null,
+        currency: "PKR",
+        sent_at: status === "sent" ? new Date().toISOString() : null,
+        paid_at: status === "paid" ? new Date().toISOString() : null,
+      };
+
+      let invoiceId = savedInvoiceId;
+      let invoiceNumber: string;
+
+      if (invoiceId) {
+        const { data, error } = await (supabase as any)
+          .from("invoices")
+          .update(insertPayload)
+          .eq("id", invoiceId)
+          .select("id, invoice_number")
+          .single();
+        if (error) throw error;
+        invoiceNumber = data.invoice_number;
+      } else {
+        const { data, error } = await (supabase as any)
+          .from("invoices")
+          .insert(insertPayload)
+          .select("id, invoice_number")
+          .single();
+        if (error) throw error;
+        invoiceId = data.id as string;
+        invoiceNumber = data.invoice_number as string;
+
+        // Insert items only on first save
+        const itemPayloads: any[] = [];
+        Object.values(selected).forEach((sel, idx) => {
+          const p = products.find((x) => x.id === sel.productId);
+          if (!p) return;
+          const plan = p.plans?.find((pl) => pl.id === sel.planId);
+          const baseUnit = plan ? Number(plan.price) : Number(p.base_price);
+          const unit = sel.priceOverride != null ? Number(sel.priceOverride) : baseUnit;
+          itemPayloads.push({
+            invoice_id: invoiceId,
+            product_id: p.id,
+            plan_id: plan?.id ?? null,
+            product_name: p.name,
+            plan_name: plan?.name ?? null,
+            quantity: sel.quantity,
+            unit_price: unit,
+            line_total: unit * sel.quantity,
+            sort_order: idx,
+          });
+        });
+        let bIdx = itemPayloads.length;
+        selectedBundles.forEach((bid) => {
+          const b = bundles.find((x) => x.id === bid);
+          if (!b) return;
+          const baseUnit = b.bundle_price ?? b.bundle_items?.reduce((s, it) => s + (Number(it.product?.base_price) || 0) * (it.quantity || 1), 0) ?? 0;
+          const unit = bundlePriceOverride[bid] != null ? bundlePriceOverride[bid] : Number(baseUnit);
+          const qty = bundleQty[bid] ?? 1;
+          itemPayloads.push({
+            invoice_id: invoiceId,
+            bundle_id: b.id,
+            product_name: b.name,
+            plan_name: "Bundle",
+            quantity: qty,
+            unit_price: unit,
+            line_total: unit * qty,
+            sort_order: bIdx++,
+          });
+        });
+        if (itemPayloads.length > 0) {
+          const { error: itemsError } = await (supabase as any).from("invoice_items").insert(itemPayloads);
+          if (itemsError) throw itemsError;
+        }
+      }
+
+      setSavedInvoiceId(invoiceId);
+      const preview = buildInvoicePreviewData(invoiceNumber, status);
+      setSavedInvoice(preview);
+      toast({
+        title: status === "draft" ? "Invoice saved as draft" : `Invoice marked as ${status}`,
+        description: invoiceNumber,
+      });
+    } catch (err: any) {
+      console.error("[invoice]", err);
+      toast({ title: "Failed to save invoice", description: err?.message ?? "Unknown error", variant: "destructive" });
+    } finally {
+      setSavingInvoice(false);
+    }
+  }
+
+  function handleCopyInvoice() {
+    if (!savedInvoice) return;
+    const msg = buildInvoiceMessage(savedInvoice);
+    navigator.clipboard.writeText(msg);
+    toast({ title: "Invoice summary copied" });
+  }
+
+  function handleSendInvoiceToChat() {
+    if (!savedInvoice) return;
+    const msg = buildInvoiceMessage(savedInvoice);
+    onInsert(msg);
+    // Mark sent if currently draft
+    if (savedInvoice.status === "draft") void saveInvoice("sent");
+    onOpenChange(false);
+    clearAll();
+  }
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl p-0 flex flex-col">
         <SheetHeader className="px-4 py-3 border-b border-border/40">
           <SheetTitle className="flex items-center gap-2 text-base">
             {step !== "select" && (
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setStep(step === "preview" ? "pricing" : "select")}>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => {
+                if (step === "preview") setStep("pricing");
+                else if (step === "invoice") setStep("pricing");
+                else if (step === "pricing") setStep("select");
+              }}>
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             )}
-            {step === "pricing" ? <Calculator className="h-4 w-4 text-primary" /> : <Package className="h-4 w-4 text-primary" />}
+            {step === "pricing" ? <Calculator className="h-4 w-4 text-primary" /> : step === "invoice" ? <FileText className="h-4 w-4 text-primary" /> : <Package className="h-4 w-4 text-primary" />}
             {step === "select" && "Product Selector"}
             {step === "pricing" && "Pricing Calculator"}
             {step === "preview" && "Message Preview"}
+            {step === "invoice" && "Invoice"}
             {totalSelected > 0 && step === "select" && (
               <Badge variant="secondary" className="ml-auto h-5 text-[10px]">{totalSelected} selected</Badge>
             )}
@@ -569,9 +793,73 @@ export function ProductSelectorPanel({ open, onOpenChange, onInsert }: Props) {
           </div>
         )}
 
+        {/* STEP: INVOICE */}
+        {step === "invoice" && (
+          <ScrollArea className="flex-1">
+            <div className="p-3 space-y-3">
+              {savingInvoice && !savedInvoice && (
+                <p className="text-xs text-muted-foreground py-6 text-center">Generating invoice…</p>
+              )}
+              {savedInvoice && (
+                <>
+                  <InvoicePreview data={savedInvoice} />
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Internal notes (optional)</Label>
+                    <Textarea
+                      value={invoiceNotes}
+                      onChange={(e) => setInvoiceNotes(e.target.value)}
+                      placeholder="Add a note for the customer…"
+                      className="text-xs resize-none bg-background/60 min-h-[60px]"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-[11px] gap-1.5"
+                      onClick={() => saveInvoice("draft")}
+                      disabled={savingInvoice}
+                    >
+                      Save Draft
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-[11px] gap-1.5"
+                      onClick={() => saveInvoice("sent")}
+                      disabled={savingInvoice}
+                    >
+                      <CheckCheck className="h-3.5 w-3.5" /> Mark Sent
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-[11px] gap-1.5"
+                      onClick={() => saveInvoice("paid")}
+                      disabled={savingInvoice}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Mark Paid
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-[11px] gap-1.5"
+                      onClick={handleCopyInvoice}
+                    >
+                      <Copy className="h-3.5 w-3.5" /> Copy
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </ScrollArea>
+        )}
+
         {/* Actions */}
         <div className="border-t border-border/40 p-3 flex items-center gap-2 bg-background/60">
-          <Button variant="ghost" size="sm" onClick={clearAll} disabled={totalSelected === 0 && !generated} className="gap-1.5">
+          <Button variant="ghost" size="sm" onClick={clearAll} disabled={totalSelected === 0 && !generated && !savedInvoice} className="gap-1.5">
             <Trash2 className="h-3.5 w-3.5" /> Clear
           </Button>
           <div className="flex-1" />
@@ -588,13 +876,24 @@ export function ProductSelectorPanel({ open, onOpenChange, onInsert }: Props) {
           )}
 
           {step === "pricing" && (
-            <Button size="sm" onClick={generatePricingMessage} disabled={lineItems.length === 0} className="gap-1.5">
-              <Sparkles className="h-3.5 w-3.5" /> Generate Message
-            </Button>
+            <>
+              <Button variant="outline" size="sm" onClick={generatePricingMessage} disabled={lineItems.length === 0} className="gap-1.5">
+                <Sparkles className="h-3.5 w-3.5" /> Pricing Msg
+              </Button>
+              <Button size="sm" onClick={handleGenerateInvoice} disabled={lineItems.length === 0} className="gap-1.5">
+                <FileText className="h-3.5 w-3.5" /> Generate Invoice
+              </Button>
+            </>
           )}
 
           {step === "preview" && (
             <Button size="sm" onClick={handleSend} disabled={!generated.trim()} className="gap-1.5">
+              <Send className="h-3.5 w-3.5" /> Send to Chat
+            </Button>
+          )}
+
+          {step === "invoice" && (
+            <Button size="sm" onClick={handleSendInvoiceToChat} disabled={!savedInvoice || savingInvoice} className="gap-1.5">
               <Send className="h-3.5 w-3.5" /> Send to Chat
             </Button>
           )}

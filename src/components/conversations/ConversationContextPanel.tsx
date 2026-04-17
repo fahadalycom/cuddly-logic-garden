@@ -1,7 +1,11 @@
-import { X, Phone, Mail, Package, RefreshCw, CreditCard, Ticket, StickyNote } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, Phone, Mail, Package, RefreshCw, CreditCard, Ticket, StickyNote, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/template-engine";
+import { cn } from "@/lib/utils";
 import type { MockConversation } from "@/lib/conversations-mock";
 
 interface Props {
@@ -9,7 +13,41 @@ interface Props {
   onClose?: () => void;
 }
 
+interface LatestInvoice {
+  id: string;
+  invoice_number: string;
+  status: "draft" | "sent" | "paid" | "cancelled";
+  final_total: number;
+  currency: string;
+  created_at: string;
+}
+
+const INVOICE_STATUS_STYLE: Record<LatestInvoice["status"], string> = {
+  draft: "bg-muted/40 text-muted-foreground border-border/40",
+  sent: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  paid: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  cancelled: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+};
+
 export function ConversationContextPanel({ conversation, onClose }: Props) {
+  const [latestInvoice, setLatestInvoice] = useState<LatestInvoice | null>(null);
+
+  useEffect(() => {
+    if (!conversation?.id) { setLatestInvoice(null); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("invoices")
+        .select("id, invoice_number, status, final_total, currency, created_at")
+        .eq("conversation_id", conversation.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled) setLatestInvoice((data as LatestInvoice) ?? null);
+    })();
+    return () => { cancelled = true; };
+  }, [conversation?.id]);
+
   if (!conversation) return null;
   const ctx = conversation.context;
 
@@ -51,6 +89,30 @@ export function ConversationContextPanel({ conversation, onClose }: Props) {
           </section>
 
           {/* Recent orders */}
+          {/* Latest invoice */}
+          <Section title="Latest Invoice" icon={FileText}>
+            {!latestInvoice ? (
+              <Empty text="No invoices yet" />
+            ) : (
+              <div className="rounded-md border border-border/30 bg-background/30 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-mono">{latestInvoice.invoice_number}</span>
+                  <Badge variant="outline" className={cn("text-[10px] capitalize", INVOICE_STATUS_STYLE[latestInvoice.status])}>
+                    {latestInvoice.status}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-[10px] text-muted-foreground">
+                    {new Date(latestInvoice.created_at).toLocaleDateString()}
+                  </span>
+                  <span className="text-xs font-semibold">
+                    {formatCurrency(Number(latestInvoice.final_total))} {latestInvoice.currency}
+                  </span>
+                </div>
+              </div>
+            )}
+          </Section>
+
           <Section title="Recent Orders" icon={Package} count={ctx.recentOrders.length}>
             {ctx.recentOrders.length === 0 ? (
               <Empty text="No orders yet" />
