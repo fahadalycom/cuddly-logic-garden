@@ -26,6 +26,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const [tab, setTab] = useState<Tab>("messages");
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState("");
+  const [productPanelOpen, setProductPanelOpen] = useState(false);
 
   if (!conversation) {
     return (
