@@ -1,7 +1,8 @@
 import { useState } from "react";
 import {
-  ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, CheckCheck, RefreshCw, AlertTriangle,
+  ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, CheckCheck, RefreshCw, AlertTriangle, Package,
 } from "lucide-react";
+import { ProductSelectorPanel } from "./ProductSelectorPanel";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
