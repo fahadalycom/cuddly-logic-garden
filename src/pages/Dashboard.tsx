@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { StatCard } from "@/components/shared/StatCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
+import { SmartHighlightsCard } from "@/components/automation/SmartHighlightsCard";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import {
@@ -27,7 +28,10 @@ function FounderDashboard() {
         <StatCard title="Total Customers" value="2,431" icon={Users} accent="primary" />
         <StatCard title="Revenue (MTD)" value="$24,580" icon={TrendingUp} accent="emerald" trend={{ value: "18%", up: true }} />
       </div>
-      <RecentActivity />
+      <div className="grid lg:grid-cols-2 gap-4 mb-2">
+        <SmartHighlightsCard />
+        <RecentActivity />
+      </div>
     </>
   );
 }
