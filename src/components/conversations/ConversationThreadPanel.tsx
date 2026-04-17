@@ -203,6 +203,10 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
         open={productPanelOpen}
         onOpenChange={setProductPanelOpen}
         onInsert={(text) => setDraft((prev) => (prev ? `${prev}\n\n${text}` : text))}
+        conversationId={conversation.id}
+        customerName={conversation.customerName}
+        customerPhone={conversation.customerPhone}
+        customerEmail={conversation.context?.email ?? null}
       />
     </div>
   );
