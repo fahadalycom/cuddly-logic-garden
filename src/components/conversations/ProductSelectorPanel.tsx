@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Package, Layers, Sparkles, Trash2, Pencil, Send, Calculator, Minus, Plus, ArrowLeft, FileText, Copy, CheckCircle2 } from "lucide-react";
+import { Search, Package, Layers, Sparkles, Trash2, Pencil, Send, Calculator, Minus, Plus, ArrowLeft, FileText, Copy, CheckCheck, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
