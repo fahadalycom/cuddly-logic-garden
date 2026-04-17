@@ -588,7 +588,11 @@ export type Database = {
           id: string
           line_total: number
           order_id: string
+          plan_id: string | null
+          plan_name: string | null
           product_id: string
+          product_name: string | null
+          quantity: number
           unit_price: number
           variant_id: string | null
         }
@@ -600,7 +604,11 @@ export type Database = {
           id?: string
           line_total?: number
           order_id: string
+          plan_id?: string | null
+          plan_name?: string | null
           product_id: string
+          product_name?: string | null
+          quantity?: number
           unit_price?: number
           variant_id?: string | null
         }
@@ -612,7 +620,11 @@ export type Database = {
           id?: string
           line_total?: number
           order_id?: string
+          plan_id?: string | null
+          plan_name?: string | null
           product_id?: string
+          product_name?: string | null
+          quantity?: number
           unit_price?: number
           variant_id?: string | null
         }
@@ -680,42 +692,66 @@ export type Database = {
       }
       orders: {
         Row: {
+          assigned_to: string | null
           client_id: string
+          conversation_id: string | null
           created_at: string
           created_by: string
           discount_amount: number
+          discount_type: string
+          discount_value: number
+          fulfillment_status: Database["public"]["Enums"]["order_fulfillment_status"]
           id: string
+          invoice_id: string | null
           is_archived: boolean
           notes: string | null
+          order_number: string | null
           paid_amount: number
+          payment_status: Database["public"]["Enums"]["order_payment_status"]
           remaining_due: number
           status: Database["public"]["Enums"]["order_status"]
           total_amount: number
           updated_at: string
         }
         Insert: {
+          assigned_to?: string | null
           client_id: string
+          conversation_id?: string | null
           created_at?: string
           created_by: string
           discount_amount?: number
+          discount_type?: string
+          discount_value?: number
+          fulfillment_status?: Database["public"]["Enums"]["order_fulfillment_status"]
           id?: string
+          invoice_id?: string | null
           is_archived?: boolean
           notes?: string | null
+          order_number?: string | null
           paid_amount?: number
+          payment_status?: Database["public"]["Enums"]["order_payment_status"]
           remaining_due?: number
           status?: Database["public"]["Enums"]["order_status"]
           total_amount?: number
           updated_at?: string
         }
         Update: {
+          assigned_to?: string | null
           client_id?: string
+          conversation_id?: string | null
           created_at?: string
           created_by?: string
           discount_amount?: number
+          discount_type?: string
+          discount_value?: number
+          fulfillment_status?: Database["public"]["Enums"]["order_fulfillment_status"]
           id?: string
+          invoice_id?: string | null
           is_archived?: boolean
           notes?: string | null
+          order_number?: string | null
           paid_amount?: number
+          payment_status?: Database["public"]["Enums"]["order_payment_status"]
           remaining_due?: number
           status?: Database["public"]["Enums"]["order_status"]
           total_amount?: number
@@ -2310,6 +2346,17 @@ export type Database = {
         | "referral"
         | "other"
       lead_status: "new" | "interested" | "follow_up" | "converted" | "dead"
+      order_fulfillment_status:
+        | "not_started"
+        | "ready"
+        | "in_progress"
+        | "delivered"
+        | "failed"
+      order_payment_status:
+        | "unpaid"
+        | "pending_verification"
+        | "paid"
+        | "rejected"
       order_status:
         | "draft"
         | "pending_payment"
@@ -2318,6 +2365,9 @@ export type Database = {
         | "to_deliver"
         | "delivered"
         | "cancelled"
+        | "confirmed"
+        | "in_progress"
+        | "completed"
       payment_status: "pending" | "verified" | "rejected"
       priority_level: "low" | "medium" | "high" | "urgent"
       product_type: "shared" | "private" | "invite_based" | "custom"
@@ -2547,6 +2597,19 @@ export const Constants = {
         "other",
       ],
       lead_status: ["new", "interested", "follow_up", "converted", "dead"],
+      order_fulfillment_status: [
+        "not_started",
+        "ready",
+        "in_progress",
+        "delivered",
+        "failed",
+      ],
+      order_payment_status: [
+        "unpaid",
+        "pending_verification",
+        "paid",
+        "rejected",
+      ],
       order_status: [
         "draft",
         "pending_payment",
@@ -2555,6 +2618,9 @@ export const Constants = {
         "to_deliver",
         "delivered",
         "cancelled",
+        "confirmed",
+        "in_progress",
+        "completed",
       ],
       payment_status: ["pending", "verified", "rejected"],
       priority_level: ["low", "medium", "high", "urgent"],
