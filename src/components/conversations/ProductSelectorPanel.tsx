@@ -793,9 +793,73 @@ export function ProductSelectorPanel({
           </div>
         )}
 
+        {/* STEP: INVOICE */}
+        {step === "invoice" && (
+          <ScrollArea className="flex-1">
+            <div className="p-3 space-y-3">
+              {savingInvoice && !savedInvoice && (
+                <p className="text-xs text-muted-foreground py-6 text-center">Generating invoice…</p>
+              )}
+              {savedInvoice && (
+                <>
+                  <InvoicePreview data={savedInvoice} />
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Internal notes (optional)</Label>
+                    <Textarea
+                      value={invoiceNotes}
+                      onChange={(e) => setInvoiceNotes(e.target.value)}
+                      placeholder="Add a note for the customer…"
+                      className="text-xs resize-none bg-background/60 min-h-[60px]"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-[11px] gap-1.5"
+                      onClick={() => saveInvoice("draft")}
+                      disabled={savingInvoice}
+                    >
+                      Save Draft
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-[11px] gap-1.5"
+                      onClick={() => saveInvoice("sent")}
+                      disabled={savingInvoice}
+                    >
+                      <CheckCheck className="h-3.5 w-3.5" /> Mark Sent
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-[11px] gap-1.5"
+                      onClick={() => saveInvoice("paid")}
+                      disabled={savingInvoice}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Mark Paid
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-[11px] gap-1.5"
+                      onClick={handleCopyInvoice}
+                    >
+                      <Copy className="h-3.5 w-3.5" /> Copy
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </ScrollArea>
+        )}
+
         {/* Actions */}
         <div className="border-t border-border/40 p-3 flex items-center gap-2 bg-background/60">
-          <Button variant="ghost" size="sm" onClick={clearAll} disabled={totalSelected === 0 && !generated} className="gap-1.5">
+          <Button variant="ghost" size="sm" onClick={clearAll} disabled={totalSelected === 0 && !generated && !savedInvoice} className="gap-1.5">
             <Trash2 className="h-3.5 w-3.5" /> Clear
           </Button>
           <div className="flex-1" />
@@ -812,13 +876,24 @@ export function ProductSelectorPanel({
           )}
 
           {step === "pricing" && (
-            <Button size="sm" onClick={generatePricingMessage} disabled={lineItems.length === 0} className="gap-1.5">
-              <Sparkles className="h-3.5 w-3.5" /> Generate Message
-            </Button>
+            <>
+              <Button variant="outline" size="sm" onClick={generatePricingMessage} disabled={lineItems.length === 0} className="gap-1.5">
+                <Sparkles className="h-3.5 w-3.5" /> Pricing Msg
+              </Button>
+              <Button size="sm" onClick={handleGenerateInvoice} disabled={lineItems.length === 0} className="gap-1.5">
+                <FileText className="h-3.5 w-3.5" /> Generate Invoice
+              </Button>
+            </>
           )}
 
           {step === "preview" && (
             <Button size="sm" onClick={handleSend} disabled={!generated.trim()} className="gap-1.5">
+              <Send className="h-3.5 w-3.5" /> Send to Chat
+            </Button>
+          )}
+
+          {step === "invoice" && (
+            <Button size="sm" onClick={handleSendInvoiceToChat} disabled={!savedInvoice || savingInvoice} className="gap-1.5">
               <Send className="h-3.5 w-3.5" /> Send to Chat
             </Button>
           )}
