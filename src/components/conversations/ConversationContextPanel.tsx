@@ -1,13 +1,33 @@
-import { X, Phone, Mail, Package, RefreshCw, CreditCard, Ticket, StickyNote } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, Phone, Mail, Package, RefreshCw, CreditCard, Ticket, StickyNote, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/template-engine";
+import { cn } from "@/lib/utils";
 import type { MockConversation } from "@/lib/conversations-mock";
 
 interface Props {
   conversation: MockConversation | null;
   onClose?: () => void;
 }
+
+interface LatestInvoice {
+  id: string;
+  invoice_number: string;
+  status: "draft" | "sent" | "paid" | "cancelled";
+  final_total: number;
+  currency: string;
+  created_at: string;
+}
+
+const INVOICE_STATUS_STYLE: Record<LatestInvoice["status"], string> = {
+  draft: "bg-muted/40 text-muted-foreground border-border/40",
+  sent: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  paid: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  cancelled: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+};
 
 export function ConversationContextPanel({ conversation, onClose }: Props) {
   if (!conversation) return null;
