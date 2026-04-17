@@ -1,4 +1,6 @@
+import { forwardRef } from "react";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import type { ConvStatus, ConvQueue } from "@/lib/conversations-mock";
 
 const statusMap: Record<ConvStatus, { label: string; className: string }> = {
@@ -18,19 +20,35 @@ const queueMap: Record<ConvQueue, string> = {
   general: "bg-muted/50 text-muted-foreground border-border/30",
 };
 
-export function ConvStatusBadge({ status }: { status: ConvStatus }) {
+export const ConvStatusBadge = forwardRef<
+  HTMLDivElement,
+  { status: ConvStatus; className?: string }
+>(({ status, className }, ref) => {
   const c = statusMap[status];
   return (
-    <Badge variant="outline" className={`${c.className} text-[10px] font-medium border px-2 py-0.5 rounded-md`}>
+    <Badge
+      ref={ref}
+      variant="outline"
+      className={cn(c.className, "text-[10px] font-medium border px-2 py-0.5 rounded-md", className)}
+    >
       {c.label}
     </Badge>
   );
-}
+});
+ConvStatusBadge.displayName = "ConvStatusBadge";
 
-export function QueueBadge({ queue }: { queue: ConvQueue }) {
+export const QueueBadge = forwardRef<
+  HTMLDivElement,
+  { queue: ConvQueue; className?: string }
+>(({ queue, className }, ref) => {
   return (
-    <Badge variant="outline" className={`${queueMap[queue]} text-[10px] font-medium border px-2 py-0.5 rounded-md capitalize`}>
+    <Badge
+      ref={ref}
+      variant="outline"
+      className={cn(queueMap[queue], "text-[10px] font-medium border px-2 py-0.5 rounded-md capitalize", className)}
+    >
       {queue}
     </Badge>
   );
-}
+});
+QueueBadge.displayName = "QueueBadge";

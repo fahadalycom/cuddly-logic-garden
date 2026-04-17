@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useClipboard } from "@/hooks/useClipboard";
+import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 import { formatCurrency } from "@/lib/template-engine";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { LoadingState } from "@/components/shared/PageStates";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { ShoppingCart, User, Package, Receipt, Copy, ArrowRight } from "lucide-react";
+import { ShoppingCart, User, Package, Receipt, Copy, ArrowRight, Loader2 } from "lucide-react";
 import type { Product, ProductVariant, ProductDuration } from "@/types/database";
 
 export default function NewOrderPage() {
@@ -27,6 +28,7 @@ export default function NewOrderPage() {
   const { user } = useAuth();
   const { copy } = useClipboard();
   const navigate = useNavigate();
+  const { submitting, run } = useSubmitGuard();
 
   useEffect(() => {
     supabase.from("products").select("*, product_variants(*), product_durations(*)").eq("is_active", true).then(({ data }) => {
@@ -60,26 +62,62 @@ export default function NewOrderPage() {
     copy(lines, "Pre-invoice");
   };
 
-  const createOrder = async () => {
-    if (!product || !clientName || !clientPhone) { toast.error("Please fill all required fields"); return; }
-    let { data: client } = await supabase.from("clients").select("id").eq("phone", clientPhone).single();
-    if (!client) {
-      const { data: newClient, error } = await supabase.from("clients").insert({ name: clientName, phone: clientPhone, whatsapp_number: clientPhone }).select("id").single();
-      if (error) { toast.error(error.message); return; }
-      client = newClient;
+  const createOrder = () => run(async () => {
+    if (!product || !clientName.trim() || !clientPhone.trim()) {
+      toast.error("Please fill all required fields");
+      return;
     }
+    if (lineTotal < 0) {
+      toast.error("Discount cannot exceed price");
+      return;
+    }
+    // Use maybeSingle to avoid throwing when phone doesn't exist yet
+    const { data: existing, error: lookupErr } = await supabase
+      .from("clients").select("id").eq("phone", clientPhone.trim()).maybeSingle();
+    if (lookupErr) { toast.error(lookupErr.message); return; }
+
+    let clientId = existing?.id;
+    if (!clientId) {
+      const { data: newClient, error } = await supabase.from("clients").insert({
+        name: clientName.trim(), phone: clientPhone.trim(), whatsapp_number: clientPhone.trim(),
+      }).select("id").single();
+      if (error) { toast.error(error.message); return; }
+      clientId = newClient.id;
+    }
+
     const { data: order, error: orderErr } = await supabase.from("orders").insert({
-      client_id: client!.id, created_by: user!.id, status: "pending_payment", total_amount: lineTotal, discount_amount: effectiveDiscount, remaining_due: lineTotal, notes,
+      client_id: clientId,
+      created_by: user!.id,
+      status: "pending_payment",
+      total_amount: lineTotal,
+      discount_amount: effectiveDiscount,
+      remaining_due: lineTotal,
+      notes: notes.trim() || null,
     }).select("id").single();
     if (orderErr) { toast.error(orderErr.message); return; }
-    await supabase.from("order_items").insert({
-      order_id: order!.id, product_id: product.id, variant_id: variant?.id || null, duration_type: duration?.duration_type || null, duration_value: duration?.duration_value || 1, unit_price: unitPrice, discount: effectiveDiscount, line_total: lineTotal,
+
+    const { error: itemErr } = await supabase.from("order_items").insert({
+      order_id: order.id,
+      product_id: product.id,
+      variant_id: variant?.id || null,
+      duration_type: duration?.duration_type || null,
+      duration_value: duration?.duration_value || 1,
+      unit_price: unitPrice,
+      discount: effectiveDiscount,
+      line_total: lineTotal,
     });
-    await supabase.from("order_status_history").insert({ order_id: order!.id, to_status: "pending_payment", changed_by: user!.id });
+    if (itemErr) {
+      toast.error(`Order created but item failed: ${itemErr.message}`);
+      return;
+    }
+
+    await supabase.from("order_status_history").insert({
+      order_id: order.id, to_status: "pending_payment", changed_by: user!.id,
+    });
     toast.success("Order created!");
     generatePreInvoice();
     navigate("/orders");
-  };
+  });
 
   if (loading) return <LoadingState />;
 
@@ -178,8 +216,16 @@ export default function NewOrderPage() {
         <Button onClick={generatePreInvoice} variant="outline" disabled={!product} className="flex-1 rounded-xl border-border/20 bg-card/40 hover:bg-card/60 h-11">
           <Copy className="h-4 w-4 mr-2" /> Copy Pre-Invoice
         </Button>
-        <Button onClick={createOrder} disabled={!product || !clientName || !clientPhone} className="flex-1 rounded-xl gradient-primary text-white border-0 h-11 shadow-lg shadow-primary/20">
-          Create Order <ArrowRight className="h-4 w-4 ml-2" />
+        <Button
+          onClick={createOrder}
+          disabled={!product || !clientName.trim() || !clientPhone.trim() || submitting}
+          className="flex-1 rounded-xl gradient-primary text-white border-0 h-11 shadow-lg shadow-primary/20"
+        >
+          {submitting ? (
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Creating…</>
+          ) : (
+            <>Create Order <ArrowRight className="h-4 w-4 ml-2" /></>
+          )}
         </Button>
       </div>
     </div>

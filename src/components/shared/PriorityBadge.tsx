@@ -1,4 +1,6 @@
+import { forwardRef } from "react";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 type Priority = "low" | "medium" | "high" | "urgent";
 
@@ -9,11 +11,19 @@ const map: Record<Priority, { label: string; className: string }> = {
   urgent: { label: "Urgent", className: "bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse" },
 };
 
-export function PriorityBadge({ priority }: { priority: Priority }) {
+export const PriorityBadge = forwardRef<
+  HTMLDivElement,
+  { priority: Priority; className?: string }
+>(({ priority, className }, ref) => {
   const c = map[priority] || map.medium;
   return (
-    <Badge variant="outline" className={`${c.className} text-[11px] font-medium border px-2.5 py-0.5 rounded-lg`}>
+    <Badge
+      ref={ref}
+      variant="outline"
+      className={cn(c.className, "text-[11px] font-medium border px-2.5 py-0.5 rounded-lg", className)}
+    >
       {c.label}
     </Badge>
   );
-}
+});
+PriorityBadge.displayName = "PriorityBadge";
