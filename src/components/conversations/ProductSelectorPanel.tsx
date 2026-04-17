@@ -466,6 +466,207 @@ export function ProductSelectorPanel({
     clearAll();
   }
 
+  // ===== Order =====
+  function buildOrderPreviewData(
+    orderNumber: string,
+    status: OrderStatusVal,
+    paymentStatus: PaymentStatusVal,
+    fulfillmentStatus: FulfillmentStatusVal,
+    createdAt: string,
+  ): OrderPreviewData {
+    return {
+      orderNumber,
+      status,
+      paymentStatus,
+      fulfillmentStatus,
+      customerName: customerName || "Customer",
+      customerPhone,
+      customerEmail,
+      conversationLabel: conversationId ? `Chat #${conversationId.slice(0, 6)}` : null,
+      invoiceNumber: savedInvoice?.invoiceNumber ?? null,
+      items: lineItems.map((it) => ({
+        name: it.name,
+        meta: it.meta,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        lineTotal: it.lineTotal,
+      })),
+      subtotal,
+      discountLabel:
+        discountAmount > 0 ? (discountMode === "percent" ? `${discountValue}%` : "fixed") : null,
+      discountAmount,
+      finalTotal,
+      notes: orderNotes || null,
+      currency: "PKR",
+      createdAt,
+    };
+  }
+
+  function buildOrderMessage(data: OrderPreviewData): string {
+    const lines: string[] = [
+      "Your order has been created ✅",
+      "",
+      `Order No: ${data.orderNumber}`,
+      `Status: ${data.status.replace(/_/g, " ")}`,
+      "",
+      "Items:",
+    ];
+    data.items.forEach((it) => {
+      const qty = it.quantity > 1 ? ` ×${it.quantity}` : "";
+      lines.push(`• ${it.name}${qty}: ${formatCurrency(it.lineTotal)}`);
+    });
+    lines.push("");
+    lines.push(`Subtotal: ${formatCurrency(data.subtotal)}`);
+    if (data.discountAmount > 0) {
+      const dl = data.discountLabel ? ` (${data.discountLabel})` : "";
+      lines.push(`Discount${dl}: -${formatCurrency(data.discountAmount)}`);
+    }
+    lines.push(`*Total: ${formatCurrency(data.finalTotal)} ${data.currency ?? "PKR"}*`);
+    lines.push("");
+    lines.push("We'll keep you posted on the next step 👍");
+    return lines.join("\n");
+  }
+
+  async function handleOpenOrder() {
+    if (lineItems.length === 0) return;
+    setStep("order");
+    if (!savedOrder) await saveOrder("draft", "unpaid", "not_started");
+  }
+
+  async function saveOrder(
+    status: OrderStatusVal,
+    paymentStatus: PaymentStatusVal,
+    fulfillmentStatus: FulfillmentStatusVal,
+  ) {
+    if (savingOrder) return; // Prevent duplicate clicks
+    setSavingOrder(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
+      if (!userId) {
+        toast({ title: "Sign in required", description: "Please sign in to create orders.", variant: "destructive" });
+        return;
+      }
+      if (!clientId) {
+        toast({ title: "Customer required", description: "This conversation isn't linked to a client yet.", variant: "destructive" });
+        return;
+      }
+
+      const payload: any = {
+        client_id: clientId,
+        conversation_id: conversationId,
+        invoice_id: savedInvoiceId,
+        created_by: userId,
+        status,
+        payment_status: paymentStatus,
+        fulfillment_status: fulfillmentStatus,
+        total_amount: finalTotal,
+        discount_type: discountMode,
+        discount_value: discountValue,
+        discount_amount: discountAmount,
+        paid_amount: paymentStatus === "paid" ? finalTotal : 0,
+        remaining_due: paymentStatus === "paid" ? 0 : finalTotal,
+        notes: orderNotes || null,
+      };
+
+      let orderId = savedOrderId;
+      let orderNumber: string;
+      let createdAt: string;
+
+      if (orderId) {
+        const { data, error } = await (supabase as any)
+          .from("orders")
+          .update(payload)
+          .eq("id", orderId)
+          .select("id, order_number, created_at")
+          .single();
+        if (error) throw error;
+        orderNumber = data.order_number;
+        createdAt = data.created_at;
+      } else {
+        const { data, error } = await (supabase as any)
+          .from("orders")
+          .insert(payload)
+          .select("id, order_number, created_at")
+          .single();
+        if (error) throw error;
+        orderId = data.id as string;
+        orderNumber = data.order_number as string;
+        createdAt = data.created_at as string;
+
+        // Insert order item snapshots only on first save
+        const itemPayloads: any[] = [];
+        Object.values(selected).forEach((sel) => {
+          const p = products.find((x) => x.id === sel.productId);
+          if (!p) return;
+          const plan = p.plans?.find((pl) => pl.id === sel.planId);
+          const baseUnit = plan ? Number(plan.price) : Number(p.base_price);
+          const unit = sel.priceOverride != null ? Number(sel.priceOverride) : baseUnit;
+          itemPayloads.push({
+            order_id: orderId,
+            product_id: p.id,
+            plan_id: plan?.id ?? null,
+            product_name: p.name,
+            plan_name: plan?.name ?? null,
+            quantity: sel.quantity,
+            unit_price: unit,
+            line_total: unit * sel.quantity,
+          });
+        });
+        selectedBundles.forEach((bid) => {
+          const b = bundles.find((x) => x.id === bid);
+          if (!b) return;
+          const baseUnit = b.bundle_price ?? b.bundle_items?.reduce((s, it) => s + (Number(it.product?.base_price) || 0) * (it.quantity || 1), 0) ?? 0;
+          const unit = bundlePriceOverride[bid] != null ? bundlePriceOverride[bid] : Number(baseUnit);
+          const qty = bundleQty[bid] ?? 1;
+          // Bundles are synthesized as a line item using the first bundled product as anchor
+          const anchor = b.bundle_items?.[0]?.product;
+          if (!anchor) return;
+          itemPayloads.push({
+            order_id: orderId,
+            product_id: anchor.id,
+            plan_id: null,
+            product_name: b.name,
+            plan_name: "Bundle",
+            quantity: qty,
+            unit_price: unit,
+            line_total: unit * qty,
+          });
+        });
+        if (itemPayloads.length > 0) {
+          const { error: itemsError } = await (supabase as any).from("order_items").insert(itemPayloads);
+          if (itemsError) throw itemsError;
+        }
+
+        // Status history entry
+        await (supabase as any).from("order_status_history").insert({
+          order_id: orderId,
+          from_status: null,
+          to_status: status,
+          changed_by: userId,
+          notes: "Order created from chat",
+        });
+      }
+
+      setSavedOrderId(orderId);
+      setSavedOrder(buildOrderPreviewData(orderNumber, status, paymentStatus, fulfillmentStatus, createdAt));
+      toast({ title: `Order ${orderNumber} saved`, description: status.replace(/_/g, " ") });
+    } catch (err: any) {
+      console.error("[order]", err);
+      toast({ title: "Failed to save order", description: err?.message ?? "Unknown error", variant: "destructive" });
+    } finally {
+      setSavingOrder(false);
+    }
+  }
+
+  function handleSendOrderToChat() {
+    if (!savedOrder) return;
+    const msg = buildOrderMessage(savedOrder);
+    onInsert(msg);
+    onOpenChange(false);
+    clearAll();
+  }
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl p-0 flex flex-col">
