@@ -41,7 +41,7 @@ export function RelatedTasks({ relatedType, relatedId, defaultDepartment, defaul
 
   async function handleComplete(t: Task) {
     try {
-      await setTaskStatus(t.id, "completed");
+      await setTaskStatus(t.id, "done");
       toast.success("Task completed");
       load();
     } catch (e: any) {
@@ -90,7 +90,7 @@ export function RelatedTasks({ relatedType, relatedId, defaultDepartment, defaul
                     )}
                   </div>
                 </div>
-                {t.status !== "completed" && (
+                {t.status !== "done" && (
                   <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]"
                           onClick={(e) => { e.stopPropagation(); handleComplete(t); }}>
                     Done

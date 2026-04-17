@@ -86,7 +86,7 @@ export default function TasksPage() {
         <StatPill label="Total" value={tasks.length} />
         <StatPill label="Pending" value={tasks.filter((t) => t.status === "pending").length} />
         <StatPill label="In Progress" value={tasks.filter((t) => t.status === "in_progress").length} />
-        <StatPill label="Completed" value={tasks.filter((t) => t.status === "completed").length} accent="emerald" />
+        <StatPill label="Done" value={tasks.filter((t) => t.status === "done").length} accent="emerald" />
         <StatPill label="Overdue" value={overdueCount} accent="rose" />
       </div>
 

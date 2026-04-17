@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type TaskStatus = "pending" | "in_progress" | "waiting" | "completed" | "cancelled" | "overdue";
+export type TaskStatus = "pending" | "in_progress" | "waiting" | "done" | "cancelled" | "overdue";
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 export type TaskDepartment = "sales" | "support" | "payments" | "fulfillment" | "renewals" | "operations" | "general";
 export type TaskRelatedType = "conversation" | "order" | "ticket" | "payment" | "renewal" | "account" | "lead" | "general";
@@ -35,7 +35,7 @@ export interface TaskActivity {
   created_at: string;
 }
 
-export const TASK_STATUSES: TaskStatus[] = ["pending", "in_progress", "waiting", "completed", "cancelled", "overdue"];
+export const TASK_STATUSES: TaskStatus[] = ["pending", "in_progress", "waiting", "done", "cancelled", "overdue"];
 export const TASK_PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
 export const TASK_DEPARTMENTS: TaskDepartment[] = ["sales", "support", "payments", "fulfillment", "renewals", "operations", "general"];
 export const TASK_RELATED_TYPES: TaskRelatedType[] = ["conversation", "order", "ticket", "payment", "renewal", "account", "lead", "general"];
@@ -44,7 +44,7 @@ export const STATUS_STYLE: Record<TaskStatus, string> = {
   pending: "bg-muted/40 text-muted-foreground border-border/40",
   in_progress: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   waiting: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  completed: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  done: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   cancelled: "bg-rose-500/10 text-rose-400 border-rose-500/20",
   overdue: "bg-rose-600/15 text-rose-300 border-rose-500/30 animate-pulse",
 };
@@ -81,7 +81,7 @@ export const TASK_TEMPLATES: { key: string; title: string; department: TaskDepar
 // Mark overdue tasks (run client-side filter; trigger fires server-side periodically)
 export function isOverdue(t: Pick<Task, "due_date" | "status">): boolean {
   if (!t.due_date) return false;
-  if (["completed", "cancelled"].includes(t.status)) return false;
+  if (["done", "cancelled"].includes(t.status)) return false;
   return new Date(t.due_date).getTime() < Date.now();
 }
 
