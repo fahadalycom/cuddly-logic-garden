@@ -264,6 +264,199 @@ export function ProductSelectorPanel({
     onOpenChange(false);
   }
 
+  // ===== Invoice =====
+  function buildInvoicePreviewData(invoiceNumber: string, status: InvoicePreviewData["status"]): InvoicePreviewData {
+    return {
+      invoiceNumber,
+      status,
+      issueDate: new Date().toISOString(),
+      customerName: customerName || "Customer",
+      customerPhone,
+      customerEmail,
+      items: lineItems.map((it) => ({
+        name: it.name,
+        meta: it.meta,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        lineTotal: it.lineTotal,
+      })),
+      subtotal,
+      discountLabel:
+        discountAmount > 0
+          ? discountMode === "percent"
+            ? `${discountValue}%`
+            : "fixed"
+          : null,
+      discountAmount,
+      finalTotal,
+      notes: invoiceNotes || null,
+      currency: "PKR",
+    };
+  }
+
+  function buildInvoiceMessage(data: InvoicePreviewData): string {
+    const lines: string[] = [
+      "Your invoice is ready 📄",
+      "",
+      `Invoice No: ${data.invoiceNumber}`,
+      `Date: ${new Date(data.issueDate).toLocaleDateString()}`,
+      "",
+      "Items:",
+    ];
+    data.items.forEach((it) => {
+      const qty = it.quantity > 1 ? ` ×${it.quantity}` : "";
+      lines.push(`• ${it.name}${qty}: ${formatCurrency(it.lineTotal)}`);
+    });
+    lines.push("");
+    lines.push(`Subtotal: ${formatCurrency(data.subtotal)}`);
+    if (data.discountAmount > 0) {
+      const dl = data.discountLabel ? ` (${data.discountLabel})` : "";
+      lines.push(`Discount${dl}: -${formatCurrency(data.discountAmount)}`);
+    }
+    lines.push(`*Final Total: ${formatCurrency(data.finalTotal)} ${data.currency ?? "PKR"}*`);
+    if (data.notes) {
+      lines.push("");
+      lines.push(`Notes: ${data.notes}`);
+    }
+    lines.push("");
+    lines.push("Please review and confirm to proceed 👍");
+    return lines.join("\n");
+  }
+
+  async function handleGenerateInvoice() {
+    if (lineItems.length === 0) return;
+    setStep("invoice");
+    if (savedInvoice) return; // already generated
+    await saveInvoice("draft");
+  }
+
+  async function saveInvoice(status: InvoicePreviewData["status"]) {
+    setSavingInvoice(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
+      if (!userId) {
+        toast({ title: "Sign in required", description: "Please sign in to save invoices.", variant: "destructive" });
+        return;
+      }
+
+      const insertPayload: any = {
+        conversation_id: conversationId,
+        client_id: clientId,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        customer_email: customerEmail,
+        created_by: userId,
+        status,
+        subtotal,
+        discount_type: discountMode,
+        discount_value: discountValue,
+        discount_amount: discountAmount,
+        final_total: finalTotal,
+        notes: invoiceNotes || null,
+        currency: "PKR",
+        sent_at: status === "sent" ? new Date().toISOString() : null,
+        paid_at: status === "paid" ? new Date().toISOString() : null,
+      };
+
+      let invoiceId = savedInvoiceId;
+      let invoiceNumber: string;
+
+      if (invoiceId) {
+        const { data, error } = await (supabase as any)
+          .from("invoices")
+          .update(insertPayload)
+          .eq("id", invoiceId)
+          .select("id, invoice_number")
+          .single();
+        if (error) throw error;
+        invoiceNumber = data.invoice_number;
+      } else {
+        const { data, error } = await (supabase as any)
+          .from("invoices")
+          .insert(insertPayload)
+          .select("id, invoice_number")
+          .single();
+        if (error) throw error;
+        invoiceId = data.id as string;
+        invoiceNumber = data.invoice_number as string;
+
+        // Insert items only on first save
+        const itemPayloads: any[] = [];
+        Object.values(selected).forEach((sel, idx) => {
+          const p = products.find((x) => x.id === sel.productId);
+          if (!p) return;
+          const plan = p.plans?.find((pl) => pl.id === sel.planId);
+          const baseUnit = plan ? Number(plan.price) : Number(p.base_price);
+          const unit = sel.priceOverride != null ? Number(sel.priceOverride) : baseUnit;
+          itemPayloads.push({
+            invoice_id: invoiceId,
+            product_id: p.id,
+            plan_id: plan?.id ?? null,
+            product_name: p.name,
+            plan_name: plan?.name ?? null,
+            quantity: sel.quantity,
+            unit_price: unit,
+            line_total: unit * sel.quantity,
+            sort_order: idx,
+          });
+        });
+        let bIdx = itemPayloads.length;
+        selectedBundles.forEach((bid) => {
+          const b = bundles.find((x) => x.id === bid);
+          if (!b) return;
+          const baseUnit = b.bundle_price ?? b.bundle_items?.reduce((s, it) => s + (Number(it.product?.base_price) || 0) * (it.quantity || 1), 0) ?? 0;
+          const unit = bundlePriceOverride[bid] != null ? bundlePriceOverride[bid] : Number(baseUnit);
+          const qty = bundleQty[bid] ?? 1;
+          itemPayloads.push({
+            invoice_id: invoiceId,
+            bundle_id: b.id,
+            product_name: b.name,
+            plan_name: "Bundle",
+            quantity: qty,
+            unit_price: unit,
+            line_total: unit * qty,
+            sort_order: bIdx++,
+          });
+        });
+        if (itemPayloads.length > 0) {
+          const { error: itemsError } = await (supabase as any).from("invoice_items").insert(itemPayloads);
+          if (itemsError) throw itemsError;
+        }
+      }
+
+      setSavedInvoiceId(invoiceId);
+      const preview = buildInvoicePreviewData(invoiceNumber, status);
+      setSavedInvoice(preview);
+      toast({
+        title: status === "draft" ? "Invoice saved as draft" : `Invoice marked as ${status}`,
+        description: invoiceNumber,
+      });
+    } catch (err: any) {
+      console.error("[invoice]", err);
+      toast({ title: "Failed to save invoice", description: err?.message ?? "Unknown error", variant: "destructive" });
+    } finally {
+      setSavingInvoice(false);
+    }
+  }
+
+  function handleCopyInvoice() {
+    if (!savedInvoice) return;
+    const msg = buildInvoiceMessage(savedInvoice);
+    navigator.clipboard.writeText(msg);
+    toast({ title: "Invoice summary copied" });
+  }
+
+  function handleSendInvoiceToChat() {
+    if (!savedInvoice) return;
+    const msg = buildInvoiceMessage(savedInvoice);
+    onInsert(msg);
+    // Mark sent if currently draft
+    if (savedInvoice.status === "draft") void saveInvoice("sent");
+    onOpenChange(false);
+    clearAll();
+  }
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl p-0 flex flex-col">
