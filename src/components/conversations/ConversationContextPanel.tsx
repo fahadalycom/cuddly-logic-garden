@@ -30,6 +30,24 @@ const INVOICE_STATUS_STYLE: Record<LatestInvoice["status"], string> = {
 };
 
 export function ConversationContextPanel({ conversation, onClose }: Props) {
+  const [latestInvoice, setLatestInvoice] = useState<LatestInvoice | null>(null);
+
+  useEffect(() => {
+    if (!conversation?.id) { setLatestInvoice(null); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("invoices")
+        .select("id, invoice_number, status, final_total, currency, created_at")
+        .eq("conversation_id", conversation.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled) setLatestInvoice((data as LatestInvoice) ?? null);
+    })();
+    return () => { cancelled = true; };
+  }, [conversation?.id]);
+
   if (!conversation) return null;
   const ctx = conversation.context;
 
