@@ -45,7 +45,10 @@ export interface MockConversation {
   status: ConvStatus;
   priority: ConvPriority;
   assignedAgent: string | null;
-  assignmentType?: "auto" | "manual" | "sticky" | "overflow";
+  assignmentType?: "auto" | "manual" | "sticky" | "overflow" | "failover" | "escalation";
+  reassignmentCount?: number;
+  previousAgent?: string | null;
+  autoSummary?: string;
   lastMessage: string;
   lastTime: string;
   unread: number;
