@@ -142,6 +142,38 @@ export function ConversationContextPanel({ conversation, onClose }: Props) {
             )}
           </Section>
 
+          {/* Latest order */}
+          <Section title="Latest Order" icon={ShoppingCart}>
+            {!latestOrder ? (
+              <Empty text="No orders yet" />
+            ) : (
+              <div className="rounded-md border border-border/30 bg-background/30 p-2 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-mono font-semibold">{latestOrder.order_number}</span>
+                  <Badge variant="outline" className={cn("text-[10px] capitalize", ORDER_STATUS_STYLE[latestOrder.status] ?? ORDER_STATUS_STYLE.draft)}>
+                    {latestOrder.status.replace(/_/g, " ")}
+                  </Badge>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <Badge variant="outline" className="text-[9px] capitalize border-border/40">
+                    Pay: {latestOrder.payment_status.replace(/_/g, " ")}
+                  </Badge>
+                  <Badge variant="outline" className="text-[9px] capitalize border-border/40">
+                    Fulfill: {latestOrder.fulfillment_status.replace(/_/g, " ")}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground">
+                    {new Date(latestOrder.created_at).toLocaleDateString()}
+                  </span>
+                  <span className="text-xs font-semibold">
+                    {formatCurrency(Number(latestOrder.total_amount))} PKR
+                  </span>
+                </div>
+              </div>
+            )}
+          </Section>
+
           <Section title="Recent Orders" icon={Package} count={ctx.recentOrders.length}>
             {ctx.recentOrders.length === 0 ? (
               <Empty text="No orders yet" />
