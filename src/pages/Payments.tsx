@@ -55,7 +55,7 @@ export default function PaymentsPage() {
 
       const { error: updErr } = await supabase.from("orders").update({
         status: nextStatus,
-        payment_status: fullyPaid ? "paid" : "partially_paid",
+        payment_status: fullyPaid ? "paid" : "unpaid",
         paid_amount: newPaid,
         remaining_due: newRemaining,
       }).eq("id", order.id);
