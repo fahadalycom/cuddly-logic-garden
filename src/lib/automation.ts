@@ -132,7 +132,7 @@ export function deriveConversationHints(opts: {
 
 // ───────── AI call wrappers ─────────
 
-type AIResp<T> = ({ ok: true } & T) | { ok: false; error: string; status?: number };
+type AIResp<T> = { ok: true; data: T } | { ok: false; error: string; status?: number };
 
 async function invokeAssist<T>(type: string, payload: unknown): Promise<AIResp<T>> {
   const { data, error } = await supabase.functions.invoke("ai-assist", { body: { type, payload } });
@@ -145,7 +145,7 @@ async function invokeAssist<T>(type: string, payload: unknown): Promise<AIResp<T
       : data.error;
     return { ok: false, error: msg, status: data.status };
   }
-  return { ok: true, ...(data as T) };
+  return { ok: true, data: data as T };
 }
 
 export const aiAssist = {
