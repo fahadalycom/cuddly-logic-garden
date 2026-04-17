@@ -1503,19 +1503,63 @@ export type Database = {
         }
         Relationships: []
       }
+      task_activity: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          event_type: string
+          from_value: string | null
+          id: string
+          note: string | null
+          task_id: string
+          to_value: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          event_type: string
+          from_value?: string | null
+          id?: string
+          note?: string | null
+          task_id: string
+          to_value?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          event_type?: string
+          from_value?: string | null
+          id?: string
+          note?: string | null
+          task_id?: string
+          to_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_activity_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           assigned_to: string | null
           completed_at: string | null
           created_at: string
           created_by: string
+          department: Database["public"]["Enums"]["task_department"]
           description: string | null
           due_date: string | null
           id: string
+          internal_note: string | null
           priority: Database["public"]["Enums"]["priority_level"]
           related_id: string | null
           related_type: Database["public"]["Enums"]["task_related_type"]
           status: Database["public"]["Enums"]["task_status"]
+          template_key: string | null
           title: string
           updated_at: string
         }
@@ -1524,13 +1568,16 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           created_by: string
+          department?: Database["public"]["Enums"]["task_department"]
           description?: string | null
           due_date?: string | null
           id?: string
+          internal_note?: string | null
           priority?: Database["public"]["Enums"]["priority_level"]
           related_id?: string | null
           related_type?: Database["public"]["Enums"]["task_related_type"]
           status?: Database["public"]["Enums"]["task_status"]
+          template_key?: string | null
           title: string
           updated_at?: string
         }
@@ -1539,13 +1586,16 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           created_by?: string
+          department?: Database["public"]["Enums"]["task_department"]
           description?: string | null
           due_date?: string | null
           id?: string
+          internal_note?: string | null
           priority?: Database["public"]["Enums"]["priority_level"]
           related_id?: string | null
           related_type?: Database["public"]["Enums"]["task_related_type"]
           status?: Database["public"]["Enums"]["task_status"]
+          template_key?: string | null
           title?: string
           updated_at?: string
         }
@@ -2376,6 +2426,20 @@ export type Database = {
         Args: { _conversation_id: string }
         Returns: Json
       }
+      create_task_auto: {
+        Args: {
+          _created_by?: string
+          _department: string
+          _description: string
+          _due_in_hours?: number
+          _priority?: string
+          _related_id: string
+          _related_type: string
+          _template_key?: string
+          _title: string
+        }
+        Returns: string
+      }
       get_user_roles: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"][]
@@ -2401,6 +2465,8 @@ export type Database = {
         Args: { _agent_id: string; _conversation_id: string; _force?: boolean }
         Returns: Json
       }
+      mark_overdue_tasks: { Args: never; Returns: number }
+      pick_agent_for_department: { Args: { _dept: string }; Returns: string }
       promote_next_from_queue: { Args: { _agent_id: string }; Returns: string }
       reassign_stale_conversations: { Args: never; Returns: Json }
       redistribute_overflow: { Args: never; Returns: Json }
@@ -2513,6 +2579,14 @@ export type Database = {
         | "expired"
         | "renewed"
         | "terminated"
+      task_department:
+        | "sales"
+        | "support"
+        | "payments"
+        | "fulfillment"
+        | "renewals"
+        | "operations"
+        | "general"
       task_related_type:
         | "order"
         | "conversation"
@@ -2520,7 +2594,16 @@ export type Database = {
         | "lead"
         | "subscription"
         | "general"
-      task_status: "pending" | "in_progress" | "done" | "cancelled"
+        | "payment"
+        | "renewal"
+        | "account"
+      task_status:
+        | "pending"
+        | "in_progress"
+        | "done"
+        | "cancelled"
+        | "waiting"
+        | "overdue"
       template_category:
         | "pre_invoice"
         | "payment_confirmation"
@@ -2791,6 +2874,15 @@ export const Constants = {
         "renewed",
         "terminated",
       ],
+      task_department: [
+        "sales",
+        "support",
+        "payments",
+        "fulfillment",
+        "renewals",
+        "operations",
+        "general",
+      ],
       task_related_type: [
         "order",
         "conversation",
@@ -2798,8 +2890,18 @@ export const Constants = {
         "lead",
         "subscription",
         "general",
+        "payment",
+        "renewal",
+        "account",
       ],
-      task_status: ["pending", "in_progress", "done", "cancelled"],
+      task_status: [
+        "pending",
+        "in_progress",
+        "done",
+        "cancelled",
+        "waiting",
+        "overdue",
+      ],
       template_category: [
         "pre_invoice",
         "payment_confirmation",
