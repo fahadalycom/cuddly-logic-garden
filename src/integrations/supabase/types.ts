@@ -2134,6 +2134,45 @@ export type Database = {
           },
         ]
       }
+      wa_handoff_log: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          from_agent_id: string | null
+          from_queue: string | null
+          id: string
+          note: string | null
+          reason: string | null
+          to_agent_id: string | null
+          to_queue: string
+          transferred_by: string | null
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          from_agent_id?: string | null
+          from_queue?: string | null
+          id?: string
+          note?: string | null
+          reason?: string | null
+          to_agent_id?: string | null
+          to_queue: string
+          transferred_by?: string | null
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          from_agent_id?: string | null
+          from_queue?: string | null
+          id?: string
+          note?: string | null
+          reason?: string | null
+          to_agent_id?: string | null
+          to_queue?: string
+          transferred_by?: string | null
+        }
+        Relationships: []
+      }
       wa_internal_notes: {
         Row: {
           author_id: string
@@ -2340,6 +2379,15 @@ export type Database = {
       get_user_roles: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"][]
+      }
+      handoff_conversation: {
+        Args: {
+          _conversation_id: string
+          _note?: string
+          _set_status?: string
+          _to_queue: string
+        }
+        Returns: Json
       }
       has_role: {
         Args: {
