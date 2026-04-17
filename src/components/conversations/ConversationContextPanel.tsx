@@ -89,6 +89,30 @@ export function ConversationContextPanel({ conversation, onClose }: Props) {
           </section>
 
           {/* Recent orders */}
+          {/* Latest invoice */}
+          <Section title="Latest Invoice" icon={FileText}>
+            {!latestInvoice ? (
+              <Empty text="No invoices yet" />
+            ) : (
+              <div className="rounded-md border border-border/30 bg-background/30 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-mono">{latestInvoice.invoice_number}</span>
+                  <Badge variant="outline" className={cn("text-[10px] capitalize", INVOICE_STATUS_STYLE[latestInvoice.status])}>
+                    {latestInvoice.status}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-[10px] text-muted-foreground">
+                    {new Date(latestInvoice.created_at).toLocaleDateString()}
+                  </span>
+                  <span className="text-xs font-semibold">
+                    {formatCurrency(Number(latestInvoice.final_total))} {latestInvoice.currency}
+                  </span>
+                </div>
+              </div>
+            )}
+          </Section>
+
           <Section title="Recent Orders" icon={Package} count={ctx.recentOrders.length}>
             {ctx.recentOrders.length === 0 ? (
               <Empty text="No orders yet" />
