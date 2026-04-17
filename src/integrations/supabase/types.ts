@@ -96,6 +96,55 @@ export type Database = {
         }
         Relationships: []
       }
+      bundle_items: {
+        Row: {
+          bundle_id: string
+          created_at: string
+          id: string
+          plan_id: string | null
+          product_id: string
+          quantity: number
+        }
+        Insert: {
+          bundle_id: string
+          created_at?: string
+          id?: string
+          plan_id?: string | null
+          product_id: string
+          quantity?: number
+        }
+        Update: {
+          bundle_id?: string
+          created_at?: string
+          id?: string
+          plan_id?: string | null
+          product_id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bundle_items_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "product_bundles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bundle_items_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bundle_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_notes: {
         Row: {
           author_id: string
@@ -645,6 +694,42 @@ export type Database = {
           },
         ]
       }
+      product_bundles: {
+        Row: {
+          bundle_price: number | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          bundle_price?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          bundle_price?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       product_durations: {
         Row: {
           created_at: string
@@ -737,12 +822,17 @@ export type Database = {
           created_at: string
           description: string | null
           faq_content: string | null
+          features: string[]
           id: string
           image_url: string | null
           is_active: boolean
           name: string
+          product_type: Database["public"]["Enums"]["product_type"]
+          short_description: string | null
           sort_order: number | null
+          support_notes: string | null
           updated_at: string
+          usage_instructions: string | null
         }
         Insert: {
           base_price?: number
@@ -750,12 +840,17 @@ export type Database = {
           created_at?: string
           description?: string | null
           faq_content?: string | null
+          features?: string[]
           id?: string
           image_url?: string | null
           is_active?: boolean
           name: string
+          product_type?: Database["public"]["Enums"]["product_type"]
+          short_description?: string | null
           sort_order?: number | null
+          support_notes?: string | null
           updated_at?: string
+          usage_instructions?: string | null
         }
         Update: {
           base_price?: number
@@ -763,12 +858,17 @@ export type Database = {
           created_at?: string
           description?: string | null
           faq_content?: string | null
+          features?: string[]
           id?: string
           image_url?: string | null
           is_active?: boolean
           name?: string
+          product_type?: Database["public"]["Enums"]["product_type"]
+          short_description?: string | null
           sort_order?: number | null
+          support_notes?: string | null
           updated_at?: string
+          usage_instructions?: string | null
         }
         Relationships: []
       }
@@ -2051,6 +2151,7 @@ export type Database = {
         | "cancelled"
       payment_status: "pending" | "verified" | "rejected"
       priority_level: "low" | "medium" | "high" | "urgent"
+      product_type: "shared" | "private" | "invite_based" | "custom"
       reminder_response: "pending" | "renewed" | "refused" | "deferred"
       staff_availability: "active" | "on_break" | "offline" | "inactive"
       subscription_status:
@@ -2286,6 +2387,7 @@ export const Constants = {
       ],
       payment_status: ["pending", "verified", "rejected"],
       priority_level: ["low", "medium", "high", "urgent"],
+      product_type: ["shared", "private", "invite_based", "custom"],
       reminder_response: ["pending", "renewed", "refused", "deferred"],
       staff_availability: ["active", "on_break", "offline", "inactive"],
       subscription_status: [
