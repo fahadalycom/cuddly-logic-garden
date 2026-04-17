@@ -92,15 +92,18 @@ export default function VendorsPage() {
       <PageHeader
         title="Vendors & Deals"
         description="Sourcing pipeline for vendors, coupons, and partnership deals."
-        icon={Handshake}
-      >
-        <Button variant="outline" onClick={() => { setEditVendor(null); setVendorOpen(true); }}>
-          <Building2 className="mr-2 h-4 w-4" /> New vendor
-        </Button>
-        <Button onClick={() => { setEditDeal(null); setPrefillVendorId(undefined); setDealOpen(true); }} disabled={vendors.length === 0}>
-          <Plus className="mr-2 h-4 w-4" /> New deal
-        </Button>
-      </PageHeader>
+        icon={<Handshake className="h-5 w-5 text-primary-foreground" />}
+        actions={
+          <>
+            <Button variant="outline" onClick={() => { setEditVendor(null); setVendorOpen(true); }}>
+              <Building2 className="mr-2 h-4 w-4" /> New vendor
+            </Button>
+            <Button onClick={() => { setEditDeal(null); setPrefillVendorId(undefined); setDealOpen(true); }} disabled={vendors.length === 0}>
+              <Plus className="mr-2 h-4 w-4" /> New deal
+            </Button>
+          </>
+        }
+      />
 
       {/* Stat widgets */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-6">
