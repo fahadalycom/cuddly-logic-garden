@@ -96,6 +96,75 @@ export type Database = {
         }
         Relationships: []
       }
+      automation_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          result: string
+          rule_key: string
+          source: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          result?: string
+          rule_key: string
+          source?: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          result?: string
+          rule_key?: string
+          source?: string
+        }
+        Relationships: []
+      }
+      automation_settings: {
+        Row: {
+          category: string
+          description: string | null
+          enabled: boolean
+          id: string
+          key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       bundle_items: {
         Row: {
           bundle_id: string
@@ -2603,6 +2672,7 @@ export type Database = {
         Args: { _conversation_id: string }
         Returns: Json
       }
+      automation_enabled: { Args: { _key: string }; Returns: boolean }
       create_task_auto: {
         Args: {
           _created_by?: string
@@ -2638,6 +2708,18 @@ export type Database = {
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      log_automation: {
+        Args: {
+          _action: string
+          _details?: Json
+          _entity_id: string
+          _entity_type: string
+          _result?: string
+          _rule_key: string
+          _source?: string
+        }
+        Returns: undefined
+      }
       manual_assign_conversation: {
         Args: { _agent_id: string; _conversation_id: string; _force?: boolean }
         Returns: Json
@@ -2655,6 +2737,11 @@ export type Database = {
         Args: { _queue: string }
         Returns: Database["public"]["Enums"]["app_role"][]
       }
+      scan_expiring_subscriptions: {
+        Args: { _days_ahead?: number }
+        Returns: Json
+      }
+      scan_overdue_vendor_followups: { Args: never; Returns: Json }
     }
     Enums: {
       account_status: "available" | "assigned" | "exhausted" | "expired"
