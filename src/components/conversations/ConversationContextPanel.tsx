@@ -6,6 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/template-engine";
 import { cn } from "@/lib/utils";
+import { TicketDialog } from "@/components/support/TicketDialog";
+import {
+  STATUS_STYLE as TICKET_STATUS_STYLE, PRIORITY_STYLE as TICKET_PRIORITY_STYLE,
+  TICKET_STATUSES, labelFor,
+  type TicketStatus, type TicketPriority,
+} from "@/lib/support-tickets";
 import type { MockConversation } from "@/lib/conversations-mock";
 
 interface Props {
@@ -48,33 +54,44 @@ const ORDER_STATUS_STYLE: Record<string, string> = {
   cancelled: "bg-rose-500/10 text-rose-400 border-rose-500/20",
 };
 
+interface OpenTicket {
+  id: string;
+  ticket_number: string | null;
+  status: TicketStatus;
+  priority: TicketPriority;
+  summary: string | null;
+}
+
 export function ConversationContextPanel({ conversation, onClose }: Props) {
   const [latestInvoice, setLatestInvoice] = useState<LatestInvoice | null>(null);
   const [latestOrder, setLatestOrder] = useState<LatestOrder | null>(null);
+  const [openTickets, setOpenTickets] = useState<OpenTicket[]>([]);
+  const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
+
+  const loadAll = async (convId: string) => {
+    const [invRes, ordRes, tixRes] = await Promise.all([
+      (supabase as any).from("invoices")
+        .select("id, invoice_number, status, final_total, currency, created_at")
+        .eq("conversation_id", convId)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      (supabase as any).from("orders")
+        .select("id, order_number, status, payment_status, fulfillment_status, total_amount, created_at")
+        .eq("conversation_id", convId)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      (supabase as any).from("support_issues")
+        .select("id, ticket_number, status, priority, summary")
+        .eq("conversation_id", convId)
+        .neq("status", "closed")
+        .order("created_at", { ascending: false }).limit(5),
+    ]);
+    setLatestInvoice((invRes.data as LatestInvoice) ?? null);
+    setLatestOrder((ordRes.data as LatestOrder) ?? null);
+    setOpenTickets((tixRes.data as OpenTicket[]) ?? []);
+  };
 
   useEffect(() => {
-    if (!conversation?.id) { setLatestInvoice(null); setLatestOrder(null); return; }
-    let cancelled = false;
-    (async () => {
-      const [invRes, ordRes] = await Promise.all([
-        (supabase as any).from("invoices")
-          .select("id, invoice_number, status, final_total, currency, created_at")
-          .eq("conversation_id", conversation.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        (supabase as any).from("orders")
-          .select("id, order_number, status, payment_status, fulfillment_status, total_amount, created_at")
-          .eq("conversation_id", conversation.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ]);
-      if (cancelled) return;
-      setLatestInvoice((invRes.data as LatestInvoice) ?? null);
-      setLatestOrder((ordRes.data as LatestOrder) ?? null);
-    })();
-    return () => { cancelled = true; };
+    if (!conversation?.id) { setLatestInvoice(null); setLatestOrder(null); setOpenTickets([]); return; }
+    loadAll(conversation.id);
   }, [conversation?.id]);
 
   if (!conversation) return null;
@@ -232,19 +249,28 @@ export function ConversationContextPanel({ conversation, onClose }: Props) {
             </div>
           </Section>
 
-          {/* Open tickets */}
-          <Section title="Open Tickets" icon={Ticket} count={ctx.openTickets.length}>
-            {ctx.openTickets.length === 0 ? (
+          {/* Open tickets (real) */}
+          <Section title="Open Tickets" icon={Ticket} count={openTickets.length}>
+            {openTickets.length === 0 ? (
               <Empty text="No open tickets" />
             ) : (
               <ul className="space-y-1.5">
-                {ctx.openTickets.map((t) => (
-                  <li key={t.id} className="rounded-md border border-border/30 bg-background/30 p-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono text-muted-foreground">{t.id}</span>
-                      <Badge variant="outline" className="text-[10px] capitalize">{t.priority}</Badge>
+                {openTickets.map((t) => (
+                  <li
+                    key={t.id}
+                    className="rounded-md border border-border/30 bg-background/30 p-2 cursor-pointer hover:bg-background/50 transition-colors"
+                    onClick={() => setActiveTicketId(t.id)}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-mono text-muted-foreground">{t.ticket_number ?? t.id.slice(0, 8)}</span>
+                      <div className="flex gap-1">
+                        <Badge variant="outline" className={cn("text-[9px] capitalize", TICKET_PRIORITY_STYLE[t.priority])}>{t.priority}</Badge>
+                        <Badge variant="outline" className={cn("text-[9px] capitalize", TICKET_STATUS_STYLE[t.status])}>
+                          {labelFor(TICKET_STATUSES, t.status)}
+                        </Badge>
+                      </div>
                     </div>
-                    <p className="text-xs text-foreground mt-0.5">{t.subject}</p>
+                    {t.summary && <p className="text-xs text-foreground mt-0.5 truncate">{t.summary}</p>}
                   </li>
                 ))}
               </ul>
@@ -257,6 +283,13 @@ export function ConversationContextPanel({ conversation, onClose }: Props) {
           </Section>
         </div>
       </ScrollArea>
+
+      <TicketDialog
+        open={!!activeTicketId}
+        onOpenChange={(o) => { if (!o) setActiveTicketId(null); }}
+        ticketId={activeTicketId}
+        onSaved={() => conversation?.id && loadAll(conversation.id)}
+      />
     </aside>
   );
 }

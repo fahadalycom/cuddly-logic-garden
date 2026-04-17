@@ -1371,14 +1371,22 @@ export type Database = {
           account_id: string | null
           assigned_to: string | null
           client_id: string
+          closed_at: string | null
           conversation_id: string | null
           created_at: string
+          created_by: string | null
           description: string
           id: string
+          internal_notes: string | null
+          issue_type_v2: Database["public"]["Enums"]["issue_type"]
+          order_id: string | null
           order_item_id: string | null
           priority: Database["public"]["Enums"]["priority_level"]
           resolution_notes: string | null
+          resolved_at: string | null
           status: Database["public"]["Enums"]["issue_status"]
+          summary: string | null
+          ticket_number: string | null
           type: string
           updated_at: string
         }
@@ -1386,14 +1394,22 @@ export type Database = {
           account_id?: string | null
           assigned_to?: string | null
           client_id: string
+          closed_at?: string | null
           conversation_id?: string | null
           created_at?: string
+          created_by?: string | null
           description: string
           id?: string
+          internal_notes?: string | null
+          issue_type_v2?: Database["public"]["Enums"]["issue_type"]
+          order_id?: string | null
           order_item_id?: string | null
           priority?: Database["public"]["Enums"]["priority_level"]
           resolution_notes?: string | null
+          resolved_at?: string | null
           status?: Database["public"]["Enums"]["issue_status"]
+          summary?: string | null
+          ticket_number?: string | null
           type?: string
           updated_at?: string
         }
@@ -1401,14 +1417,22 @@ export type Database = {
           account_id?: string | null
           assigned_to?: string | null
           client_id?: string
+          closed_at?: string | null
           conversation_id?: string | null
           created_at?: string
+          created_by?: string | null
           description?: string
           id?: string
+          internal_notes?: string | null
+          issue_type_v2?: Database["public"]["Enums"]["issue_type"]
+          order_id?: string | null
           order_item_id?: string | null
           priority?: Database["public"]["Enums"]["priority_level"]
           resolution_notes?: string | null
+          resolved_at?: string | null
           status?: Database["public"]["Enums"]["issue_status"]
+          summary?: string | null
+          ticket_number?: string | null
           type?: string
           updated_at?: string
         }
@@ -1636,6 +1660,47 @@ export type Database = {
             columns: ["subscription_id"]
             isOneToOne: false
             referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_activity: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          event_type: string
+          from_value: string | null
+          id: string
+          note: string | null
+          ticket_id: string
+          to_value: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          event_type: string
+          from_value?: string | null
+          id?: string
+          note?: string | null
+          ticket_id: string
+          to_value?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          event_type?: string
+          from_value?: string | null
+          id?: string
+          note?: string | null
+          ticket_id?: string
+          to_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_activity_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_issues"
             referencedColumns: ["id"]
           },
         ]
@@ -2337,7 +2402,28 @@ export type Database = {
       feedback_type: "review" | "feedback" | "follow_up"
       invoice_discount_type: "none" | "fixed" | "percent"
       invoice_status: "draft" | "sent" | "paid" | "cancelled"
-      issue_status: "open" | "in_review" | "approved" | "resolved" | "rejected"
+      issue_status:
+        | "open"
+        | "in_review"
+        | "approved"
+        | "resolved"
+        | "rejected"
+        | "waiting_customer"
+        | "waiting_internal"
+        | "closed"
+        | "reopened"
+      issue_type:
+        | "login_issue"
+        | "access_issue"
+        | "wrong_plan"
+        | "payment_issue"
+        | "renewal_issue"
+        | "account_problem"
+        | "product_not_working"
+        | "replacement_request"
+        | "refund_request"
+        | "general_support"
+        | "other"
       lead_source:
         | "whatsapp"
         | "facebook"
@@ -2587,7 +2673,30 @@ export const Constants = {
       feedback_type: ["review", "feedback", "follow_up"],
       invoice_discount_type: ["none", "fixed", "percent"],
       invoice_status: ["draft", "sent", "paid", "cancelled"],
-      issue_status: ["open", "in_review", "approved", "resolved", "rejected"],
+      issue_status: [
+        "open",
+        "in_review",
+        "approved",
+        "resolved",
+        "rejected",
+        "waiting_customer",
+        "waiting_internal",
+        "closed",
+        "reopened",
+      ],
+      issue_type: [
+        "login_issue",
+        "access_issue",
+        "wrong_plan",
+        "payment_issue",
+        "renewal_issue",
+        "account_problem",
+        "product_not_working",
+        "replacement_request",
+        "refund_request",
+        "general_support",
+        "other",
+      ],
       lead_source: [
         "whatsapp",
         "facebook",
