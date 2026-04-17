@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, CheckCheck,
+  ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, CheckCheck, RefreshCw, AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -101,6 +101,33 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
           ))}
         </div>
       </div>
+
+      {/* Reassignment / handoff banner */}
+      {((conversation.reassignmentCount ?? 0) > 0 || conversation.autoSummary) && (
+        <div className={cn(
+          "px-3 py-2 border-b text-[11px] flex items-start gap-2",
+          conversation.assignmentType === "escalation"
+            ? "border-destructive/30 bg-destructive/10 text-destructive"
+            : "border-amber-500/20 bg-amber-500/10 text-amber-200",
+        )}>
+          {conversation.assignmentType === "escalation"
+            ? <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            : <RefreshCw className="h-3.5 w-3.5 shrink-0 mt-0.5" />}
+          <div className="flex-1 min-w-0">
+            <p className="font-medium">
+              {conversation.assignmentType === "escalation"
+                ? "Escalated"
+                : `Reassigned ${conversation.reassignmentCount}× — handoff context`}
+              {conversation.previousAgent && (
+                <span className="opacity-70 font-normal"> · was {conversation.previousAgent}</span>
+              )}
+            </p>
+            {conversation.autoSummary && (
+              <p className="opacity-80 mt-0.5">{conversation.autoSummary}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Body */}
       <ScrollArea className="flex-1">

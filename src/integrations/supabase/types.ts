@@ -1689,6 +1689,8 @@ export type Database = {
       wa_conversations: {
         Row: {
           assigned_agent_id: string | null
+          assigned_at: string | null
+          auto_summary: string | null
           channel: Database["public"]["Enums"]["conversation_channel"]
           client_id: string | null
           created_at: string
@@ -1696,16 +1698,22 @@ export type Database = {
           customer_phone: string
           customer_whatsapp_id: string | null
           id: string
+          last_agent_reply_at: string | null
           last_message_at: string | null
           last_message_preview: string | null
+          lock_until: string | null
+          previous_agent_id: string | null
           priority: Database["public"]["Enums"]["priority_level"]
           queue: Database["public"]["Enums"]["conversation_queue"]
+          reassignment_count: number
           status: Database["public"]["Enums"]["wa_conversation_status"]
           unread_count: number
           updated_at: string
         }
         Insert: {
           assigned_agent_id?: string | null
+          assigned_at?: string | null
+          auto_summary?: string | null
           channel?: Database["public"]["Enums"]["conversation_channel"]
           client_id?: string | null
           created_at?: string
@@ -1713,16 +1721,22 @@ export type Database = {
           customer_phone: string
           customer_whatsapp_id?: string | null
           id?: string
+          last_agent_reply_at?: string | null
           last_message_at?: string | null
           last_message_preview?: string | null
+          lock_until?: string | null
+          previous_agent_id?: string | null
           priority?: Database["public"]["Enums"]["priority_level"]
           queue?: Database["public"]["Enums"]["conversation_queue"]
+          reassignment_count?: number
           status?: Database["public"]["Enums"]["wa_conversation_status"]
           unread_count?: number
           updated_at?: string
         }
         Update: {
           assigned_agent_id?: string | null
+          assigned_at?: string | null
+          auto_summary?: string | null
           channel?: Database["public"]["Enums"]["conversation_channel"]
           client_id?: string | null
           created_at?: string
@@ -1730,10 +1744,14 @@ export type Database = {
           customer_phone?: string
           customer_whatsapp_id?: string | null
           id?: string
+          last_agent_reply_at?: string | null
           last_message_at?: string | null
           last_message_preview?: string | null
+          lock_until?: string | null
+          previous_agent_id?: string | null
           priority?: Database["public"]["Enums"]["priority_level"]
           queue?: Database["public"]["Enums"]["conversation_queue"]
+          reassignment_count?: number
           status?: Database["public"]["Enums"]["wa_conversation_status"]
           unread_count?: number
           updated_at?: string
@@ -1968,6 +1986,12 @@ export type Database = {
         Returns: Json
       }
       promote_next_from_queue: { Args: { _agent_id: string }; Returns: string }
+      reassign_stale_conversations: { Args: never; Returns: Json }
+      redistribute_overflow: { Args: never; Returns: Json }
+      release_conversation: {
+        Args: { _conversation_id: string; _reason?: string }
+        Returns: Json
+      }
       role_for_queue: {
         Args: { _queue: string }
         Returns: Database["public"]["Enums"]["app_role"][]

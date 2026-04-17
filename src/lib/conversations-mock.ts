@@ -45,7 +45,10 @@ export interface MockConversation {
   status: ConvStatus;
   priority: ConvPriority;
   assignedAgent: string | null;
-  assignmentType?: "auto" | "manual" | "sticky" | "overflow";
+  assignmentType?: "auto" | "manual" | "sticky" | "overflow" | "failover" | "escalation";
+  reassignmentCount?: number;
+  previousAgent?: string | null;
+  autoSummary?: string;
   lastMessage: string;
   lastTime: string;
   unread: number;
@@ -93,7 +96,10 @@ export const mockConversationsList: MockConversation[] = [
     status: "waiting_internal",
     priority: "urgent",
     assignedAgent: "Hassan Ali",
-    assignmentType: "sticky",
+    assignmentType: "failover",
+    reassignmentCount: 2,
+    previousAgent: "Bilal Raza",
+    autoSummary: "Customer reported login failure on Netflix Family. Previous agent went offline before replying.",
     lastMessage: "Account login is still failing",
     lastTime: "12m",
     unread: 4,
