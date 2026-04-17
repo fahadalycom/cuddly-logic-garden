@@ -493,6 +493,48 @@ export const mockMessagesByConv: Record<string, MockMessage[]> = {
   conv_8: [
     { id: "m1", conversationId: "conv_8", sender: "agent", senderName: "Hassan", text: "Issue resolved, ticket closed.", time: "Yesterday" },
   ],
+  conv_9: [
+    { id: "m1", conversationId: "conv_9", sender: "customer", senderName: "Fatima", text: "Hi, what's the price for ChatGPT Plus 6 months?", time: "11:30" },
+  ],
+  conv_10: [
+    { id: "m1", conversationId: "conv_10", sender: "customer", senderName: "Omar", text: "My Netflix account is locked AGAIN", time: "11:00" },
+    { id: "m2", conversationId: "conv_10", sender: "agent", senderName: "Hassan", text: "Sorry to hear that, checking now.", time: "11:02" },
+    { id: "m3", conversationId: "conv_10", sender: "customer", senderName: "Omar", text: "This is the third time my account got locked!", time: "11:05" },
+  ],
+  conv_11: [
+    { id: "m1", conversationId: "conv_11", sender: "customer", senderName: "Priya", text: "I just paid for the Canva Team plan", time: "10:40", type: "image" },
+    { id: "m2", conversationId: "conv_11", sender: "agent", senderName: "Ali", text: "Got it, verifying with the bank.", time: "10:45" },
+    { id: "m3", conversationId: "conv_11", sender: "customer", senderName: "Priya", text: "I sent the bank transfer 2 hours ago, please verify", time: "11:08" },
+  ],
+  conv_12: [
+    { id: "m1", conversationId: "conv_12", sender: "agent", senderName: "Sara", text: "Hi Zaid, your Spotify Family expires in 3 days. Want to renew?", time: "10:25" },
+    { id: "m2", conversationId: "conv_12", sender: "customer", senderName: "Zaid", text: "Yes please renew it for another year", time: "10:55" },
+  ],
+  conv_13: [
+    { id: "m1", conversationId: "conv_13", sender: "customer", senderName: "Ayesha", text: "Do you have any bundles?", time: "10:15" },
+    { id: "m2", conversationId: "conv_13", sender: "agent", senderName: "Bilal", text: "Sent you the bundle pricing — let me know!", time: "10:45" },
+  ],
+  conv_14: [
+    { id: "m1", conversationId: "conv_14", sender: "customer", senderName: "Rohan", text: "Canva isn't loading on my Mac at all", time: "10:30" },
+  ],
+  conv_15: [
+    { id: "m1", conversationId: "conv_15", sender: "customer", senderName: "Bilal", text: "Sending payment now", time: "09:30" },
+    { id: "m2", conversationId: "conv_15", sender: "customer", senderName: "Bilal", text: "Done", time: "09:32", type: "image" },
+    { id: "m3", conversationId: "conv_15", sender: "agent", senderName: "Ali", text: "Payment confirmed and account activated. Enjoy!", time: "09:40" },
+  ],
+  conv_16: [
+    { id: "m1", conversationId: "conv_16", sender: "customer", senderName: "Sadia", text: "Do you accept JazzCash?", time: "08:30" },
+  ],
+  conv_17: [
+    { id: "m1", conversationId: "conv_17", sender: "customer", senderName: "Imran", text: "I was charged TWICE for the same renewal!", time: "07:30" },
+    { id: "m2", conversationId: "conv_17", sender: "system", text: "Reassigned from Bilal to Hassan (escalation)", time: "07:45" },
+    { id: "m3", conversationId: "conv_17", sender: "agent", senderName: "Hassan", text: "I'm so sorry, I can see the duplicate charge. Processing refund.", time: "07:50" },
+    { id: "m4", conversationId: "conv_17", sender: "customer", senderName: "Imran", text: "I want a refund AND an explanation", time: "08:00" },
+  ],
+  conv_18: [
+    { id: "m1", conversationId: "conv_18", sender: "agent", senderName: "Sara", text: "Renewal invoice sent.", time: "Yesterday" },
+    { id: "m2", conversationId: "conv_18", sender: "customer", senderName: "Nadia", text: "Renewed for 1 year. Thank you!", time: "Yesterday" },
+  ],
 };
 
 export const mockNotesByConv: Record<string, MockInternalNote[]> = {
