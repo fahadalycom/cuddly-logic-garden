@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Package, Layers, Sparkles, Trash2, Pencil, Send, Calculator, Minus, Plus, ArrowLeft } from "lucide-react";
+import { Search, Package, Layers, Sparkles, Trash2, Pencil, Send, Calculator, Minus, Plus, ArrowLeft, FileText, Copy, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,11 +14,18 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PRODUCT_TYPE_COLOR, PRODUCT_TYPE_LABEL, type ProductFull, type Plan, type BundleWithItems } from "@/types/products";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/template-engine";
+import { InvoicePreview, type InvoicePreviewData } from "./InvoicePreview";
+import { toast } from "@/hooks/use-toast";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onInsert: (text: string) => void;
+  conversationId?: string | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
+  clientId?: string | null;
 }
 
 type ProductWithPlans = ProductFull & { plans: Plan[] };
