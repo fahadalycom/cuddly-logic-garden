@@ -6,6 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/template-engine";
 import { cn } from "@/lib/utils";
+import { TicketDialog } from "@/components/support/TicketDialog";
+import {
+  STATUS_STYLE as TICKET_STATUS_STYLE, PRIORITY_STYLE as TICKET_PRIORITY_STYLE,
+  TICKET_STATUSES, labelFor,
+  type TicketStatus, type TicketPriority,
+} from "@/lib/support-tickets";
 import type { MockConversation } from "@/lib/conversations-mock";
 
 interface Props {
