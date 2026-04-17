@@ -1187,6 +1187,71 @@ export type Database = {
           },
         ]
       }
+      research_records: {
+        Row: {
+          assigned_to: string | null
+          category: string | null
+          created_at: string
+          created_by: string
+          decided_at: string | null
+          demand_score: number | null
+          feasibility_score: number | null
+          id: string
+          notes: string | null
+          recommendation: Database["public"]["Enums"]["research_recommendation"]
+          related_request_id: string | null
+          risk_score: number | null
+          status: Database["public"]["Enums"]["research_status"]
+          support_complexity_score: number | null
+          tool_name: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          category?: string | null
+          created_at?: string
+          created_by: string
+          decided_at?: string | null
+          demand_score?: number | null
+          feasibility_score?: number | null
+          id?: string
+          notes?: string | null
+          recommendation?: Database["public"]["Enums"]["research_recommendation"]
+          related_request_id?: string | null
+          risk_score?: number | null
+          status?: Database["public"]["Enums"]["research_status"]
+          support_complexity_score?: number | null
+          tool_name: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: string | null
+          created_at?: string
+          created_by?: string
+          decided_at?: string | null
+          demand_score?: number | null
+          feasibility_score?: number | null
+          id?: string
+          notes?: string | null
+          recommendation?: Database["public"]["Enums"]["research_recommendation"]
+          related_request_id?: string | null
+          risk_score?: number | null
+          status?: Database["public"]["Enums"]["research_status"]
+          support_complexity_score?: number | null
+          tool_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_records_related_request_id_fkey"
+            columns: ["related_request_id"]
+            isOneToOne: false
+            referencedRelation: "tool_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       software_accounts: {
         Row: {
           capacity: number
@@ -1763,9 +1828,14 @@ export type Database = {
           demand_count: number
           description: string | null
           id: string
+          last_requested_at: string
           notes: string | null
+          priority: Database["public"]["Enums"]["priority_level"]
           requested_by_client_id: string | null
+          requested_by_name: string | null
           requested_by_user_id: string | null
+          requester_type: Database["public"]["Enums"]["requester_type"]
+          source: Database["public"]["Enums"]["request_source"]
           status: Database["public"]["Enums"]["tool_request_status"]
           tool_name: string
           updated_at: string
@@ -1777,9 +1847,14 @@ export type Database = {
           demand_count?: number
           description?: string | null
           id?: string
+          last_requested_at?: string
           notes?: string | null
+          priority?: Database["public"]["Enums"]["priority_level"]
           requested_by_client_id?: string | null
+          requested_by_name?: string | null
           requested_by_user_id?: string | null
+          requester_type?: Database["public"]["Enums"]["requester_type"]
+          source?: Database["public"]["Enums"]["request_source"]
           status?: Database["public"]["Enums"]["tool_request_status"]
           tool_name: string
           updated_at?: string
@@ -1791,9 +1866,14 @@ export type Database = {
           demand_count?: number
           description?: string | null
           id?: string
+          last_requested_at?: string
           notes?: string | null
+          priority?: Database["public"]["Enums"]["priority_level"]
           requested_by_client_id?: string | null
+          requested_by_name?: string | null
           requested_by_user_id?: string | null
+          requester_type?: Database["public"]["Enums"]["requester_type"]
+          source?: Database["public"]["Enums"]["request_source"]
           status?: Database["public"]["Enums"]["tool_request_status"]
           tool_name?: string
           updated_at?: string
@@ -2572,6 +2652,20 @@ export type Database = {
       priority_level: "low" | "medium" | "high" | "urgent"
       product_type: "shared" | "private" | "invite_based" | "custom"
       reminder_response: "pending" | "renewed" | "refused" | "deferred"
+      request_source:
+        | "whatsapp"
+        | "facebook"
+        | "instagram"
+        | "internal"
+        | "other"
+      requester_type: "customer" | "team_member" | "admin"
+      research_recommendation:
+        | "approve"
+        | "reject"
+        | "test_first"
+        | "revisit_later"
+        | "undecided"
+      research_status: "not_started" | "in_progress" | "completed" | "on_hold"
       staff_availability: "active" | "on_break" | "offline" | "inactive"
       subscription_status:
         | "active"
@@ -2618,6 +2712,8 @@ export type Database = {
         | "approved"
         | "rejected"
         | "sourced"
+        | "launched"
+        | "revisit_later"
       trust_tag: "not_trusted" | "trusted" | "super_client"
       vendor_status: "active" | "inactive" | "blacklisted"
       wa_ai_confidence: "high" | "medium" | "low"
@@ -2866,6 +2962,22 @@ export const Constants = {
       priority_level: ["low", "medium", "high", "urgent"],
       product_type: ["shared", "private", "invite_based", "custom"],
       reminder_response: ["pending", "renewed", "refused", "deferred"],
+      request_source: [
+        "whatsapp",
+        "facebook",
+        "instagram",
+        "internal",
+        "other",
+      ],
+      requester_type: ["customer", "team_member", "admin"],
+      research_recommendation: [
+        "approve",
+        "reject",
+        "test_first",
+        "revisit_later",
+        "undecided",
+      ],
+      research_status: ["not_started", "in_progress", "completed", "on_hold"],
       staff_availability: ["active", "on_break", "offline", "inactive"],
       subscription_status: [
         "active",
@@ -2917,6 +3029,8 @@ export const Constants = {
         "approved",
         "rejected",
         "sourced",
+        "launched",
+        "revisit_later",
       ],
       trust_tag: ["not_trusted", "trusted", "super_client"],
       vendor_status: ["active", "inactive", "blacklisted"],
