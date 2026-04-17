@@ -3,6 +3,7 @@ import {
   ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, CheckCheck, RefreshCw, AlertTriangle, Package,
 } from "lucide-react";
 import { ProductSelectorPanel } from "./ProductSelectorPanel";
+import { TicketDialog } from "@/components/support/TicketDialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -27,6 +28,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState("");
   const [productPanelOpen, setProductPanelOpen] = useState(false);
+  const [ticketOpen, setTicketOpen] = useState(false);
 
   if (!conversation) {
     return (
@@ -84,7 +86,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
           <ActionBtn icon={Tag} label="Status" />
           <ActionBtn icon={Flag} label="Priority" />
           <ActionBtn icon={StickyNote} label="Add Note" onClick={() => setTab("notes")} />
-          <ActionBtn icon={Ticket} label="Create Ticket" />
+          <ActionBtn icon={Ticket} label="Create Ticket" onClick={() => setTicketOpen(true)} />
           <ActionBtn icon={User} label="View Customer" />
         </div>
 
@@ -207,6 +209,18 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
         customerName={conversation.customerName}
         customerPhone={conversation.customerPhone}
         customerEmail={conversation.context?.email ?? null}
+      />
+
+      <TicketDialog
+        open={ticketOpen}
+        onOpenChange={setTicketOpen}
+        prefill={{
+          conversationId: conversation.id,
+          clientId: null,
+          customerName: conversation.customerName,
+          customerPhone: conversation.customerPhone,
+          summary: conversation.lastMessage?.slice(0, 120) ?? null,
+        }}
       />
     </div>
   );
