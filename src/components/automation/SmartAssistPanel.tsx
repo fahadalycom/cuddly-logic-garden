@@ -118,8 +118,6 @@ export function SmartAssistPanel({ conversation, onUseDraft, enabled }: Props) {
     } else {
       toast.error(r.error);
     }
-    return;
-    toast.success("AI classification applied");
   };
 
   const runSummary = async () => {
