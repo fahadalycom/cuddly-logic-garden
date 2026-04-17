@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, Phone, Mail, Package, RefreshCw, CreditCard, Ticket, StickyNote, FileText, ShoppingCart } from "lucide-react";
+import { X, Phone, Mail, Package, RefreshCw, CreditCard, Ticket, StickyNote, FileText, ShoppingCart, ArrowRightLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import {
   TICKET_STATUSES, labelFor,
   type TicketStatus, type TicketPriority,
 } from "@/lib/support-tickets";
+import { getHandoffHistory, QUEUE_LABEL, QUEUE_COLOR, type HandoffLogEntry } from "@/lib/handoff";
 import type { MockConversation } from "@/lib/conversations-mock";
 
 interface Props {
@@ -67,9 +68,10 @@ export function ConversationContextPanel({ conversation, onClose }: Props) {
   const [latestOrder, setLatestOrder] = useState<LatestOrder | null>(null);
   const [openTickets, setOpenTickets] = useState<OpenTicket[]>([]);
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
+  const [handoffHistory, setHandoffHistory] = useState<HandoffLogEntry[]>([]);
 
   const loadAll = async (convId: string) => {
-    const [invRes, ordRes, tixRes] = await Promise.all([
+    const [invRes, ordRes, tixRes, hoRes] = await Promise.all([
       (supabase as any).from("invoices")
         .select("id, invoice_number, status, final_total, currency, created_at")
         .eq("conversation_id", convId)
@@ -83,14 +85,19 @@ export function ConversationContextPanel({ conversation, onClose }: Props) {
         .eq("conversation_id", convId)
         .neq("status", "closed")
         .order("created_at", { ascending: false }).limit(5),
+      getHandoffHistory(convId, 5),
     ]);
     setLatestInvoice((invRes.data as LatestInvoice) ?? null);
     setLatestOrder((ordRes.data as LatestOrder) ?? null);
     setOpenTickets((tixRes.data as OpenTicket[]) ?? []);
+    setHandoffHistory(hoRes ?? []);
   };
 
   useEffect(() => {
-    if (!conversation?.id) { setLatestInvoice(null); setLatestOrder(null); setOpenTickets([]); return; }
+    if (!conversation?.id) {
+      setLatestInvoice(null); setLatestOrder(null); setOpenTickets([]); setHandoffHistory([]);
+      return;
+    }
     loadAll(conversation.id);
   }, [conversation?.id]);
 
@@ -271,6 +278,33 @@ export function ConversationContextPanel({ conversation, onClose }: Props) {
                       </div>
                     </div>
                     {t.summary && <p className="text-xs text-foreground mt-0.5 truncate">{t.summary}</p>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+
+          {/* Handoff history */}
+          <Section title="Transfer History" icon={ArrowRightLeft} count={handoffHistory.length}>
+            {handoffHistory.length === 0 ? (
+              <Empty text="No transfers yet" />
+            ) : (
+              <ul className="space-y-1.5">
+                {handoffHistory.map((h) => (
+                  <li key={h.id} className="rounded-md border border-border/30 bg-background/30 p-2">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <Badge variant="outline" className={cn("text-[9px] uppercase", QUEUE_COLOR[h.from_queue ?? "general"])}>
+                        {QUEUE_LABEL[h.from_queue ?? "general"] ?? h.from_queue ?? "—"}
+                      </Badge>
+                      <ArrowRightLeft className="h-2.5 w-2.5 text-muted-foreground" />
+                      <Badge variant="outline" className={cn("text-[9px] uppercase", QUEUE_COLOR[h.to_queue])}>
+                        {QUEUE_LABEL[h.to_queue] ?? h.to_queue}
+                      </Badge>
+                      <span className="text-[10px] text-muted-foreground ml-auto">
+                        {new Date(h.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    {h.note && <p className="text-xs text-foreground/90 mt-1">{h.note}</p>}
                   </li>
                 ))}
               </ul>
