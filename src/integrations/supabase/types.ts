@@ -190,6 +190,8 @@ export type Database = {
           name: string
           notes: string | null
           phone: string | null
+          status: Database["public"]["Enums"]["client_status"]
+          tags: string[]
           trust_tag: Database["public"]["Enums"]["trust_tag"]
           updated_at: string
           whatsapp_number: string | null
@@ -203,6 +205,8 @@ export type Database = {
           name: string
           notes?: string | null
           phone?: string | null
+          status?: Database["public"]["Enums"]["client_status"]
+          tags?: string[]
           trust_tag?: Database["public"]["Enums"]["trust_tag"]
           updated_at?: string
           whatsapp_number?: string | null
@@ -216,6 +220,8 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string | null
+          status?: Database["public"]["Enums"]["client_status"]
+          tags?: string[]
           trust_tag?: Database["public"]["Enums"]["trust_tag"]
           updated_at?: string
           whatsapp_number?: string | null
@@ -262,6 +268,62 @@ export type Database = {
           {
             foreignKeyName: "feedback_client_id_fkey"
             columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          assigned_to: string | null
+          converted_client_id: string | null
+          created_at: string
+          created_by: string
+          email: string | null
+          id: string
+          interest: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          source: Database["public"]["Enums"]["lead_source"]
+          status: Database["public"]["Enums"]["lead_status"]
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          converted_client_id?: string | null
+          created_at?: string
+          created_by: string
+          email?: string | null
+          id?: string
+          interest?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          source?: Database["public"]["Enums"]["lead_source"]
+          status?: Database["public"]["Enums"]["lead_status"]
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          converted_client_id?: string | null
+          created_at?: string
+          created_by?: string
+          email?: string | null
+          id?: string
+          interest?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          source?: Database["public"]["Enums"]["lead_source"]
+          status?: Database["public"]["Enums"]["lead_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_converted_client_id_fkey"
+            columns: ["converted_client_id"]
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
@@ -461,6 +523,7 @@ export type Database = {
           method: string | null
           notes: string | null
           order_id: string
+          proof_url: string | null
           reference: string | null
           status: Database["public"]["Enums"]["payment_status"]
           verified_at: string | null
@@ -473,6 +536,7 @@ export type Database = {
           method?: string | null
           notes?: string | null
           order_id: string
+          proof_url?: string | null
           reference?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           verified_at?: string | null
@@ -485,6 +549,7 @@ export type Database = {
           method?: string | null
           notes?: string | null
           order_id?: string
+          proof_url?: string | null
           reference?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           verified_at?: string | null
@@ -529,6 +594,56 @@ export type Database = {
           role?: Database["public"]["Enums"]["app_role"]
         }
         Relationships: []
+      }
+      plans: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration_days: number
+          id: string
+          is_active: boolean
+          max_users: number
+          name: string
+          price: number
+          product_id: string
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration_days?: number
+          id?: string
+          is_active?: boolean
+          max_users?: number
+          name: string
+          price?: number
+          product_id: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration_days?: number
+          id?: string
+          is_active?: boolean
+          max_users?: number
+          name?: string
+          price?: number
+          product_id?: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plans_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_durations: {
         Row: {
@@ -837,34 +952,43 @@ export type Database = {
       }
       staff_profiles: {
         Row: {
+          availability_status: Database["public"]["Enums"]["staff_availability"]
           avatar_url: string | null
           created_at: string
+          department: string | null
           email: string
           full_name: string
           id: string
           is_active: boolean
+          max_active_chats: number
           phone: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          availability_status?: Database["public"]["Enums"]["staff_availability"]
           avatar_url?: string | null
           created_at?: string
+          department?: string | null
           email: string
           full_name: string
           id?: string
           is_active?: boolean
+          max_active_chats?: number
           phone?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          availability_status?: Database["public"]["Enums"]["staff_availability"]
           avatar_url?: string | null
           created_at?: string
+          department?: string | null
           email?: string
           full_name?: string
           id?: string
           is_active?: boolean
+          max_active_chats?: number
           phone?: string | null
           updated_at?: string
           user_id?: string
@@ -944,10 +1068,12 @@ export type Database = {
           account_id: string | null
           assigned_to: string | null
           client_id: string
+          conversation_id: string | null
           created_at: string
           description: string
           id: string
           order_item_id: string | null
+          priority: Database["public"]["Enums"]["priority_level"]
           resolution_notes: string | null
           status: Database["public"]["Enums"]["issue_status"]
           type: string
@@ -957,10 +1083,12 @@ export type Database = {
           account_id?: string | null
           assigned_to?: string | null
           client_id: string
+          conversation_id?: string | null
           created_at?: string
           description: string
           id?: string
           order_item_id?: string | null
+          priority?: Database["public"]["Enums"]["priority_level"]
           resolution_notes?: string | null
           status?: Database["public"]["Enums"]["issue_status"]
           type?: string
@@ -970,10 +1098,12 @@ export type Database = {
           account_id?: string | null
           assigned_to?: string | null
           client_id?: string
+          conversation_id?: string | null
           created_at?: string
           description?: string
           id?: string
           order_item_id?: string | null
+          priority?: Database["public"]["Enums"]["priority_level"]
           resolution_notes?: string | null
           status?: Database["public"]["Enums"]["issue_status"]
           type?: string
@@ -992,6 +1122,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_issues_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_conversations"
             referencedColumns: ["id"]
           },
           {
@@ -1036,6 +1173,54 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           value?: string | null
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          due_date: string | null
+          id: string
+          priority: Database["public"]["Enums"]["priority_level"]
+          related_id: string | null
+          related_type: Database["public"]["Enums"]["task_related_type"]
+          status: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["priority_level"]
+          related_id?: string | null
+          related_type?: Database["public"]["Enums"]["task_related_type"]
+          status?: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["priority_level"]
+          related_id?: string | null
+          related_type?: Database["public"]["Enums"]["task_related_type"]
+          status?: Database["public"]["Enums"]["task_status"]
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1152,6 +1337,59 @@ export type Database = {
           },
         ]
       }
+      tool_requests: {
+        Row: {
+          assigned_to: string | null
+          category: string | null
+          created_at: string
+          demand_count: number
+          description: string | null
+          id: string
+          notes: string | null
+          requested_by_client_id: string | null
+          requested_by_user_id: string | null
+          status: Database["public"]["Enums"]["tool_request_status"]
+          tool_name: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          category?: string | null
+          created_at?: string
+          demand_count?: number
+          description?: string | null
+          id?: string
+          notes?: string | null
+          requested_by_client_id?: string | null
+          requested_by_user_id?: string | null
+          status?: Database["public"]["Enums"]["tool_request_status"]
+          tool_name: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: string | null
+          created_at?: string
+          demand_count?: number
+          description?: string | null
+          id?: string
+          notes?: string | null
+          requested_by_client_id?: string | null
+          requested_by_user_id?: string | null
+          status?: Database["public"]["Enums"]["tool_request_status"]
+          tool_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_requests_requested_by_client_id_fkey"
+            columns: ["requested_by_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -1167,6 +1405,104 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      vendor_deals: {
+        Row: {
+          coupon_code: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          discount_details: string | null
+          expires_at: string | null
+          id: string
+          starts_at: string | null
+          status: Database["public"]["Enums"]["deal_status"]
+          title: string
+          updated_at: string
+          vendor_id: string
+        }
+        Insert: {
+          coupon_code?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          discount_details?: string | null
+          expires_at?: string | null
+          id?: string
+          starts_at?: string | null
+          status?: Database["public"]["Enums"]["deal_status"]
+          title: string
+          updated_at?: string
+          vendor_id: string
+        }
+        Update: {
+          coupon_code?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          discount_details?: string | null
+          expires_at?: string | null
+          id?: string
+          starts_at?: string | null
+          status?: Database["public"]["Enums"]["deal_status"]
+          title?: string
+          updated_at?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_deals_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendors: {
+        Row: {
+          category: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          contact_url: string | null
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          notes: string | null
+          status: Database["public"]["Enums"]["vendor_status"]
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          contact_url?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["vendor_status"]
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          contact_url?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["vendor_status"]
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1308,6 +1644,7 @@ export type Database = {
       wa_conversations: {
         Row: {
           assigned_agent_id: string | null
+          channel: Database["public"]["Enums"]["conversation_channel"]
           client_id: string | null
           created_at: string
           customer_name: string | null
@@ -1316,12 +1653,15 @@ export type Database = {
           id: string
           last_message_at: string | null
           last_message_preview: string | null
+          priority: Database["public"]["Enums"]["priority_level"]
+          queue: Database["public"]["Enums"]["conversation_queue"]
           status: Database["public"]["Enums"]["wa_conversation_status"]
           unread_count: number
           updated_at: string
         }
         Insert: {
           assigned_agent_id?: string | null
+          channel?: Database["public"]["Enums"]["conversation_channel"]
           client_id?: string | null
           created_at?: string
           customer_name?: string | null
@@ -1330,12 +1670,15 @@ export type Database = {
           id?: string
           last_message_at?: string | null
           last_message_preview?: string | null
+          priority?: Database["public"]["Enums"]["priority_level"]
+          queue?: Database["public"]["Enums"]["conversation_queue"]
           status?: Database["public"]["Enums"]["wa_conversation_status"]
           unread_count?: number
           updated_at?: string
         }
         Update: {
           assigned_agent_id?: string | null
+          channel?: Database["public"]["Enums"]["conversation_channel"]
           client_id?: string | null
           created_at?: string
           customer_name?: string | null
@@ -1344,6 +1687,8 @@ export type Database = {
           id?: string
           last_message_at?: string | null
           last_message_preview?: string | null
+          priority?: Database["public"]["Enums"]["priority_level"]
+          queue?: Database["public"]["Enums"]["conversation_queue"]
           status?: Database["public"]["Enums"]["wa_conversation_status"]
           unread_count?: number
           updated_at?: string
@@ -1569,9 +1914,40 @@ export type Database = {
         | "client_relation_manager"
         | "accountant"
         | "accounts_creator"
+        | "operations_manager"
+        | "payment_verifier"
+        | "fulfillment_agent"
+        | "renewal_agent"
+        | "account_provisioning_manager"
+        | "research_analyst"
+        | "vendor_coordinator"
+        | "qa_reviewer"
+      client_status: "active" | "inactive" | "blocked"
+      conversation_channel:
+        | "whatsapp"
+        | "facebook"
+        | "instagram"
+        | "email"
+        | "web"
+        | "other"
+      conversation_queue:
+        | "sales"
+        | "support"
+        | "payment"
+        | "renewal"
+        | "general"
+      deal_status: "active" | "negotiation" | "expired" | "rejected"
       duration_type: "day" | "week" | "month" | "year"
       feedback_type: "review" | "feedback" | "follow_up"
       issue_status: "open" | "in_review" | "approved" | "resolved" | "rejected"
+      lead_source:
+        | "whatsapp"
+        | "facebook"
+        | "instagram"
+        | "website"
+        | "referral"
+        | "other"
+      lead_status: "new" | "interested" | "follow_up" | "converted" | "dead"
       order_status:
         | "draft"
         | "pending_payment"
@@ -1581,13 +1957,23 @@ export type Database = {
         | "delivered"
         | "cancelled"
       payment_status: "pending" | "verified" | "rejected"
+      priority_level: "low" | "medium" | "high" | "urgent"
       reminder_response: "pending" | "renewed" | "refused" | "deferred"
+      staff_availability: "active" | "on_break" | "offline" | "inactive"
       subscription_status:
         | "active"
         | "expiring"
         | "expired"
         | "renewed"
         | "terminated"
+      task_related_type:
+        | "order"
+        | "conversation"
+        | "ticket"
+        | "lead"
+        | "subscription"
+        | "general"
+      task_status: "pending" | "in_progress" | "done" | "cancelled"
       template_category:
         | "pre_invoice"
         | "payment_confirmation"
@@ -1596,7 +1982,14 @@ export type Database = {
         | "feedback_request"
         | "product_info"
         | "general"
+      tool_request_status:
+        | "new"
+        | "researching"
+        | "approved"
+        | "rejected"
+        | "sourced"
       trust_tag: "not_trusted" | "trusted" | "super_client"
+      vendor_status: "active" | "inactive" | "blacklisted"
       wa_ai_confidence: "high" | "medium" | "low"
       wa_conversation_status: "active" | "waiting" | "resolved" | "archived"
       wa_media_type:
@@ -1743,10 +2136,38 @@ export const Constants = {
         "client_relation_manager",
         "accountant",
         "accounts_creator",
+        "operations_manager",
+        "payment_verifier",
+        "fulfillment_agent",
+        "renewal_agent",
+        "account_provisioning_manager",
+        "research_analyst",
+        "vendor_coordinator",
+        "qa_reviewer",
       ],
+      client_status: ["active", "inactive", "blocked"],
+      conversation_channel: [
+        "whatsapp",
+        "facebook",
+        "instagram",
+        "email",
+        "web",
+        "other",
+      ],
+      conversation_queue: ["sales", "support", "payment", "renewal", "general"],
+      deal_status: ["active", "negotiation", "expired", "rejected"],
       duration_type: ["day", "week", "month", "year"],
       feedback_type: ["review", "feedback", "follow_up"],
       issue_status: ["open", "in_review", "approved", "resolved", "rejected"],
+      lead_source: [
+        "whatsapp",
+        "facebook",
+        "instagram",
+        "website",
+        "referral",
+        "other",
+      ],
+      lead_status: ["new", "interested", "follow_up", "converted", "dead"],
       order_status: [
         "draft",
         "pending_payment",
@@ -1757,7 +2178,9 @@ export const Constants = {
         "cancelled",
       ],
       payment_status: ["pending", "verified", "rejected"],
+      priority_level: ["low", "medium", "high", "urgent"],
       reminder_response: ["pending", "renewed", "refused", "deferred"],
+      staff_availability: ["active", "on_break", "offline", "inactive"],
       subscription_status: [
         "active",
         "expiring",
@@ -1765,6 +2188,15 @@ export const Constants = {
         "renewed",
         "terminated",
       ],
+      task_related_type: [
+        "order",
+        "conversation",
+        "ticket",
+        "lead",
+        "subscription",
+        "general",
+      ],
+      task_status: ["pending", "in_progress", "done", "cancelled"],
       template_category: [
         "pre_invoice",
         "payment_confirmation",
@@ -1774,7 +2206,15 @@ export const Constants = {
         "product_info",
         "general",
       ],
+      tool_request_status: [
+        "new",
+        "researching",
+        "approved",
+        "rejected",
+        "sourced",
+      ],
       trust_tag: ["not_trusted", "trusted", "super_client"],
+      vendor_status: ["active", "inactive", "blacklisted"],
       wa_ai_confidence: ["high", "medium", "low"],
       wa_conversation_status: ["active", "waiting", "resolved", "archived"],
       wa_media_type: ["text", "image", "video", "audio", "document", "sticker"],
