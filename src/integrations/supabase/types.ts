@@ -1510,11 +1510,14 @@ export type Database = {
         Row: {
           agent_id: string
           created_at: string
+          current_active_count: number
+          current_queue_count: number
           daily_message_limit: number
           id: string
           is_available: boolean
           last_reset_date: string
           max_active_chats: number
+          max_queue_limit: number
           max_unread_visible: number
           messages_sent_today: number
           updated_at: string
@@ -1522,11 +1525,14 @@ export type Database = {
         Insert: {
           agent_id: string
           created_at?: string
+          current_active_count?: number
+          current_queue_count?: number
           daily_message_limit?: number
           id?: string
           is_available?: boolean
           last_reset_date?: string
           max_active_chats?: number
+          max_queue_limit?: number
           max_unread_visible?: number
           messages_sent_today?: number
           updated_at?: string
@@ -1534,11 +1540,14 @@ export type Database = {
         Update: {
           agent_id?: string
           created_at?: string
+          current_active_count?: number
+          current_queue_count?: number
           daily_message_limit?: number
           id?: string
           is_available?: boolean
           last_reset_date?: string
           max_active_chats?: number
+          max_queue_limit?: number
           max_unread_visible?: number
           messages_sent_today?: number
           updated_at?: string
@@ -1812,8 +1821,10 @@ export type Database = {
           created_at: string
           id: string
           priority: number
+          queue_type: Database["public"]["Enums"]["wa_queue_type"]
           reason: string | null
           status: Database["public"]["Enums"]["wa_queue_status"]
+          target_agent_id: string | null
         }
         Insert: {
           assigned_at?: string | null
@@ -1822,8 +1833,10 @@ export type Database = {
           created_at?: string
           id?: string
           priority?: number
+          queue_type?: Database["public"]["Enums"]["wa_queue_type"]
           reason?: string | null
           status?: Database["public"]["Enums"]["wa_queue_status"]
+          target_agent_id?: string | null
         }
         Update: {
           assigned_at?: string | null
@@ -1832,8 +1845,10 @@ export type Database = {
           created_at?: string
           id?: string
           priority?: number
+          queue_type?: Database["public"]["Enums"]["wa_queue_type"]
           reason?: string | null
           status?: Database["public"]["Enums"]["wa_queue_status"]
+          target_agent_id?: string | null
         }
         Relationships: [
           {
@@ -1892,6 +1907,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_conversation_with_capacity: {
+        Args: { _agent_id: string; _conversation_id: string; _force?: boolean }
+        Returns: Json
+      }
       get_user_roles: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"][]
@@ -1904,6 +1923,7 @@ export type Database = {
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      promote_next_from_queue: { Args: { _agent_id: string }; Returns: string }
     }
     Enums: {
       account_status: "available" | "assigned" | "exhausted" | "expired"
@@ -1936,6 +1956,7 @@ export type Database = {
         | "payment"
         | "renewal"
         | "general"
+        | "overflow"
       deal_status: "active" | "negotiation" | "expired" | "rejected"
       duration_type: "day" | "week" | "month" | "year"
       feedback_type: "review" | "feedback" | "follow_up"
@@ -1999,7 +2020,14 @@ export type Database = {
         | "audio"
         | "document"
         | "sticker"
-      wa_queue_status: "waiting" | "assigned" | "expired"
+      wa_queue_status: "waiting" | "assigned" | "expired" | "active"
+      wa_queue_type:
+        | "sales"
+        | "support"
+        | "payments"
+        | "renewals"
+        | "overflow"
+        | "agent"
       wa_sender_type: "customer" | "agent" | "system" | "ai"
     }
     CompositeTypes: {
@@ -2154,7 +2182,14 @@ export const Constants = {
         "web",
         "other",
       ],
-      conversation_queue: ["sales", "support", "payment", "renewal", "general"],
+      conversation_queue: [
+        "sales",
+        "support",
+        "payment",
+        "renewal",
+        "general",
+        "overflow",
+      ],
       deal_status: ["active", "negotiation", "expired", "rejected"],
       duration_type: ["day", "week", "month", "year"],
       feedback_type: ["review", "feedback", "follow_up"],
@@ -2218,7 +2253,15 @@ export const Constants = {
       wa_ai_confidence: ["high", "medium", "low"],
       wa_conversation_status: ["active", "waiting", "resolved", "archived"],
       wa_media_type: ["text", "image", "video", "audio", "document", "sticker"],
-      wa_queue_status: ["waiting", "assigned", "expired"],
+      wa_queue_status: ["waiting", "assigned", "expired", "active"],
+      wa_queue_type: [
+        "sales",
+        "support",
+        "payments",
+        "renewals",
+        "overflow",
+        "agent",
+      ],
       wa_sender_type: ["customer", "agent", "system", "ai"],
     },
   },
