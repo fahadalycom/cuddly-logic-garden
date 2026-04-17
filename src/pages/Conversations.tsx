@@ -1,35 +1,57 @@
-import { MessageSquare } from "lucide-react";
-import { PlaceholderPage } from "@/components/shared/PlaceholderPage";
-import { StatusBadge } from "@/components/shared/StatusBadge";
-import { mockConversations } from "@/lib/mock-data";
+import { useState } from "react";
+import { ConversationListPanel } from "@/components/conversations/ConversationListPanel";
+import { ConversationThreadPanel } from "@/components/conversations/ConversationThreadPanel";
+import { ConversationContextPanel } from "@/components/conversations/ConversationContextPanel";
+import { mockConversationsList } from "@/lib/conversations-mock";
+import { cn } from "@/lib/utils";
 
 export default function ConversationsPage() {
-  const rows = mockConversations.map((c) => ({
-    customer: <span className="font-medium text-foreground">{c.customer}</span>,
-    channel: <span className="text-xs px-2 py-0.5 rounded-md bg-muted/40 text-muted-foreground">{c.channel}</span>,
-    queue: c.queue,
-    status: <StatusBadge status={c.status as any} />,
-    agent: c.agent,
-    lastMessage: <span className="text-muted-foreground/80 truncate max-w-[240px] inline-block">{c.lastMessage}</span>,
-    time: <span className="text-xs text-muted-foreground/60">{c.time}</span>,
-  }));
+  const [selectedId, setSelectedId] = useState<string | null>(mockConversationsList[0]?.id ?? null);
+  const [contextOpen, setContextOpen] = useState(false);
+  const selected = mockConversationsList.find((c) => c.id === selectedId) ?? null;
+
+  // Mobile view state: list -> thread (tap conv) -> context (tap user icon)
+  const showThreadOnMobile = !!selectedId;
 
   return (
-    <PlaceholderPage
-      title="Conversations"
-      description="Unified inbox across WhatsApp, Instagram, Facebook and other channels"
-      icon={MessageSquare}
-      primaryAction="New conversation"
-      columns={[
-        { key: "customer", label: "Customer" },
-        { key: "channel", label: "Channel" },
-        { key: "queue", label: "Queue" },
-        { key: "status", label: "Status" },
-        { key: "agent", label: "Agent" },
-        { key: "lastMessage", label: "Last message" },
-        { key: "time", label: "Time" },
-      ]}
-      rows={rows}
-    />
+    <div className="h-[calc(100vh-3.5rem)] flex overflow-hidden">
+      {/* Left: list */}
+      <div className={cn(
+        "w-full lg:w-[340px] xl:w-[360px] shrink-0",
+        showThreadOnMobile && "hidden lg:flex lg:flex-col",
+        "flex flex-col",
+      )}>
+        <ConversationListPanel
+          conversations={mockConversationsList}
+          selectedId={selectedId}
+          onSelect={(id) => { setSelectedId(id); setContextOpen(false); }}
+        />
+      </div>
+
+      {/* Center: thread */}
+      <div className={cn(
+        "flex-1 min-w-0",
+        !showThreadOnMobile && "hidden lg:flex",
+        contextOpen && "hidden lg:flex",
+        "flex flex-col",
+      )}>
+        <ConversationThreadPanel
+          conversation={selected}
+          onBack={() => setSelectedId(null)}
+          onToggleContext={() => setContextOpen(true)}
+        />
+      </div>
+
+      {/* Right: context */}
+      <div className={cn(
+        "w-full lg:w-[320px] xl:w-[340px] shrink-0",
+        contextOpen ? "flex flex-col" : "hidden lg:flex lg:flex-col",
+      )}>
+        <ConversationContextPanel
+          conversation={selected}
+          onClose={() => setContextOpen(false)}
+        />
+      </div>
+    </div>
   );
 }
