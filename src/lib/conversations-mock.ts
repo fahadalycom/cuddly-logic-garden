@@ -45,6 +45,7 @@ export interface MockConversation {
   status: ConvStatus;
   priority: ConvPriority;
   assignedAgent: string | null;
+  assignmentType?: "auto" | "manual" | "sticky" | "overflow";
   lastMessage: string;
   lastTime: string;
   unread: number;
@@ -61,6 +62,7 @@ export const mockConversationsList: MockConversation[] = [
     status: "active",
     priority: "high",
     assignedAgent: "Sara Ahmed",
+    assignmentType: "auto",
     lastMessage: "Yes I'll pay tomorrow morning",
     lastTime: "2m",
     unread: 2,
@@ -91,6 +93,7 @@ export const mockConversationsList: MockConversation[] = [
     status: "waiting_internal",
     priority: "urgent",
     assignedAgent: "Hassan Ali",
+    assignmentType: "sticky",
     lastMessage: "Account login is still failing",
     lastTime: "12m",
     unread: 4,
@@ -161,6 +164,7 @@ export const mockConversationsList: MockConversation[] = [
     status: "waiting_customer",
     priority: "medium",
     assignedAgent: "Bilal Khan",
+    assignmentType: "auto",
     lastMessage: "Sent the ChatGPT Pro pricing",
     lastTime: "2h",
     unread: 0,
@@ -184,6 +188,7 @@ export const mockConversationsList: MockConversation[] = [
     status: "active",
     priority: "high",
     assignedAgent: "Sara Ahmed",
+    assignmentType: "manual",
     lastMessage: "Can I get a discount on yearly plan?",
     lastTime: "3h",
     unread: 1,

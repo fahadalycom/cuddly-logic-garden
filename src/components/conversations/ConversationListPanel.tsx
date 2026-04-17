@@ -149,9 +149,25 @@ export function ConversationListPanel({ conversations, selectedId, onSelect, cur
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-muted-foreground/60 mt-1 truncate">
-                      {c.assignedAgent ? `Assigned: ${c.assignedAgent}` : "Unassigned"}
-                    </p>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <p className="text-[10px] text-muted-foreground/60 truncate">
+                        {c.assignedAgent ? `Assigned: ${c.assignedAgent}` : "Unassigned"}
+                      </p>
+                      {c.assignmentType && c.assignedAgent && (
+                        <span
+                          className={cn(
+                            "shrink-0 px-1.5 py-px rounded text-[9px] font-semibold uppercase tracking-wide border",
+                            c.assignmentType === "auto" && "bg-primary/10 text-primary border-primary/20",
+                            c.assignmentType === "sticky" && "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+                            c.assignmentType === "manual" && "bg-muted/40 text-muted-foreground border-border/40",
+                            c.assignmentType === "overflow" && "bg-destructive/10 text-destructive border-destructive/20",
+                          )}
+                          title={`${c.assignmentType} assignment`}
+                        >
+                          {c.assignmentType === "auto" ? "Auto" : c.assignmentType === "sticky" ? "Sticky" : c.assignmentType === "manual" ? "Manual" : "Overflow"}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </button>
               </li>

@@ -1554,6 +1554,42 @@ export type Database = {
         }
         Relationships: []
       }
+      wa_assignment_log: {
+        Row: {
+          assigned_by: string | null
+          assigned_to: string | null
+          assignment_type: string
+          conversation_id: string
+          created_at: string
+          id: string
+          placement: string
+          queue_type: string | null
+          reason: string | null
+        }
+        Insert: {
+          assigned_by?: string | null
+          assigned_to?: string | null
+          assignment_type?: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          placement?: string
+          queue_type?: string | null
+          reason?: string | null
+        }
+        Update: {
+          assigned_by?: string | null
+          assigned_to?: string | null
+          assignment_type?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          placement?: string
+          queue_type?: string | null
+          reason?: string | null
+        }
+        Relationships: []
+      }
       wa_auto_response_log: {
         Row: {
           agent_approved: boolean | null
@@ -1911,6 +1947,10 @@ export type Database = {
         Args: { _agent_id: string; _conversation_id: string; _force?: boolean }
         Returns: Json
       }
+      auto_assign_conversation: {
+        Args: { _conversation_id: string }
+        Returns: Json
+      }
       get_user_roles: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"][]
@@ -1923,7 +1963,15 @@ export type Database = {
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      manual_assign_conversation: {
+        Args: { _agent_id: string; _conversation_id: string; _force?: boolean }
+        Returns: Json
+      }
       promote_next_from_queue: { Args: { _agent_id: string }; Returns: string }
+      role_for_queue: {
+        Args: { _queue: string }
+        Returns: Database["public"]["Enums"]["app_role"][]
+      }
     }
     Enums: {
       account_status: "available" | "assigned" | "exhausted" | "expired"
