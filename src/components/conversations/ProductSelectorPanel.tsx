@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Package, Layers, Sparkles, Trash2, Pencil, Send, Calculator, Minus, Plus, ArrowLeft, FileText, Copy, CheckCheck, CheckCircle2 } from "lucide-react";
+import { Search, Package, Layers, Sparkles, Trash2, Pencil, Send, Calculator, Minus, Plus, ArrowLeft, FileText, Copy, CheckCheck, CheckCircle2, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { PRODUCT_TYPE_COLOR, PRODUCT_TYPE_LABEL, type ProductFull, type Plan, ty
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/template-engine";
 import { InvoicePreview, type InvoicePreviewData } from "./InvoicePreview";
+import { OrderPreview, type OrderPreviewData, type OrderStatusVal, type PaymentStatusVal, type FulfillmentStatusVal } from "./OrderPreview";
 import { toast } from "@/hooks/use-toast";
 
 interface Props {
@@ -37,7 +38,7 @@ interface SelectedProduct {
   priceOverride?: number | null;
 }
 
-type Step = "select" | "pricing" | "preview" | "invoice";
+type Step = "select" | "pricing" | "preview" | "invoice" | "order";
 type DiscountMode = "none" | "fixed" | "percent";
 
 export function ProductSelectorPanel({
@@ -74,6 +75,11 @@ export function ProductSelectorPanel({
   const [savedInvoice, setSavedInvoice] = useState<InvoicePreviewData | null>(null);
   const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(null);
 
+  // Order
+  const [orderNotes, setOrderNotes] = useState("");
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [savedOrder, setSavedOrder] = useState<OrderPreviewData | null>(null);
+  const [savedOrderId, setSavedOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -152,6 +158,9 @@ export function ProductSelectorPanel({
     setInvoiceNotes("");
     setSavedInvoice(null);
     setSavedInvoiceId(null);
+    setOrderNotes("");
+    setSavedOrder(null);
+    setSavedOrderId(null);
     setStep("select");
   }
 
