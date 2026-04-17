@@ -60,11 +60,10 @@ export default function ConversationsPage() {
         </div>
       ) : (
         <div className="flex-1 min-h-0 flex overflow-hidden">
-          {/* List panel */}
+          {/* List panel — visible on mobile only when no chat is selected */}
           <div className={cn(
-            "w-full lg:w-[340px] xl:w-[380px] shrink-0 border-r border-border/40",
-            !showListMobile && "hidden lg:flex",
-            "flex flex-col min-h-0",
+            "w-full lg:w-[340px] xl:w-[380px] shrink-0 border-r border-border/40 flex-col min-h-0",
+            showListMobile ? "flex" : "hidden lg:flex",
           )}>
             <ConversationListPanel
               conversations={mockConversationsList}
@@ -73,12 +72,10 @@ export default function ConversationsPage() {
             />
           </div>
 
-          {/* Thread panel */}
+          {/* Thread panel — visible on mobile only when a chat is selected and context isn't open */}
           <div className={cn(
-            "flex-1 min-w-0 min-h-0",
-            !showThreadMobile && !selected && "hidden lg:flex",
-            showContextMobile && "hidden lg:flex",
-            "flex flex-col",
+            "flex-1 min-w-0 min-h-0 flex-col",
+            showThreadMobile ? "flex" : "hidden lg:flex",
           )}>
             {selected ? (
               <ConversationThreadPanel
@@ -99,11 +96,10 @@ export default function ConversationsPage() {
             )}
           </div>
 
-          {/* Context panel */}
+          {/* Context panel — full-screen on mobile when toggled, side panel on desktop */}
           <div className={cn(
-            "w-full lg:w-[320px] xl:w-[360px] shrink-0",
-            showContextMobile ? "flex flex-col" : "hidden lg:flex lg:flex-col",
-            "min-h-0",
+            "w-full lg:w-[320px] xl:w-[360px] shrink-0 flex-col min-h-0",
+            showContextMobile ? "flex" : "hidden lg:flex",
           )}>
             <ConversationContextPanel
               conversation={selected}
