@@ -37,10 +37,19 @@ interface SelectedProduct {
   priceOverride?: number | null;
 }
 
-type Step = "select" | "pricing" | "preview";
+type Step = "select" | "pricing" | "preview" | "invoice";
 type DiscountMode = "none" | "fixed" | "percent";
 
-export function ProductSelectorPanel({ open, onOpenChange, onInsert }: Props) {
+export function ProductSelectorPanel({
+  open,
+  onOpenChange,
+  onInsert,
+  conversationId = null,
+  customerName = null,
+  customerPhone = null,
+  customerEmail = null,
+  clientId = null,
+}: Props) {
   const [products, setProducts] = useState<ProductWithPlans[]>([]);
   const [bundles, setBundles] = useState<BundleWithItems[]>([]);
   const [loading, setLoading] = useState(false);
@@ -58,6 +67,13 @@ export function ProductSelectorPanel({ open, onOpenChange, onInsert }: Props) {
   // Discount
   const [discountMode, setDiscountMode] = useState<DiscountMode>("none");
   const [discountValue, setDiscountValue] = useState<number>(0);
+
+  // Invoice
+  const [invoiceNotes, setInvoiceNotes] = useState("");
+  const [savingInvoice, setSavingInvoice] = useState(false);
+  const [savedInvoice, setSavedInvoice] = useState<InvoicePreviewData | null>(null);
+  const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (!open) return;
