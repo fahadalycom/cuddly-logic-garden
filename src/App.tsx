@@ -28,6 +28,16 @@ import RolesPage from "./pages/Roles";
 import TemplatesPage from "./pages/Templates";
 import AuditLogsPage from "./pages/AuditLogs";
 import WhatsAppPage from "./pages/WhatsApp";
+import ConversationsPage from "./pages/Conversations";
+import LeadsPage from "./pages/Leads";
+import SupportPage from "./pages/Support";
+import FulfillmentPage from "./pages/Fulfillment";
+import ProvisioningPage from "./pages/Provisioning";
+import ResearchPage from "./pages/Research";
+import VendorsPage from "./pages/Vendors";
+import TasksPage from "./pages/Tasks";
+import ReportsPage from "./pages/Reports";
+import TeamManagementPage from "./pages/TeamManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,19 +54,29 @@ const App = () => (
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/conversations" element={<ConversationsPage />} />
+              <Route path="/leads" element={<LeadsPage />} />
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/orders" element={<OrdersPage />} />
               <Route path="/orders/new" element={<NewOrderPage />} />
               <Route path="/payments" element={<PaymentsPage />} />
+              <Route path="/fulfillment" element={<FulfillmentPage />} />
               <Route path="/delivery" element={<DeliveryPage />} />
               <Route path="/completed" element={<CompletedPage />} />
+              <Route path="/provisioning" element={<ProvisioningPage />} />
               <Route path="/inventory" element={<InventoryPage />} />
+              <Route path="/support" element={<SupportPage />} />
               <Route path="/clients" element={<ClientsPage />} />
               <Route path="/clients/:id" element={<ClientProfilePage />} />
               <Route path="/renewals" element={<RenewalsPage />} />
               <Route path="/reminders" element={<RemindersPage />} />
               <Route path="/feedback" element={<FeedbackPage />} />
               <Route path="/old-clients" element={<OldClientsPage />} />
+              <Route path="/research" element={<ResearchPage />} />
+              <Route path="/vendors" element={<VendorsPage />} />
+              <Route path="/tasks" element={<TasksPage />} />
+              <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/team" element={<TeamManagementPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/settings/staff" element={<StaffPage />} />

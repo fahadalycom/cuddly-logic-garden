@@ -1,7 +1,8 @@
 import {
   LayoutDashboard, Package, ShoppingCart, CreditCard, Database, Users, RefreshCw,
-  MessageSquare, BarChart3, Settings, LogOut, Truck, CheckCircle,
-  Clock, Shield, FileText, UserCog, MessageCircle, Archive, Zap
+  MessageSquare, BarChart3, Settings, LogOut, Truck, CheckCircle, Clock, Shield,
+  FileText, UserCog, MessageCircle, Archive, Zap, UserPlus, LifeBuoy, KeyRound,
+  FlaskConical, Handshake, ListChecks, UsersRound,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -18,35 +19,51 @@ interface NavGroup { label: string; items: NavItem[]; }
 
 const navGroups: NavGroup[] = [
   { label: "Overview", items: [
-    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, module: "dashboard" },
-    { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle, module: "dashboard" },
+    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  ]},
+  { label: "Inbox", items: [
+    { title: "Conversations", url: "/conversations", icon: MessageSquare },
+    { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
+  ]},
+  { label: "Pipeline", items: [
+    { title: "Leads", url: "/leads", icon: UserPlus },
+    { title: "Customers", url: "/clients", icon: Users, module: "clients" },
+  ]},
+  { label: "Catalog", items: [
+    { title: "Products", url: "/products", icon: Package, module: "products" },
   ]},
   { label: "Sales", items: [
-    { title: "Products", url: "/products", icon: Package, module: "products" },
     { title: "New Order", url: "/orders/new", icon: ShoppingCart, module: "orders" },
     { title: "Orders", url: "/orders", icon: FileText, module: "orders" },
-  ]},
-  { label: "Finance", items: [
     { title: "Payments", url: "/payments", icon: CreditCard, module: "payments" },
   ]},
   { label: "Operations", items: [
+    { title: "Fulfillment", url: "/fulfillment", icon: Truck },
     { title: "To Deliver", url: "/delivery", icon: Truck, module: "orders" },
     { title: "Completed", url: "/completed", icon: CheckCircle, module: "orders" },
+    { title: "Account Provisioning", url: "/provisioning", icon: KeyRound },
     { title: "Inventory", url: "/inventory", icon: Database, module: "inventory" },
   ]},
-  { label: "Clients", items: [
-    { title: "All Clients", url: "/clients", icon: Users, module: "clients" },
-  ]},
-  { label: "Retention", items: [
+  { label: "Lifecycle", items: [
+    { title: "Support", url: "/support", icon: LifeBuoy },
     { title: "Renewals", url: "/renewals", icon: RefreshCw, module: "renewals" },
     { title: "Reminders", url: "/reminders", icon: Clock, module: "renewals" },
     { title: "Feedback", url: "/feedback", icon: MessageSquare, module: "feedback" },
     { title: "Old Clients", url: "/old-clients", icon: Archive, module: "feedback" },
   ]},
+  { label: "Growth", items: [
+    { title: "Research", url: "/research", icon: FlaskConical },
+    { title: "Vendors / Deals", url: "/vendors", icon: Handshake },
+  ]},
+  { label: "Workflow", items: [
+    { title: "Tasks", url: "/tasks", icon: ListChecks },
+  ]},
   { label: "Insights", items: [
+    { title: "Reports", url: "/reports", icon: BarChart3 },
     { title: "Analytics", url: "/analytics", icon: BarChart3, module: "analytics" },
   ]},
   { label: "Admin", items: [
+    { title: "Team Management", url: "/team", icon: UsersRound },
     { title: "Staff & Teams", url: "/settings/staff", icon: UserCog, module: "settings" },
     { title: "Roles", url: "/settings/roles", icon: Shield, module: "settings" },
     { title: "Templates", url: "/settings/templates", icon: MessageCircle, module: "settings" },
@@ -59,7 +76,8 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
-  const { profile, signOut, hasPermission } = useAuth();
+  const { profile, roles, signOut, hasPermission } = useAuth();
+  const primaryRole = roles[0]?.replace(/_/g, " ") || "staff";
 
   return (
     <Sidebar collapsible="icon">
@@ -70,8 +88,8 @@ export function AppSidebar() {
               <Zap className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-[13px] font-bold text-sidebar-accent-foreground tracking-tight leading-none">AI Sub Manager</p>
-              <p className="text-[10px] font-medium text-sidebar-foreground/55 uppercase tracking-[0.2em] mt-1">Management Suite</p>
+              <p className="text-[13px] font-bold text-sidebar-accent-foreground tracking-tight leading-none">SubManager</p>
+              <p className="text-[10px] font-medium text-sidebar-foreground/55 uppercase tracking-[0.2em] mt-1">Business OS</p>
             </div>
           </div>
         ) : (
@@ -132,7 +150,7 @@ export function AppSidebar() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[12px] font-semibold text-sidebar-accent-foreground truncate leading-none">{profile.full_name}</p>
-              <p className="text-[10px] text-sidebar-foreground/65 truncate mt-1">{profile.email}</p>
+              <p className="text-[10px] text-sidebar-foreground/65 truncate mt-1 capitalize">{primaryRole}</p>
             </div>
           </div>
         )}
