@@ -45,6 +45,7 @@ export interface MockConversation {
   status: ConvStatus;
   priority: ConvPriority;
   assignedAgent: string | null;
+  assignmentType?: "auto" | "manual" | "sticky" | "overflow";
   lastMessage: string;
   lastTime: string;
   unread: number;
