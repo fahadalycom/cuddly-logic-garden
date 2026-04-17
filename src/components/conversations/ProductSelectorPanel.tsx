@@ -676,16 +676,21 @@ export function ProductSelectorPanel({
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => {
                 if (step === "preview") setStep("pricing");
                 else if (step === "invoice") setStep("pricing");
+                else if (step === "order") setStep("invoice");
                 else if (step === "pricing") setStep("select");
               }}>
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             )}
-            {step === "pricing" ? <Calculator className="h-4 w-4 text-primary" /> : step === "invoice" ? <FileText className="h-4 w-4 text-primary" /> : <Package className="h-4 w-4 text-primary" />}
+            {step === "pricing" ? <Calculator className="h-4 w-4 text-primary" />
+              : step === "invoice" ? <FileText className="h-4 w-4 text-primary" />
+              : step === "order" ? <ShoppingCart className="h-4 w-4 text-primary" />
+              : <Package className="h-4 w-4 text-primary" />}
             {step === "select" && "Product Selector"}
             {step === "pricing" && "Pricing Calculator"}
             {step === "preview" && "Message Preview"}
             {step === "invoice" && "Invoice"}
+            {step === "order" && "Create Order"}
             {totalSelected > 0 && step === "select" && (
               <Badge variant="secondary" className="ml-auto h-5 text-[10px]">{totalSelected} selected</Badge>
             )}
