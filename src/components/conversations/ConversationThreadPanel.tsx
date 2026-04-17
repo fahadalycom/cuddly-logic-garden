@@ -163,6 +163,9 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
       <div className="border-t border-border/40 bg-card/40 p-2">
         {tab === "messages" ? (
           <div className="flex items-end gap-2">
+            <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setProductPanelOpen(true)} title="Insert products">
+              <Package className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0">
               <Paperclip className="h-4 w-4" />
             </Button>
@@ -195,6 +198,12 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
           </div>
         )}
       </div>
+
+      <ProductSelectorPanel
+        open={productPanelOpen}
+        onOpenChange={setProductPanelOpen}
+        onInsert={(text) => setDraft((prev) => (prev ? `${prev}\n\n${text}` : text))}
+      />
     </div>
   );
 }
