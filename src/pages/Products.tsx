@@ -257,7 +257,7 @@ export default function ProductsPage() {
                     <div className="mt-auto pt-3 border-t border-border/20 flex items-end justify-between">
                       <div>
                         <p className="text-lg font-bold">{formatCurrency(finalPrice)}</p>
-                        {savings > 0 && <p className="text-[10px] text-emerald-400">Save {formatCurrency(savings)}</p>}
+                        {savings > 0 && <p className="text-[10px] text-primary">Save {formatCurrency(savings)}</p>}
                       </div>
                       {isAdmin && (
                         <div className="flex gap-1">
