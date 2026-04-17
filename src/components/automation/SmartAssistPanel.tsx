@@ -113,7 +113,7 @@ export function SmartAssistPanel({ conversation, onUseDraft, enabled }: Props) {
     const r = await aiAssist.classify({ transcript, customer_name: conversation.customerName });
     setClassifyLoading(false);
     if (!r.ok) { toast.error(r.error); return; }
-    setAiHints(r.result as ConversationHints);
+    setAiHints(r.data.result as ConversationHints);
     toast.success("AI classification applied");
   };
 
@@ -122,7 +122,7 @@ export function SmartAssistPanel({ conversation, onUseDraft, enabled }: Props) {
     const r = await aiAssist.summarize({ target: "conversation", context: transcript });
     setSummaryLoading(false);
     if (!r.ok) { toast.error(r.error); return; }
-    setSummary(r.summary);
+    setSummary(r.data.summary);
   };
 
   const runRewrite = async (tpl: Template) => {
@@ -132,7 +132,7 @@ export function SmartAssistPanel({ conversation, onUseDraft, enabled }: Props) {
     });
     setDraftLoading(false);
     if (!r.ok) { toast.error(r.error); return; }
-    setDraft(r.reply);
+    setDraft(r.data.reply);
   };
 
   const runFreshReply = async () => {
@@ -140,7 +140,7 @@ export function SmartAssistPanel({ conversation, onUseDraft, enabled }: Props) {
     const r = await aiAssist.suggestReply({ transcript, customer_name: conversation.customerName });
     setDraftLoading(false);
     if (!r.ok) { toast.error(r.error); return; }
-    setDraft(r.reply);
+    setDraft(r.data.reply);
   };
 
   return (
