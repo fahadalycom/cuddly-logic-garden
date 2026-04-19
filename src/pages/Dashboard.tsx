@@ -12,12 +12,14 @@ import {
   CreditCard, UserPlus, Activity,
 } from "lucide-react";
 import { mockConversations, mockLeads, mockTickets, mockRenewals, mockTasks, mockTeam } from "@/lib/mock-data";
+import { ChannelHealthHighlights } from "@/components/dashboard/ChannelHealthHighlights";
 import type { AppRole } from "@/types/database";
 
 // ---------- FOUNDER / ADMIN ----------
 function FounderDashboard() {
   return (
     <>
+      <ChannelHealthHighlights />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard title="Sales Today" value="$1,840" icon={DollarSign} accent="emerald" trend={{ value: "12% vs yesterday", up: true }} />
         <StatCard title="Total Orders" value="324" icon={ShoppingCart} accent="primary" subtitle="Last 30 days" />

@@ -106,7 +106,16 @@ export function useConversationMessages(conversationId: string | null) {
     setMessages((prev) => [...prev, optimistic]);
 
     try {
-      const { data, error } = await supabase.functions.invoke("whatsapp-send", {
+      // Look up channel to choose the correct send function
+      const { data: convRow } = await supabase
+        .from("wa_conversations")
+        .select("channel")
+        .eq("id", dbId)
+        .maybeSingle();
+      const ch = convRow?.channel ?? "whatsapp";
+      const fn = (ch === "facebook" || ch === "instagram") ? "messenger-send" : "whatsapp-send";
+
+      const { data, error } = await supabase.functions.invoke(fn, {
         body: {
           conversation_id: dbId,
           content: trimmed,
