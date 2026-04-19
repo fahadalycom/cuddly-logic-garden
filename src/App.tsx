@@ -88,6 +88,7 @@ const App = () => (
             </Route>
             <Route element={<ProtectedRoute><FullBleedLayout /></ProtectedRoute>}>
               <Route path="/conversations" element={<ConversationsPage />} />
+              <Route path="/orders/new" element={<NewOrderPage />} />
             </Route>
             <Route path="/whatsapp" element={<Navigate to="/conversations" replace />} />
             <Route path="*" element={<NotFound />} />
