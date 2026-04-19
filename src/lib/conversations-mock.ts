@@ -528,9 +528,12 @@ export const mockMessagesByConv: Record<string, MockMessage[]> = {
   conv_13: [
     { id: "m1", conversationId: "conv_13", sender: "customer", senderName: "Ayesha", text: "Do you have any bundles?", time: "10:15", direction: "inbound" },
     { id: "m2", conversationId: "conv_13", sender: "agent", senderName: "Bilal", text: "Sent you the bundle pricing — let me know!", time: "10:45", direction: "outbound", status: "sent_to_api" },
+    { id: "m3", conversationId: "conv_13", sender: "agent", senderName: "Bilal", text: "Following up — any thoughts on the bundle?", time: "10:50", direction: "outbound", status: "permanently_failed", retryCount: 3, errorMessage: "Messenger conversation closed by user — cannot deliver" },
   ],
   conv_14: [
     { id: "m1", conversationId: "conv_14", sender: "customer", senderName: "Rohan", text: "Canva isn't loading on my Mac at all", time: "10:30", direction: "inbound" },
+    { id: "m2", conversationId: "conv_14", sender: "agent", senderName: "Hassan", text: "Sent you troubleshooting steps via email.", time: "10:40", direction: "outbound", status: "delivered" },
+    { id: "m3", conversationId: "conv_14", sender: "agent", senderName: "Hassan", text: "Re-sending the password reset link…", time: "10:42", direction: "outbound", status: "failed", retryCount: 0, errorMessage: "SMTP relay rejected: mailbox full" },
   ],
   conv_15: [
     { id: "m1", conversationId: "conv_15", sender: "customer", senderName: "Bilal", text: "Sending payment now", time: "09:30", direction: "inbound" },
@@ -539,6 +542,7 @@ export const mockMessagesByConv: Record<string, MockMessage[]> = {
   ],
   conv_16: [
     { id: "m1", conversationId: "conv_16", sender: "customer", senderName: "Sadia", text: "Do you accept JazzCash?", time: "08:30", direction: "inbound" },
+    { id: "m2", conversationId: "conv_16", sender: "agent", senderName: "Sara", text: "Yes! Sending account details…", time: "08:31", direction: "outbound", status: "retrying", retryCount: 2, errorMessage: "Instagram graph API timeout (504) — retrying" },
   ],
   conv_17: [
     { id: "m1", conversationId: "conv_17", sender: "customer", senderName: "Imran", text: "I was charged TWICE for the same renewal!", time: "07:30", direction: "inbound" },
