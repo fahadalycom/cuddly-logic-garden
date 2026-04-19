@@ -37,7 +37,18 @@ interface Props {
 type Tab = "messages" | "notes";
 
 const MAX_FILE_BYTES = 16 * 1024 * 1024; // 16 MB
-const ACCEPT_MIME = "image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt";
+
+// Per-channel attachment capabilities (Meta API limits):
+//   WhatsApp  — images, videos, audio, documents
+//   Messenger — images, documents
+//   Instagram — images only
+type ChannelCaps = { canAttach: boolean; accept: string; allowDocs: boolean; note?: string };
+const CHANNEL_CAPS: Record<string, ChannelCaps> = {
+  whatsapp:  { canAttach: true, accept: "image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt", allowDocs: true },
+  facebook:  { canAttach: true, accept: "image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt", allowDocs: true },
+  instagram: { canAttach: true, accept: "image/*", allowDocs: false, note: "Instagram DMs only support images." },
+};
+const DEFAULT_CAPS: ChannelCaps = { canAttach: false, accept: "", allowDocs: false, note: "Attachments not supported on this channel." };
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -91,6 +102,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const notes: MockInternalNote[] = mockNotesByConv[conversation.id] || [];
   const canSend = isRealConversationId(conversation.id);
   const busy = submitting || uploading;
+  const caps = CHANNEL_CAPS[conversation.channel] ?? DEFAULT_CAPS;
 
   const handleJumpToFailed = () => {
     if (!latestFailedId) return;
@@ -146,8 +158,10 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
     }
     const isImage = file.type.startsWith("image/");
     const isAllowedDoc = /pdf|msword|officedocument|excel|spreadsheet|text\/plain/i.test(file.type);
-    if (!isImage && !isAllowedDoc) {
-      toast.error("Unsupported file type. Use image, PDF, Office doc or .txt.");
+    if (!isImage && (!isAllowedDoc || !caps.allowDocs)) {
+      toast.error(caps.allowDocs
+        ? "Unsupported file type. Use image, PDF, Office doc or .txt."
+        : caps.note ?? "This channel only accepts images.");
       return;
     }
     setUploading(true);
@@ -359,7 +373,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
               <input
                 ref={fileInputRef}
                 type="file"
-                accept={ACCEPT_MIME}
+                accept={caps.accept}
                 className="hidden"
                 onChange={handleFileChange}
               />
@@ -371,8 +385,13 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
                 size="icon"
                 className="h-9 w-9 shrink-0"
                 onClick={handleFilePick}
-                disabled={!canSend || busy}
-                title={canSend ? "Attach file" : "Connect channel to attach files"}
+                disabled={!canSend || busy || !caps.canAttach}
+                title={
+                  !canSend ? "Connect channel to attach files"
+                  : !caps.canAttach ? (caps.note ?? "Attachments not supported on this channel")
+                  : caps.allowDocs ? "Attach image or document"
+                  : (caps.note ?? "Attach image")
+                }
               >
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
               </Button>

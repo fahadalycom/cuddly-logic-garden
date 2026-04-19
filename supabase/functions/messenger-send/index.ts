@@ -103,11 +103,15 @@ serve(async (req) => {
     let externalId: string | null = null;
     let providerResponse: any = null;
     let errorCode: string | null = null;
+    let errorSubcode: number | null = null;
     let errorMessage: string | null = null;
+    let httpStatus: number | null = null;
     let failed = false;
+    let configMissing = false;
 
     if (!token || !senderEntityId) {
       failed = true;
+      configMissing = true;
       errorMessage = "Missing access token or sender id in integration config";
     } else {
       try {
@@ -130,10 +134,12 @@ serve(async (req) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        httpStatus = resp.status;
         providerResponse = await resp.json();
         if (!resp.ok) {
           failed = true;
           errorCode = String(providerResponse?.error?.code ?? resp.status);
+          errorSubcode = providerResponse?.error?.error_subcode ?? null;
           errorMessage = providerResponse?.error?.message || "Meta API error";
         } else {
           externalId = providerResponse.message_id ?? null;
@@ -144,9 +150,19 @@ serve(async (req) => {
       }
     }
 
+    // Permanent vs transient: same classification policy as whatsapp-send.
+    const PERMANENT_CODES = new Set(["190", "200", "10", "100", "551", "613"]);
+    const PERMANENT_SUBCODES = new Set([463, 467, 1545041, 2018028, 2018108]);
+    const isPermanent = failed && (
+      configMissing ||
+      (errorCode && PERMANENT_CODES.has(errorCode)) ||
+      (errorSubcode != null && PERMANENT_SUBCODES.has(errorSubcode)) ||
+      httpStatus === 401 || httpStatus === 403
+    );
+
     const updates: Record<string, unknown> = { provider_response: providerResponse };
     if (failed) {
-      updates.delivery_status = "failed";
+      updates.delivery_status = isPermanent ? "permanently_failed" : "failed";
       updates.error_code = errorCode;
       updates.error_message = errorMessage;
     } else {
