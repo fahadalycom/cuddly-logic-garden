@@ -112,7 +112,7 @@ function InboundEventsList() {
 }
 
 function FailedSendsList() {
-  const { retry, retrying } = useMessageRetry();
+  const { retry, isRetrying } = useMessageRetry();
   const { data, isLoading, refetch } = useQuery<FailedMessage[]>({
     queryKey: ["ops_failed_sends"],
     queryFn: async () => {
@@ -161,10 +161,10 @@ function FailedSendsList() {
                   <Button
                     variant="outline" size="sm"
                     className="h-7 text-[11px]"
-                    disabled={retrying === m.id || m.delivery_status === "permanently_failed"}
+                    disabled={isRetrying(m.id) || m.delivery_status === "permanently_failed"}
                     onClick={async () => { await retry(m.id); refetch(); }}
                   >
-                    <RefreshCw className={cn("h-3 w-3 mr-1", retrying === m.id && "animate-spin")} />
+                    <RefreshCw className={cn("h-3 w-3 mr-1", isRetrying(m.id) && "animate-spin")} />
                     Retry
                   </Button>
                 </div>
