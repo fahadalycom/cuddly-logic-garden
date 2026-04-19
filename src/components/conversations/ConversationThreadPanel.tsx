@@ -199,19 +199,34 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
       )}
 
       {/* Reliability strip */}
-      <ConversationReliabilityStrip channel={conversation.channel} messages={messages} lastSyncLabel="just now" />
+      <ConversationReliabilityStrip
+        channel={conversation.channel}
+        messages={messages}
+        lastInboundAt={lastInboundAt}
+        isRealtime={isRealtime}
+        latestFailedId={latestFailedId}
+        onJumpToFailed={handleJumpToFailed}
+      />
 
       {/* Body */}
       <ScrollArea className="flex-1">
         {tab === "messages" ? (
           <div className="p-3 space-y-3">
             {messages.map((m) => (
-              <MessageBubble
+              <div
                 key={m.id}
-                m={m}
-                onRetry={() => handleRetry(m)}
-                isRetrying={isRetrying(m.id)}
-              />
+                ref={(el) => { messageRefs.current[m.id] = el; }}
+                className={cn(
+                  "rounded-2xl transition-shadow",
+                  highlightedId === m.id && "ring-2 ring-destructive/60 ring-offset-2 ring-offset-background",
+                )}
+              >
+                <MessageBubble
+                  m={m}
+                  onRetry={() => handleRetry(m)}
+                  isRetrying={isRetrying(m.id)}
+                />
+              </div>
             ))}
             {messages.length === 0 && (
               <p className="text-center text-xs text-muted-foreground py-8">No messages yet.</p>
