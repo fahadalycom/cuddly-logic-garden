@@ -14,9 +14,47 @@ async function getSettingValue(supabase: any, key: string, envFallback?: string)
     .from("system_settings")
     .select("value")
     .eq("key", key)
-    .single();
+    .maybeSingle();
   if (data?.value) return data.value;
   return envFallback ? (Deno.env.get(envFallback) || "") : "";
+}
+
+/**
+ * Canonical WhatsApp credential resolver — single source of truth.
+ * Order:
+ *   1. system_settings.meta_whatsapp_access_token  (current canonical key)
+ *   2. system_settings.meta_whatsapp_token         (legacy fallback)
+ *   3. META_WHATSAPP_TOKEN env                     (last-resort env fallback)
+ *
+ * Phone number id:
+ *   1. channel_integrations.config.phone_number_id (current canonical)
+ *   2. system_settings.meta_whatsapp_phone_id      (legacy)
+ *   3. META_WHATSAPP_PHONE_ID env                  (last-resort)
+ */
+async function resolveWhatsAppCreds(supabase: any): Promise<{ token: string; phoneId: string; source: { token: string; phoneId: string } }> {
+  const tokenCanonical = await getSettingValue(supabase, "meta_whatsapp_access_token");
+  const tokenLegacy = tokenCanonical ? "" : await getSettingValue(supabase, "meta_whatsapp_token");
+  const tokenEnv = (tokenCanonical || tokenLegacy) ? "" : (Deno.env.get("META_WHATSAPP_TOKEN") || "");
+  const token = tokenCanonical || tokenLegacy || tokenEnv;
+
+  const { data: integ } = await supabase
+    .from("channel_integrations")
+    .select("config")
+    .eq("channel_type", "whatsapp")
+    .maybeSingle();
+  const phoneFromIntegration: string = integ?.config?.phone_number_id || "";
+  const phoneLegacy = phoneFromIntegration ? "" : await getSettingValue(supabase, "meta_whatsapp_phone_id");
+  const phoneEnv = (phoneFromIntegration || phoneLegacy) ? "" : (Deno.env.get("META_WHATSAPP_PHONE_ID") || "");
+  const phoneId = phoneFromIntegration || phoneLegacy || phoneEnv;
+
+  return {
+    token,
+    phoneId,
+    source: {
+      token: tokenCanonical ? "meta_whatsapp_access_token" : tokenLegacy ? "meta_whatsapp_token (legacy)" : tokenEnv ? "META_WHATSAPP_TOKEN env (legacy)" : "none",
+      phoneId: phoneFromIntegration ? "channel_integrations.config" : phoneLegacy ? "meta_whatsapp_phone_id (legacy)" : phoneEnv ? "META_WHATSAPP_PHONE_ID env (legacy)" : "none",
+    },
+  };
 }
 async function uploadMediaToWhatsApp(
   supabase: any,
@@ -183,8 +221,24 @@ serve(async (req) => {
       messageId = inserted.id;
     }
 
-    const token = await getSettingValue(supabase, "meta_whatsapp_token", "META_WHATSAPP_TOKEN");
-    const phoneId = await getSettingValue(supabase, "meta_whatsapp_phone_id", "META_WHATSAPP_PHONE_ID");
+    const creds = await resolveWhatsAppCreds(supabase);
+    const token = creds.token;
+    const phoneId = creds.phoneId;
+    console.log(`[whatsapp-send] credential source token=${creds.source.token} phoneId=${creds.source.phoneId}`);
+
+    if (!token || !phoneId) {
+      const missing = !token ? "WhatsApp access token" : "WhatsApp Phone Number ID";
+      const errMsg = `${missing} is not configured. Open Channel Integrations → WhatsApp and save credentials.`;
+      await supabase.from("wa_messages").update({
+        delivery_status: "permanently_failed",
+        error_code: "no_credentials",
+        error_message: errMsg,
+      }).eq("id", messageId);
+      return new Response(JSON.stringify({ success: false, error: errMsg }), {
+        status: 207,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     let messagePayload: any = {
       messaging_product: "whatsapp",

@@ -12,9 +12,27 @@ async function getSetting(supabase: any, key: string, envFallback?: string): Pro
     .from("system_settings")
     .select("value")
     .eq("key", key)
-    .single();
+    .maybeSingle();
   if (data?.value) return data.value;
   return envFallback ? (Deno.env.get(envFallback) || "") : "";
+}
+
+/** Canonical WhatsApp credential resolver (mirrors whatsapp-send). */
+async function resolveWhatsAppCreds(supabase: any): Promise<{ token: string; phoneId: string }> {
+  const token =
+    (await getSetting(supabase, "meta_whatsapp_access_token")) ||
+    (await getSetting(supabase, "meta_whatsapp_token")) ||
+    Deno.env.get("META_WHATSAPP_TOKEN") || "";
+  const { data: integ } = await supabase
+    .from("channel_integrations")
+    .select("config")
+    .eq("channel_type", "whatsapp")
+    .maybeSingle();
+  const phoneId =
+    integ?.config?.phone_number_id ||
+    (await getSetting(supabase, "meta_whatsapp_phone_id")) ||
+    Deno.env.get("META_WHATSAPP_PHONE_ID") || "";
+  return { token, phoneId };
 }
 
 serve(async (req) => {
@@ -171,8 +189,7 @@ Respond ONLY in this JSON format:
     }).select().single();
 
     if (shouldAutoSend && analysis.suggested_response) {
-      const token = await getSetting(supabase, "meta_whatsapp_token", "META_WHATSAPP_TOKEN");
-      const phoneId = await getSetting(supabase, "meta_whatsapp_phone_id", "META_WHATSAPP_PHONE_ID");
+      const { token, phoneId } = await resolveWhatsAppCreds(supabase);
 
       if (token && phoneId) {
         const sendResp = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
