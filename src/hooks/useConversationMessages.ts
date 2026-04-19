@@ -1,33 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { mockMessagesByConv, type MockMessage } from "@/lib/conversations-mock";
+import type { MockMessage } from "@/lib/conversations-mock";
 import {
   isRealConversationId, realToDbId, mapWaMessage, type WaMessageRow,
 } from "@/lib/conversations-data";
 
-const SELECT = "id,conversation_id,sender_type,content,media_type,delivery_status,direction,retry_count,error_message,created_at,idempotency_key";
+const SELECT = "id,conversation_id,sender_type,content,media_type,media_url,media_mime_type,media_filename,delivery_status,direction,retry_count,error_message,created_at,idempotency_key";
+
+export interface SendAttachment {
+  url: string;
+  mime: string;
+  filename: string;
+  mediaType: "image" | "document";
+}
 
 interface SendResult { ok: boolean; error?: string }
 
 /**
  * Loads messages for a conversation. For real wa_conversations ids (prefixed
  * with "wa:") this fetches from wa_messages and subscribes to realtime
- * INSERT/UPDATE. For legacy mock ids it returns mock messages (read-only).
+ * INSERT/UPDATE. For non-real ids, returns empty messages with canSend=false.
  */
 export function useConversationMessages(conversationId: string | null) {
   const [messages, setMessages] = useState<MockMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const isReal = !!conversationId && isRealConversationId(conversationId);
   const dbId = isReal && conversationId ? realToDbId(conversationId) : null;
-  const idemRef = useRef<Map<string, string>>(new Map()); // optimisticId -> idempotency_key
+  const idemRef = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
-    if (!conversationId) { setMessages([]); return; }
-    if (!isReal || !dbId) {
-      setMessages(mockMessagesByConv[conversationId] || []);
-      return;
-    }
+    if (!conversationId || !isReal || !dbId) { setMessages([]); return; }
     let active = true;
     setLoading(true);
     (async () => {
@@ -50,7 +53,6 @@ export function useConversationMessages(conversationId: string | null) {
         const row = payload.new as WaMessageRow;
         const mapped = mapWaMessage(row);
         setMessages((prev) => {
-          // Replace optimistic version if idempotency_key matches
           if (row.idempotency_key) {
             const optimisticIdx = prev.findIndex((m) =>
               m.id.startsWith("optim_") && idemRef.current.get(m.id) === row.idempotency_key
@@ -80,9 +82,12 @@ export function useConversationMessages(conversationId: string | null) {
     };
   }, [conversationId, isReal, dbId]);
 
-  const sendMessage = useCallback(async (text: string): Promise<SendResult> => {
+  const sendMessage = useCallback(async (
+    text: string,
+    attachment?: SendAttachment,
+  ): Promise<SendResult> => {
     const trimmed = text.trim();
-    if (!trimmed) return { ok: false, error: "Empty" };
+    if (!trimmed && !attachment) return { ok: false, error: "Empty" };
     if (!isReal || !dbId) {
       toast.info("Real send only available for connected channels");
       return { ok: false, error: "Channel not connected" };
@@ -102,11 +107,15 @@ export function useConversationMessages(conversationId: string | null) {
       time,
       direction: "outbound",
       status: "queued",
+      mediaUrl: attachment?.url ?? null,
+      mediaType: attachment?.mediaType ?? null,
+      mediaMimeType: attachment?.mime ?? null,
+      mediaFilename: attachment?.filename ?? null,
+      type: attachment?.mediaType === "image" ? "image" : attachment ? "file" : "text",
     };
     setMessages((prev) => [...prev, optimistic]);
 
     try {
-      // Look up channel to choose the correct send function
       const { data: convRow } = await supabase
         .from("wa_conversations")
         .select("channel")
@@ -120,13 +129,18 @@ export function useConversationMessages(conversationId: string | null) {
           conversation_id: dbId,
           content: trimmed,
           idempotency_key: idemKey,
+          ...(attachment ? {
+            media_url: attachment.url,
+            media_type: attachment.mediaType,
+            media_mime_type: attachment.mime,
+            media_filename: attachment.filename,
+          } : {}),
         },
       });
       if (error) throw error;
       if (data && (data as any).error) throw new Error((data as any).error);
       return { ok: true };
     } catch (e: any) {
-      // Mark optimistic message as failed
       setMessages((prev) => prev.map((m) =>
         m.id === optimisticId ? { ...m, status: "failed", errorMessage: e?.message || "Send failed" } : m
       ));
@@ -135,5 +149,5 @@ export function useConversationMessages(conversationId: string | null) {
     }
   }, [isReal, dbId, conversationId]);
 
-  return { messages, loading, sendMessage, isRealtime: isReal };
+  return { messages, loading, sendMessage, isRealtime: isReal, canSend: isReal };
 }

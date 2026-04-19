@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, RefreshCw, AlertTriangle, Package, ArrowRightLeft, RotateCw,
+  ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, RefreshCw, AlertTriangle, Package, ArrowRightLeft, RotateCw, X, Loader2, FileText, Download,
 } from "lucide-react";
+import EmojiPicker, { Theme as EmojiTheme } from "emoji-picker-react";
 import { ProductSelectorPanel } from "./ProductSelectorPanel";
 import { TicketDialog } from "@/components/support/TicketDialog";
 import { HandoffDialog } from "./HandoffDialog";
@@ -9,6 +10,7 @@ import type { HandoffQueue } from "@/lib/handoff";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChannelIcon } from "./ChannelIcon";
 import { ConvStatusBadge, QueueBadge } from "./ConvStatusBadge";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
@@ -16,9 +18,11 @@ import { MessageStatusIndicator } from "./MessageStatusIndicator";
 import { ConversationReliabilityStrip } from "./ConversationReliabilityStrip";
 import { isFailedStatus, isPendingStatus } from "@/lib/message-status";
 import { useSubmitGuard } from "@/hooks/useSubmitGuard";
-import { useConversationMessages } from "@/hooks/useConversationMessages";
+import { useConversationMessages, type SendAttachment } from "@/hooks/useConversationMessages";
 import { useMessageRetry } from "@/hooks/useMessageRetry";
 import { isRealConversationId } from "@/lib/conversations-data";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
   mockNotesByConv, type MockConversation, type MockMessage, type MockInternalNote,
 } from "@/lib/conversations-mock";
@@ -32,6 +36,15 @@ interface Props {
 
 type Tab = "messages" | "notes";
 
+const MAX_FILE_BYTES = 16 * 1024 * 1024; // 16 MB
+const ACCEPT_MIME = "image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt";
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
 export function ConversationThreadPanel({ conversation, onBack, onToggleContext }: Props) {
   const [tab, setTab] = useState<Tab>("messages");
   const [draft, setDraft] = useState("");
@@ -40,10 +53,15 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const [ticketOpen, setTicketOpen] = useState(false);
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [handoffSuggestion, setHandoffSuggestion] = useState<{ queue: HandoffQueue; reason: string } | undefined>();
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [pendingAttachment, setPendingAttachment] = useState<SendAttachment | null>(null);
+  const [uploading, setUploading] = useState(false);
   const { submitting, run } = useSubmitGuard();
   const { messages: liveMessages, sendMessage, isRealtime } = useConversationMessages(conversation?.id ?? null);
   const { retry: retryRemote, isRetrying } = useMessageRetry();
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
   const { latestFailedId, lastInboundAt } = useMemo(() => {
@@ -72,6 +90,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const messages: MockMessage[] = liveMessages;
   const notes: MockInternalNote[] = mockNotesByConv[conversation.id] || [];
   const canSend = isRealConversationId(conversation.id);
+  const busy = submitting || uploading;
 
   const handleJumpToFailed = () => {
     if (!latestFailedId) return;
@@ -85,15 +104,72 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
 
   const handleSend = () => run(async () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text && !pendingAttachment) return;
+    const attachment = pendingAttachment;
     setDraft("");
-    const result = await sendMessage(text);
-    if (!result.ok) setDraft(text); // restore draft on hard failure
+    setPendingAttachment(null);
+    const result = await sendMessage(text, attachment ?? undefined);
+    if (!result.ok) {
+      setDraft(text);
+      if (attachment) setPendingAttachment(attachment);
+    }
   });
 
   const handleRetry = async (m: MockMessage) => {
     if (isRetrying(m.id) || isPendingStatus(m.status)) return;
     await retryRemote(m.id);
+  };
+
+  const insertEmoji = (emoji: string) => {
+    const ta = textareaRef.current;
+    if (!ta) { setDraft((d) => d + emoji); return; }
+    const start = ta.selectionStart ?? draft.length;
+    const end = ta.selectionEnd ?? draft.length;
+    const next = draft.slice(0, start) + emoji + draft.slice(end);
+    setDraft(next);
+    requestAnimationFrame(() => {
+      ta.focus();
+      const pos = start + emoji.length;
+      ta.setSelectionRange(pos, pos);
+    });
+  };
+
+  const handleFilePick = () => fileInputRef.current?.click();
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > MAX_FILE_BYTES) {
+      toast.error(`File is too large (${formatBytes(file.size)}). Max 16 MB.`);
+      return;
+    }
+    const isImage = file.type.startsWith("image/");
+    const isAllowedDoc = /pdf|msword|officedocument|excel|spreadsheet|text\/plain/i.test(file.type);
+    if (!isImage && !isAllowedDoc) {
+      toast.error("Unsupported file type. Use image, PDF, Office doc or .txt.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const ext = file.name.includes(".") ? file.name.split(".").pop() : "";
+      const path = `outbound/${Date.now()}_${crypto.randomUUID()}${ext ? "." + ext : ""}`;
+      const { error: upErr } = await supabase.storage
+        .from("whatsapp-media")
+        .upload(path, file, { contentType: file.type, upsert: false });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("whatsapp-media").getPublicUrl(path);
+      setPendingAttachment({
+        url: pub.publicUrl,
+        mime: file.type,
+        filename: file.name,
+        mediaType: isImage ? "image" : "document",
+      });
+    } catch (err: any) {
+      toast.error(err?.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -125,7 +201,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
           <Button variant="ghost" size="icon" className="h-8 w-8 lg:hidden" onClick={onToggleContext}>
             <User className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Button variant="ghost" size="icon" className="h-8 w-8" disabled title="Coming soon">
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </div>
@@ -138,20 +214,19 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
             label="Transfer"
             onClick={() => { setHandoffSuggestion(undefined); setHandoffOpen(true); }}
           />
-          <ActionBtn icon={UserPlus} label="Assign" />
-          <ActionBtn icon={Tag} label="Status" />
-          <ActionBtn icon={Flag} label="Priority" />
+          <ActionBtn icon={UserPlus} label="Assign" disabled />
+          <ActionBtn icon={Tag} label="Status" disabled />
+          <ActionBtn icon={Flag} label="Priority" disabled />
           <ActionBtn icon={StickyNote} label="Add Note" onClick={() => setTab("notes")} />
           <ActionBtn
             icon={Ticket}
             label="Create Ticket"
             onClick={() => {
               setTicketOpen(true);
-              // Suggest support handoff after ticket creation
               setHandoffSuggestion({ queue: "support", reason: "Ticket created — route to support team" });
             }}
           />
-          <ActionBtn icon={User} label="View Customer" />
+          <ActionBtn icon={User} label="View Customer" disabled />
         </div>
 
         {/* Tabs */}
@@ -251,30 +326,101 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
       </ScrollArea>
 
       {/* Composer */}
-      <div className="border-t border-border/40 bg-card/40 p-2">
+      <div className="border-t border-border/40 bg-card/40 p-2 space-y-2">
         {tab === "messages" ? (
-          <div className="flex items-end gap-2">
-            <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setProductPanelOpen(true)} title="Insert products">
-              <Package className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0">
-              <Paperclip className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0">
-              <Smile className="h-4 w-4" />
-            </Button>
-            <Textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={canSend ? `Reply on ${conversation.channel}...` : `Demo channel — connect ${conversation.channel} to send`}
-              className="min-h-[40px] max-h-[120px] text-sm resize-none bg-background/40 border-border/30 rounded-lg"
-              rows={1}
-              disabled={!canSend}
-            />
-            <Button size="icon" className="h-9 w-9 shrink-0" disabled={!draft.trim() || submitting || !canSend} onClick={handleSend}>
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
+          <>
+            {pendingAttachment && (
+              <div className={cn(
+                "flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/40 bg-background/40 text-xs",
+                busy && "opacity-60",
+              )}>
+                {pendingAttachment.mediaType === "image" ? (
+                  <img src={pendingAttachment.url} alt="" className="h-8 w-8 rounded object-cover" />
+                ) : (
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="truncate font-medium">{pendingAttachment.filename}</p>
+                  <p className="text-[10px] text-muted-foreground">{pendingAttachment.mime}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  disabled={busy}
+                  onClick={() => setPendingAttachment(null)}
+                  title="Remove attachment"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPT_MIME}
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setProductPanelOpen(true)} title="Insert products" disabled={busy}>
+                <Package className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                onClick={handleFilePick}
+                disabled={!canSend || busy}
+                title={canSend ? "Attach file" : "Connect channel to attach files"}
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+              </Button>
+              <Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" disabled={busy} title="Insert emoji">
+                    <Smile className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent side="top" align="start" className="p-0 border-border/50 w-auto">
+                  <EmojiPicker
+                    theme={EmojiTheme.DARK}
+                    width={320}
+                    height={380}
+                    onEmojiClick={(e) => { insertEmoji(e.emoji); setEmojiOpen(false); }}
+                  />
+                </PopoverContent>
+              </Popover>
+              <Textarea
+                ref={textareaRef}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!busy && canSend && (draft.trim() || pendingAttachment)) handleSend();
+                  }
+                }}
+                placeholder={
+                  canSend
+                    ? `Reply on ${conversation.channel}...`
+                    : `${conversation.channel} not connected — set up the integration to send`
+                }
+                className="min-h-[40px] max-h-[120px] text-sm resize-none bg-background/40 border-border/30 rounded-lg"
+                rows={1}
+                disabled={!canSend || busy}
+                title={canSend ? undefined : `Connect ${conversation.channel} in Channel Integrations to enable sending`}
+              />
+              <Button
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                disabled={(!draft.trim() && !pendingAttachment) || busy || !canSend}
+                onClick={handleSend}
+              >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
+          </>
         ) : (
           <div className="flex items-end gap-2">
             <Textarea
@@ -305,7 +451,6 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
         open={ticketOpen}
         onOpenChange={(o) => {
           setTicketOpen(o);
-          // After ticket dialog closes, prompt for support handoff
           if (!o && handoffSuggestion) {
             setTimeout(() => setHandoffOpen(true), 300);
           }
@@ -332,9 +477,16 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   );
 }
 
-function ActionBtn({ icon: Icon, label, onClick }: { icon: any; label: string; onClick?: () => void }) {
+function ActionBtn({ icon: Icon, label, onClick, disabled }: { icon: any; label: string; onClick?: () => void; disabled?: boolean }) {
   return (
-    <Button variant="ghost" size="sm" onClick={onClick} className="h-7 px-2 text-[11px] gap-1.5 shrink-0 text-muted-foreground hover:text-foreground">
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={onClick}
+      disabled={disabled}
+      title={disabled ? "Coming soon" : undefined}
+      className="h-7 px-2 text-[11px] gap-1.5 shrink-0 text-muted-foreground hover:text-foreground"
+    >
       <Icon className="h-3.5 w-3.5" />
       {label}
     </Button>
@@ -352,6 +504,8 @@ function MessageBubble({ m, onRetry, isRetrying }: { m: MockMessage; onRetry?: (
   const isAgent = m.sender === "agent";
   const failed = isAgent && isFailedStatus(m.status);
   const pending = isAgent && isPendingStatus(m.status);
+  const hasImage = m.mediaUrl && m.mediaType === "image";
+  const hasDoc = m.mediaUrl && m.mediaType === "document";
 
   return (
     <div className={cn("flex flex-col gap-1", isAgent ? "items-end" : "items-start")}>
@@ -368,7 +522,34 @@ function MessageBubble({ m, onRetry, isRetrying }: { m: MockMessage; onRetry?: (
           {!isAgent && m.senderName && (
             <p className="text-[10px] font-medium opacity-70 mb-0.5">{m.senderName}</p>
           )}
-          <p className="leading-snug whitespace-pre-wrap break-words">{m.text}</p>
+          {hasImage && (
+            <a href={m.mediaUrl!} target="_blank" rel="noreferrer" className="block mb-1.5">
+              <img
+                src={m.mediaUrl!}
+                alt={m.mediaFilename ?? "attachment"}
+                className="max-h-60 max-w-full rounded-lg object-cover"
+                loading="lazy"
+              />
+            </a>
+          )}
+          {hasDoc && (
+            <a
+              href={m.mediaUrl!}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(
+                "flex items-center gap-2 rounded-md px-2 py-1.5 mb-1.5 border text-xs",
+                isAgent ? "bg-primary-foreground/10 border-primary-foreground/20" : "bg-background/40 border-border/40",
+              )}
+            >
+              <FileText className="h-4 w-4 shrink-0" />
+              <span className="flex-1 truncate">{m.mediaFilename ?? "Document"}</span>
+              <Download className="h-3.5 w-3.5 opacity-70" />
+            </a>
+          )}
+          {m.text && (
+            <p className="leading-snug whitespace-pre-wrap break-words">{m.text}</p>
+          )}
           <div className={cn("flex items-center gap-1 mt-1 text-[10px]", isAgent && !failed ? "text-primary-foreground/70 justify-end" : "text-muted-foreground justify-end")}>
             <span>{m.time}</span>
             {isAgent && (
