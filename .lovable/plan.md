@@ -1,81 +1,54 @@
 
 
-## Plan: Wire real wa_messages into Conversations UI
+This work is already done across prior approved plans:
 
-The Conversations module is currently 100% mock — `setTimeout`-simulated send pipeline, no `wa_messages` reads, no realtime, no real retry. Backend (`wa_conversations`, `wa_messages` with `delivery_status`/`idempotency_key`/`retry_count`, `whatsapp-send`, `whatsapp-retry-message`, `whatsapp-webhook` status callbacks) is ready. This step wires them together without redesigning UI.
+- DB transport state (`wa_messages.delivery_status`, `idempotency_key`, `retry_count`, `last_retry_at`, `error_code/message`, `provider_response`, `sent_at/delivered_at/read_at`, `external_message_id`, `direction`) — migrated.
+- `wa_inbound_events` raw webhook log + `wa_send_jobs` — migrated.
+- `whatsapp-send` (idempotent, status transitions), `whatsapp-webhook` (raw log + status callbacks), `whatsapp-retry-message` — deployed.
+- `MessageStatusIndicator`, `ConversationReliabilityStrip`, `useMessageRetry`, `message-status.ts` — created and wired into `ConversationThreadPanel`.
+- `useConversations` + `useConversationMessages` adapters with realtime + optimistic idempotent send — wired into `Conversations.tsx`.
+- Demo/mock states preserved for non-WhatsApp channels.
 
-Only WhatsApp has a real backend table today. Facebook/Instagram/email/web entries in the mock list will keep working as mock until their tables exist — the UI gracefully handles both.
+Re-running the same plan would be a no-op. The remaining gap from the original brief is: the reliability strip is currently mounted in the thread but does not yet surface **last-sync status** or a quick **jump-to-latest-failed** affordance, and Messenger/Instagram bubbles in mock conversations do not visually expose the new states (since mock data was only enriched for WhatsApp demos).
 
-### 1. New data layer
+## Plan: polish pass on transport-aware Conversations
 
-**`src/lib/conversations-data.ts`** — adapters between `wa_conversations`/`wa_messages` rows and the existing `MockConversation`/`MockMessage` shapes. Keeps UI components untouched.
-- `mapWaConversation(row) → MockConversation` (channel="whatsapp")
-- `mapWaMessage(row) → MockMessage` (sender from `sender_type`, status from `delivery_status`, plus `retryCount`/`errorMessage`/`direction`)
+Small, surgical additions only — no rebuild.
 
-**`src/hooks/useConversations.ts`** — fetches `wa_conversations` ordered by `last_message_at`, merges with the legacy mock entries for non-whatsapp channels (so demo UX is preserved). Subscribes to `wa_conversations` INSERT/UPDATE realtime → updates list (last message, unread, status).
+### 1. Reliability strip enrichments
+**Edit `src/components/conversations/ConversationReliabilityStrip.tsx`**
+- Accept `latestFailedId?: string` and `onJumpToFailed?: () => void` props.
+- When `r.failed > 0`, make the "N failed" pill a button that calls `onJumpToFailed`.
+- Show a "Last sync" relative time derived from the most recent inbound message timestamp (passed in via new `lastInboundAt?: string` prop).
 
-**`src/hooks/useConversationMessages.ts`** — for a given conversation id:
-- If id starts with `wa_` (real) → fetch `wa_messages where conversation_id=...` ordered by `created_at`, plus realtime channel listening for both INSERT (new inbound/outbound) and UPDATE (status transitions: queued → sending → sent_to_api → delivered → read, or → failed/retrying/permanently_failed).
-- If id is a legacy mock id → return mock messages (read-only).
-- Returns `{ messages, loading, sendMessage, retryMessage, isRealtime }`.
+**Edit `src/components/conversations/ConversationThreadPanel.tsx`**
+- Compute `latestFailedId` and `lastInboundAt` from `messages`.
+- Pass them into the strip.
+- `onJumpToFailed` scrolls the failed bubble into view (`scrollIntoView({ behavior: 'smooth', block: 'center' })`) and adds a 1.5s ring highlight.
 
-**`sendMessage(text)`** generates `idempotency_key = crypto.randomUUID()` client-side, optimistically inserts a local row with `delivery_status='queued'`, then calls `supabase.functions.invoke('whatsapp-send', { body: { conversation_id, content, idempotency_key } })`. Realtime UPDATE replaces optimistic row when server transitions arrive. Deduplicates by `idempotency_key`.
+### 2. Demo states for non-WhatsApp channels
+**Edit `src/lib/conversations-mock.ts`**
+- Add 1–2 messages per non-whatsapp mock conversation covering: `failed` (with `errorMessage`), `retrying`, `delivered`, `read`. Reuses the existing extended `MockMessage` type — no schema change.
+- This lets the bubbles + strip + retry UI be visually testable across Messenger/Instagram/Email/Web entries even before their backends exist.
+- Retry button on these mock failed messages calls a no-op handler that toasts "Retry available once channel is connected" (already the behavior in `useConversationMessages` for non-real ids; the bubble's retry just needs to surface that path — already wired).
 
-**`retryMessage(messageId)`** — already implemented in `useMessageRetry`; reuse it directly.
+### 3. Channel label + sync indicator clarity
+**Edit `ConversationReliabilityStrip.tsx`** (small)
+- Show channel label as a colored chip matching brand palette (warm amber for connected, muted for mock) so agents instantly see which conversations are live-transport vs demo.
+- Pass `isRealtime: boolean` from `useConversationMessages` through `ConversationThreadPanel` to the strip.
 
-### 2. UI wiring (no redesign)
+### 4. Files
 
-**`src/pages/Conversations.tsx`**
-- Replace `import { mockConversationsList }` with `const { conversations, loading } = useConversations()`.
-- Pass real list to `ConversationListPanel`. Keeps existing list UI/click/select behavior.
+**Edited (small)**
+- `src/components/conversations/ConversationReliabilityStrip.tsx` — new props, jump-to-failed button, last-sync, realtime chip.
+- `src/components/conversations/ConversationThreadPanel.tsx` — pass new props, scroll-to + highlight handler.
+- `src/lib/conversations-mock.ts` — add demo failed/retrying/delivered/read messages on non-whatsapp threads.
 
-**`src/components/conversations/ConversationThreadPanel.tsx`**
-- Remove the entire `setTimeout`-based simulated send pipeline (`handleSend`, `updateLocalStatus`, simulated `handleRetry`, `localMessages` state).
-- Use `useConversationMessages(conversation.id)` → returns real messages + send + retry.
-- `handleSend` becomes: `await sendMessage(text)` (wrapped in existing `useSubmitGuard`). Toasts on error; success is shown by the bubble status indicator.
-- `handleRetry(m)` becomes: `await retryMessage(m.id)` from `useMessageRetry`, with `isRetrying(m.id)` controlling the spinner.
-- `MessageBubble` and `MessageStatusIndicator` are already correctly wired — no changes.
-- The `ConversationReliabilityStrip` already uses `messages` prop with `computeReliability` — automatically reflects real data once messages are real.
+**Not touched**
+- DB schema, edge functions, hooks, `MessageStatusIndicator`, `useMessageRetry`, `message-status.ts`, `Conversations.tsx`, `ConversationListPanel.tsx`.
 
-**`ConversationListPanel`** — works as-is; just receives real items now (no prop signature change).
-
-### 3. Demo data fallback
-
-For conversations whose `id` doesn't match a real `wa_conversations` row (the legacy mock entries used to demo the multi-channel inbox), `useConversationMessages` returns mock messages and disables `sendMessage` (or shows a toast: "Real send only available for connected channels"). This way the existing demo UX still showcases multiple channels visually but the WhatsApp ones are now fully live.
-
-If the user prefers a clean cut (real-only, no mock entries in the list), `useConversations` can take a `{ realOnly: true }` flag — easy follow-up toggle. Default this round: hybrid (preserves the visual demo).
-
-### 4. Realtime subscriptions
-
-Single supabase channel `conversations:thread:{id}` per open thread:
-- `postgres_changes` on `wa_messages` filtered by `conversation_id`, listening for `INSERT` (new messages) and `UPDATE` (status transitions).
-- Cleaned up on conversation switch / unmount.
-
-Inbox-level channel `conversations:list`:
-- `postgres_changes` on `wa_conversations` for INSERT/UPDATE → re-sorts the list and updates unread badges.
-
-(Both tables are already in `supabase_realtime` publication per project memory.)
-
-### 5. Idempotency & resend safety
-
-- `sendMessage` always generates a fresh `idempotency_key`; submit button disabled while `useSubmitGuard` is in-flight.
-- Optimistic message keyed by `idempotency_key`. When the realtime INSERT for the real row arrives carrying the same `idempotency_key`, the optimistic version is replaced (not duplicated).
-- Retry button disabled while `isRetrying(id)` true or status is `sending`/`retrying`.
-
-### 6. Files
-
-**Created**
-- `src/lib/conversations-data.ts` — row → mock-shape adapters
-- `src/hooks/useConversations.ts` — list + realtime
-- `src/hooks/useConversationMessages.ts` — thread + send + realtime + retry
-
-**Edited**
-- `src/pages/Conversations.tsx` — use real hook for list
-- `src/components/conversations/ConversationThreadPanel.tsx` — remove simulated pipeline, call real send/retry, drive bubbles from real `delivery_status`
-- `src/lib/conversations-mock.ts` — keep as-is for non-WhatsApp demo entries; mark file with a comment that real data flows through `conversations-data.ts`
-
-### 7. Out of scope (explicit)
-- Sending media/attachments (text only this round; paperclip stays as UI placeholder).
-- Inbound message creation for Messenger/Instagram (no webhook yet).
-- Server-side auto-retry scheduler (manual retry button only).
+### 5. Out of scope
+- Messenger/IG real transport (no webhook yet — separate step).
+- Server-side auto-retry scheduler (still manual).
+- Media send (paperclip remains placeholder).
 
