@@ -32,7 +32,39 @@ import {
   MessageCircle,
   Facebook,
   Instagram,
+  ArrowRight,
+  Radio,
 } from "lucide-react";
+
+type Readiness = "not_configured" | "partially_configured" | "ready_for_webhook" | "ready_for_live" | "live";
+
+const READINESS_META: Record<Readiness, { label: string; cls: string; hint: string }> = {
+  not_configured: {
+    label: "Not configured",
+    cls: "bg-muted text-muted-foreground border-border",
+    hint: "Fill in the required credentials below, then save.",
+  },
+  partially_configured: {
+    label: "Partially configured",
+    cls: "bg-amber-500/15 text-amber-500 border-amber-500/30",
+    hint: "Save the verify token and run Test Connection to validate credentials.",
+  },
+  ready_for_webhook: {
+    label: "Ready for webhook",
+    cls: "bg-sky-500/15 text-sky-400 border-sky-500/30",
+    hint: "Paste the webhook URL + verify token into Meta App Dashboard and trigger a verification ping.",
+  },
+  ready_for_live: {
+    label: "Ready to go live",
+    cls: "bg-amber-500/15 text-amber-500 border-amber-500/30",
+    hint: "Webhook is receiving messages — flip the Enabled switch to start serving customers.",
+  },
+  live: {
+    label: "Live",
+    cls: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
+    hint: "Channel is active and healthy. No action needed.",
+  },
+};
 
 const ICONS: Record<ChannelType, any> = {
   whatsapp: MessageCircle,
