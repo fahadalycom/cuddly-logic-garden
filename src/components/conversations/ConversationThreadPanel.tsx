@@ -102,6 +102,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const notes: MockInternalNote[] = mockNotesByConv[conversation.id] || [];
   const canSend = isRealConversationId(conversation.id);
   const busy = submitting || uploading;
+  const caps = CHANNEL_CAPS[conversation.channel] ?? DEFAULT_CAPS;
 
   const handleJumpToFailed = () => {
     if (!latestFailedId) return;
@@ -157,8 +158,10 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
     }
     const isImage = file.type.startsWith("image/");
     const isAllowedDoc = /pdf|msword|officedocument|excel|spreadsheet|text\/plain/i.test(file.type);
-    if (!isImage && !isAllowedDoc) {
-      toast.error("Unsupported file type. Use image, PDF, Office doc or .txt.");
+    if (!isImage && (!isAllowedDoc || !caps.allowDocs)) {
+      toast.error(caps.allowDocs
+        ? "Unsupported file type. Use image, PDF, Office doc or .txt."
+        : caps.note ?? "This channel only accepts images.");
       return;
     }
     setUploading(true);
@@ -370,7 +373,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
               <input
                 ref={fileInputRef}
                 type="file"
-                accept={ACCEPT_MIME}
+                accept={caps.accept}
                 className="hidden"
                 onChange={handleFileChange}
               />
@@ -382,8 +385,13 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
                 size="icon"
                 className="h-9 w-9 shrink-0"
                 onClick={handleFilePick}
-                disabled={!canSend || busy}
-                title={canSend ? "Attach file" : "Connect channel to attach files"}
+                disabled={!canSend || busy || !caps.canAttach}
+                title={
+                  !canSend ? "Connect channel to attach files"
+                  : !caps.canAttach ? (caps.note ?? "Attachments not supported on this channel")
+                  : caps.allowDocs ? "Attach image or document"
+                  : (caps.note ?? "Attach image")
+                }
               >
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
               </Button>
