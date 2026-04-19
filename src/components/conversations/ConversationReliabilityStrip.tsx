@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, RefreshCw, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { computeReliability } from "@/lib/message-status";
 import { ChannelIcon } from "./ChannelIcon";
@@ -6,12 +6,41 @@ import type { ConvChannel } from "@/lib/conversations-mock";
 
 interface Props {
   channel: ConvChannel | string;
-  messages: Array<{ direction?: string; status?: string | null }>;
+  messages: Array<{ direction?: string; status?: string | null; sender?: string }>;
   lastSyncLabel?: string;
+  lastInboundAt?: string | Date | null;
+  isRealtime?: boolean;
+  latestFailedId?: string | null;
+  onJumpToFailed?: () => void;
   className?: string;
 }
 
-export function ConversationReliabilityStrip({ channel, messages, lastSyncLabel, className }: Props) {
+function formatRelative(input?: string | Date | null): string | null {
+  if (!input) return null;
+  const d = typeof input === "string" ? new Date(input) : input;
+  const ms = Date.now() - d.getTime();
+  if (Number.isNaN(ms)) return null;
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 5) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const days = Math.floor(h / 24);
+  return `${days}d ago`;
+}
+
+export function ConversationReliabilityStrip({
+  channel,
+  messages,
+  lastSyncLabel,
+  lastInboundAt,
+  isRealtime,
+  latestFailedId,
+  onJumpToFailed,
+  className,
+}: Props) {
   const r = computeReliability(messages);
 
   const healthMeta = {
@@ -21,15 +50,22 @@ export function ConversationReliabilityStrip({ channel, messages, lastSyncLabel,
   }[r.health];
 
   const HealthIcon = healthMeta.icon;
+  const syncLabel = lastSyncLabel ?? formatRelative(lastInboundAt);
+
+  // Brand-aware channel chip: warm amber for live transport, muted for demo/mock
+  const channelChipCls = isRealtime
+    ? "text-primary bg-primary/10 border-primary/30"
+    : "text-muted-foreground bg-muted/30 border-border/40";
 
   return (
     <div className={cn(
       "flex items-center gap-2 px-3 py-1 border-b border-border/30 bg-card/20 text-[10px] overflow-x-auto scrollbar-none",
       className,
     )}>
-      <span className="inline-flex items-center gap-1.5 text-muted-foreground shrink-0">
+      <span className={cn("inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded-full border shrink-0", channelChipCls)}>
         <ChannelIcon channel={channel as ConvChannel} size="sm" />
         <span className="capitalize">{channel}</span>
+        {isRealtime && <Radio className="h-2.5 w-2.5" />}
       </span>
 
       <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border shrink-0", healthMeta.cls)}>
@@ -38,10 +74,22 @@ export function ConversationReliabilityStrip({ channel, messages, lastSyncLabel,
       </span>
 
       {r.failed > 0 && (
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/30 shrink-0">
-          <AlertTriangle className="h-2.5 w-2.5" />
-          {r.failed} failed
-        </span>
+        latestFailedId && onJumpToFailed ? (
+          <button
+            type="button"
+            onClick={onJumpToFailed}
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/30 shrink-0 hover:bg-destructive/20 transition-colors cursor-pointer"
+            title="Jump to latest failed message"
+          >
+            <AlertTriangle className="h-2.5 w-2.5" />
+            {r.failed} failed
+          </button>
+        ) : (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/30 shrink-0">
+            <AlertTriangle className="h-2.5 w-2.5" />
+            {r.failed} failed
+          </span>
+        )
       )}
       {r.pending > 0 && (
         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 shrink-0">
@@ -55,8 +103,8 @@ export function ConversationReliabilityStrip({ channel, messages, lastSyncLabel,
           {r.delivered}/{r.total} delivered
         </span>
       )}
-      {lastSyncLabel && (
-        <span className="ml-auto text-muted-foreground/60 shrink-0">Last sync: {lastSyncLabel}</span>
+      {syncLabel && (
+        <span className="ml-auto text-muted-foreground/60 shrink-0">Last sync: {syncLabel}</span>
       )}
     </div>
   );
