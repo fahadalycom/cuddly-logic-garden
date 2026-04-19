@@ -59,7 +59,7 @@ const App = () => (
               <Route path="/leads" element={<LeadsPage />} />
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/orders" element={<OrdersPage />} />
-              <Route path="/orders/new" element={<NewOrderPage />} />
+              
               <Route path="/payments" element={<PaymentsPage />} />
               <Route path="/fulfillment" element={<FulfillmentPage />} />
               <Route path="/delivery" element={<DeliveryPage />} />
@@ -88,6 +88,7 @@ const App = () => (
             </Route>
             <Route element={<ProtectedRoute><FullBleedLayout /></ProtectedRoute>}>
               <Route path="/conversations" element={<ConversationsPage />} />
+              <Route path="/orders/new" element={<NewOrderPage />} />
             </Route>
             <Route path="/whatsapp" element={<Navigate to="/conversations" replace />} />
             <Route path="*" element={<NotFound />} />
