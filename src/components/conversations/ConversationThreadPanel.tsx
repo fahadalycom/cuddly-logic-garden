@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, RefreshCw, AlertTriangle, Package, ArrowRightLeft, RotateCw,
 } from "lucide-react";
@@ -43,6 +43,18 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const { submitting, run } = useSubmitGuard();
   const { messages: liveMessages, sendMessage, isRealtime } = useConversationMessages(conversation?.id ?? null);
   const { retry: retryRemote, isRetrying } = useMessageRetry();
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+
+  const { latestFailedId, lastInboundAt } = useMemo(() => {
+    let failed: string | null = null;
+    let inbound: string | null = null;
+    for (const m of liveMessages) {
+      if (m.sender === "agent" && isFailedStatus(m.status)) failed = m.id;
+      if (m.sender === "customer" || m.direction === "inbound") inbound = m.time;
+    }
+    return { latestFailedId: failed, lastInboundAt: inbound };
+  }, [liveMessages]);
 
   if (!conversation) {
     return (
@@ -60,6 +72,16 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const messages: MockMessage[] = liveMessages;
   const notes: MockInternalNote[] = mockNotesByConv[conversation.id] || [];
   const canSend = isRealConversationId(conversation.id);
+
+  const handleJumpToFailed = () => {
+    if (!latestFailedId) return;
+    const el = messageRefs.current[latestFailedId];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightedId(latestFailedId);
+      window.setTimeout(() => setHighlightedId(null), 1500);
+    }
+  };
 
   const handleSend = () => run(async () => {
     const text = draft.trim();
@@ -177,19 +199,34 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
       )}
 
       {/* Reliability strip */}
-      <ConversationReliabilityStrip channel={conversation.channel} messages={messages} lastSyncLabel="just now" />
+      <ConversationReliabilityStrip
+        channel={conversation.channel}
+        messages={messages}
+        lastInboundAt={lastInboundAt}
+        isRealtime={isRealtime}
+        latestFailedId={latestFailedId}
+        onJumpToFailed={handleJumpToFailed}
+      />
 
       {/* Body */}
       <ScrollArea className="flex-1">
         {tab === "messages" ? (
           <div className="p-3 space-y-3">
             {messages.map((m) => (
-              <MessageBubble
+              <div
                 key={m.id}
-                m={m}
-                onRetry={() => handleRetry(m)}
-                isRetrying={isRetrying(m.id)}
-              />
+                ref={(el) => { messageRefs.current[m.id] = el; }}
+                className={cn(
+                  "rounded-2xl transition-shadow",
+                  highlightedId === m.id && "ring-2 ring-destructive/60 ring-offset-2 ring-offset-background",
+                )}
+              >
+                <MessageBubble
+                  m={m}
+                  onRetry={() => handleRetry(m)}
+                  isRetrying={isRetrying(m.id)}
+                />
+              </div>
             ))}
             {messages.length === 0 && (
               <p className="text-center text-xs text-muted-foreground py-8">No messages yet.</p>
