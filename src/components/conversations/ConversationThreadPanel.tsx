@@ -75,6 +75,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const integrationStatus = useIntegrationStatus(conversation?.channel ?? null);
 
   const { latestFailedId, lastInboundAt } = useMemo(() => {
     let failed: string | null = null;
@@ -101,7 +102,6 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
 
   const messages: MockMessage[] = liveMessages;
   const notes: MockInternalNote[] = mockNotesByConv[conversation.id] || [];
-  const integrationStatus = useIntegrationStatus(conversation.channel);
   const isRealConv = isRealConversationId(conversation.id);
   // Gate sending on both: real conversation AND integration is healthy/enabled
   // (block sends when token expired, channel disabled, or integration in error).
