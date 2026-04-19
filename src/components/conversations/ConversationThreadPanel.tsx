@@ -126,6 +126,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
               </span>
             </div>
           </div>
+          <ConversationReliabilityStrip channel={conversation.channel} messages={messages} lastSyncLabel="just now" className="hidden" />
           <Button variant="ghost" size="icon" className="h-8 w-8 lg:hidden" onClick={onToggleContext}>
             <User className="h-4 w-4" />
           </Button>
@@ -202,11 +203,21 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
         </div>
       )}
 
+      {/* Reliability strip */}
+      <ConversationReliabilityStrip channel={conversation.channel} messages={messages} lastSyncLabel="just now" />
+
       {/* Body */}
       <ScrollArea className="flex-1">
         {tab === "messages" ? (
           <div className="p-3 space-y-3">
-            {messages.map((m) => <MessageBubble key={m.id} m={m} />)}
+            {messages.map((m) => (
+              <MessageBubble
+                key={m.id}
+                m={m}
+                onRetry={() => handleRetry(m)}
+                isRetrying={retryingIds.has(m.id)}
+              />
+            ))}
             {messages.length === 0 && (
               <p className="text-center text-xs text-muted-foreground py-8">No messages yet.</p>
             )}
@@ -249,7 +260,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
               className="min-h-[40px] max-h-[120px] text-sm resize-none bg-background/40 border-border/30 rounded-lg"
               rows={1}
             />
-            <Button size="icon" className="h-9 w-9 shrink-0" disabled={!draft.trim()} onClick={() => setDraft("")}>
+            <Button size="icon" className="h-9 w-9 shrink-0" disabled={!draft.trim() || submitting} onClick={handleSend}>
               <Send className="h-4 w-4" />
             </Button>
           </div>
@@ -319,7 +330,7 @@ function ActionBtn({ icon: Icon, label, onClick }: { icon: any; label: string; o
   );
 }
 
-function MessageBubble({ m }: { m: MockMessage }) {
+function MessageBubble({ m, onRetry, isRetrying }: { m: MockMessage; onRetry?: () => void; isRetrying?: boolean }) {
   if (m.sender === "system") {
     return (
       <div className="flex justify-center">
@@ -328,23 +339,57 @@ function MessageBubble({ m }: { m: MockMessage }) {
     );
   }
   const isAgent = m.sender === "agent";
+  const failed = isAgent && isFailedStatus(m.status);
+  const pending = isAgent && isPendingStatus(m.status);
+
   return (
-    <div className={cn("flex", isAgent ? "justify-end" : "justify-start")}>
-      <div className={cn(
-        "max-w-[80%] rounded-2xl px-3 py-2 text-sm",
-        isAgent
-          ? "bg-primary text-primary-foreground rounded-br-md"
-          : "bg-muted/40 text-foreground rounded-bl-md border border-border/30",
-      )}>
-        {!isAgent && m.senderName && (
-          <p className="text-[10px] font-medium opacity-70 mb-0.5">{m.senderName}</p>
-        )}
-        <p className="leading-snug whitespace-pre-wrap break-words">{m.text}</p>
-        <div className={cn("flex items-center gap-1 mt-1 text-[10px]", isAgent ? "text-primary-foreground/70 justify-end" : "text-muted-foreground")}>
-          <span>{m.time}</span>
-          {isAgent && <CheckCheck className="h-3 w-3" />}
+    <div className={cn("flex flex-col gap-1", isAgent ? "items-end" : "items-start")}>
+      <div className={cn("flex w-full", isAgent ? "justify-end" : "justify-start")}>
+        <div className={cn(
+          "max-w-[80%] rounded-2xl px-3 py-2 text-sm",
+          isAgent
+            ? failed
+              ? "bg-destructive/10 border border-destructive/40 text-foreground rounded-br-md"
+              : "bg-primary text-primary-foreground rounded-br-md"
+            : "bg-muted/40 text-foreground rounded-bl-md border border-border/30",
+          pending && "opacity-80",
+        )}>
+          {!isAgent && m.senderName && (
+            <p className="text-[10px] font-medium opacity-70 mb-0.5">{m.senderName}</p>
+          )}
+          <p className="leading-snug whitespace-pre-wrap break-words">{m.text}</p>
+          <div className={cn("flex items-center gap-1 mt-1 text-[10px]", isAgent && !failed ? "text-primary-foreground/70 justify-end" : "text-muted-foreground justify-end")}>
+            <span>{m.time}</span>
+            {isAgent && (
+              <MessageStatusIndicator
+                status={m.status ?? "delivered"}
+                errorMessage={m.errorMessage}
+                retryCount={m.retryCount}
+              />
+            )}
+          </div>
         </div>
       </div>
+      {failed && (
+        <div className="flex items-center gap-2 px-2">
+          <span className="text-[10px] text-destructive max-w-[260px] truncate">
+            {m.errorMessage || "Failed to deliver"}
+          </span>
+          {(m.retryCount ?? 0) > 0 && (
+            <span className="text-[10px] text-muted-foreground">· {m.retryCount}× retried</span>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-[10px] px-2 gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+            disabled={isRetrying || m.status === "permanently_failed"}
+            onClick={onRetry}
+          >
+            <RotateCw className={cn("h-3 w-3", isRetrying && "animate-spin")} />
+            {m.status === "permanently_failed" ? "Cannot retry" : "Retry"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
