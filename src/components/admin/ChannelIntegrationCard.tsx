@@ -32,7 +32,39 @@ import {
   MessageCircle,
   Facebook,
   Instagram,
+  ArrowRight,
+  Radio,
 } from "lucide-react";
+
+type Readiness = "not_configured" | "partially_configured" | "ready_for_webhook" | "ready_for_live" | "live";
+
+const READINESS_META: Record<Readiness, { label: string; cls: string; hint: string }> = {
+  not_configured: {
+    label: "Not configured",
+    cls: "bg-muted text-muted-foreground border-border",
+    hint: "Fill in the required credentials below, then save.",
+  },
+  partially_configured: {
+    label: "Partially configured",
+    cls: "bg-amber-500/15 text-amber-500 border-amber-500/30",
+    hint: "Save the verify token and run Test Connection to validate credentials.",
+  },
+  ready_for_webhook: {
+    label: "Ready for webhook",
+    cls: "bg-sky-500/15 text-sky-400 border-sky-500/30",
+    hint: "Paste the webhook URL + verify token into Meta App Dashboard and trigger a verification ping.",
+  },
+  ready_for_live: {
+    label: "Ready to go live",
+    cls: "bg-amber-500/15 text-amber-500 border-amber-500/30",
+    hint: "Webhook is receiving messages — flip the Enabled switch to start serving customers.",
+  },
+  live: {
+    label: "Live",
+    cls: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
+    hint: "Channel is active and healthy. No action needed.",
+  },
+};
 
 const ICONS: Record<ChannelType, any> = {
   whatsapp: MessageCircle,
@@ -102,6 +134,22 @@ export function ChannelIntegrationCard({ channel }: Props) {
 
   const disabled = !isAdmin;
 
+  // Compute readiness state from existing telemetry
+  const readiness: Readiness = (() => {
+    if (!integration || completeness < 100) return "not_configured";
+    if (!integration.verify_token || !integration.last_health_check_at) return "partially_configured";
+    if (!integration.last_inbound_at) return "ready_for_webhook";
+    if (!integration.enabled) return "ready_for_live";
+    return "live";
+  })();
+  const readinessMeta = READINESS_META[readiness];
+
+  const isFieldMissing = (key: string, secret: boolean | undefined) => {
+    if (secret) return !integration?.secrets_set?.[key];
+    if (key === "verify_token") return !integration?.verify_token;
+    return !integration?.config?.[key];
+  };
+
   return (
     <Card className="overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between gap-4 border-b">
@@ -111,7 +159,7 @@ export function ChannelIntegrationCard({ channel }: Props) {
           </div>
           <div>
             <CardTitle className="text-base">{meta.label}</CardTitle>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
               <span
                 className={cn(
                   "text-[10px] px-2 py-0.5 rounded-full border font-medium",
@@ -119,6 +167,16 @@ export function ChannelIntegrationCard({ channel }: Props) {
                 )}
               >
                 {STATUS_LABELS[status]}
+              </span>
+              <span
+                className={cn(
+                  "text-[10px] px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1",
+                  readinessMeta.cls,
+                )}
+                title={readinessMeta.hint}
+              >
+                {readiness === "live" && <Radio className="h-2.5 w-2.5" />}
+                {readinessMeta.label}
               </span>
               <span className="text-[11px] text-muted-foreground">
                 Config {completeness}% complete
@@ -140,6 +198,15 @@ export function ChannelIntegrationCard({ channel }: Props) {
       </CardHeader>
 
       <CardContent className="p-5 space-y-5">
+        {/* Next step guidance based on readiness */}
+        {readiness !== "live" && !integration?.last_error && (
+          <Alert>
+            <ArrowRight className="h-4 w-4" />
+            <AlertTitle>Next step</AlertTitle>
+            <AlertDescription className="text-sm">{readinessMeta.hint}</AlertDescription>
+          </Alert>
+        )}
+
         {/* Error alert */}
         {integration?.last_error && (
           <Alert variant="destructive">
@@ -173,16 +240,33 @@ export function ChannelIntegrationCard({ channel }: Props) {
           </Alert>
         )}
 
-        {/* Webhook URL */}
-        <div>
-          <Label className="text-xs text-muted-foreground">Webhook callback URL</Label>
-          <div className="flex items-center gap-2 mt-1">
-            <Input value={webhookUrl} readOnly className="font-mono text-xs" />
-            <CopyButton text={webhookUrl} />
+        {/* Webhook URL + verify token (read-only copy) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs text-muted-foreground">Webhook callback URL</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Input value={webhookUrl} readOnly className="font-mono text-xs" />
+              <CopyButton text={webhookUrl} />
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Paste into Meta Dashboard → Webhooks for {meta.label}.
+            </p>
           </div>
-          <p className="text-[11px] text-muted-foreground mt-1">
-            Paste this into Meta App Dashboard → Webhooks for {meta.label}.
-          </p>
+          <div>
+            <Label className="text-xs text-muted-foreground">Verify token</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Input
+                value={integration?.verify_token ?? ""}
+                readOnly
+                placeholder="— not set —"
+                className="font-mono text-xs"
+              />
+              {integration?.verify_token && <CopyButton text={integration.verify_token} />}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Paste this exact value into Meta's webhook verify token field.
+            </p>
+          </div>
         </div>
 
         {/* Form */}
@@ -191,14 +275,22 @@ export function ChannelIntegrationCard({ channel }: Props) {
             {meta.fields.map((f) => {
               const isShown = !!shown[f.key];
               const isMasked = f.secret;
+              const missing = f.required && isFieldMissing(f.key, f.secret);
               const placeholder = isMasked && integration?.secrets_set?.[f.key]
                 ? "•••••••• (saved — leave blank to keep)"
                 : f.placeholder ?? "";
               return (
                 <div key={f.key} className="space-y-1.5">
-                  <Label htmlFor={`${channel}-${f.key}`} className="text-xs">
-                    {f.label}
-                    {f.required && <span className="text-destructive ml-0.5">*</span>}
+                  <Label htmlFor={`${channel}-${f.key}`} className="text-xs flex items-center gap-1.5">
+                    <span>
+                      {f.label}
+                      {f.required && <span className="text-destructive ml-0.5">*</span>}
+                    </span>
+                    {missing && (
+                      <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                        Missing
+                      </span>
+                    )}
                   </Label>
                   <div className="relative">
                     <Input

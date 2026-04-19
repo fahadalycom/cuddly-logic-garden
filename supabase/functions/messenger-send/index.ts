@@ -30,8 +30,11 @@ serve(async (req) => {
   );
 
   try {
-    const { conversation_id, content, sender_id, idempotency_key, retry_of_message_id } = await req.json();
-    if (!conversation_id || !content) {
+    const {
+      conversation_id, content, sender_id, idempotency_key, retry_of_message_id,
+      media_url, media_type, media_mime_type, media_filename,
+    } = await req.json();
+    if (!conversation_id || (!content && !media_url)) {
       return json({ error: "Missing required fields" }, 400);
     }
 
@@ -76,7 +79,10 @@ serve(async (req) => {
         sender_type: "agent",
         sender_id,
         content,
-        media_type: "text",
+        media_type: media_type ?? "text",
+        media_url: media_url ?? null,
+        media_mime_type: media_mime_type ?? null,
+        media_filename: media_filename ?? null,
         is_read: true,
         direction: "outbound",
         delivery_status: "sending",
@@ -106,9 +112,17 @@ serve(async (req) => {
     } else {
       try {
         const url = `https://graph.facebook.com/v19.0/${senderEntityId}/messages?access_token=${encodeURIComponent(token)}`;
+        const messageBody: Record<string, unknown> = media_url
+          ? {
+              attachment: {
+                type: media_type === "image" ? "image" : "file",
+                payload: { url: media_url, is_reusable: true },
+              },
+            }
+          : { text: content };
         const payload = {
           recipient: { id: conversation.external_user_id },
-          message: { text: content },
+          message: messageBody,
           messaging_type: "RESPONSE",
         };
         const resp = await fetch(url, {
