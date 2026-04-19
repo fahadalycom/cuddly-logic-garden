@@ -188,7 +188,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
                 key={m.id}
                 m={m}
                 onRetry={() => handleRetry(m)}
-                isRetrying={retryingIds.has(m.id)}
+                isRetrying={isRetrying(m.id)}
               />
             ))}
             {messages.length === 0 && (
@@ -229,11 +229,12 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
             <Textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder={`Reply on ${conversation.channel}...`}
+              placeholder={canSend ? `Reply on ${conversation.channel}...` : `Demo channel — connect ${conversation.channel} to send`}
               className="min-h-[40px] max-h-[120px] text-sm resize-none bg-background/40 border-border/30 rounded-lg"
               rows={1}
+              disabled={!canSend}
             />
-            <Button size="icon" className="h-9 w-9 shrink-0" disabled={!draft.trim() || submitting} onClick={handleSend}>
+            <Button size="icon" className="h-9 w-9 shrink-0" disabled={!draft.trim() || submitting || !canSend} onClick={handleSend}>
               <Send className="h-4 w-4" />
             </Button>
           </div>
