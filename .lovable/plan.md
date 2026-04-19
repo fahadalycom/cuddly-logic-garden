@@ -1,91 +1,97 @@
 
-## Plan: Make Conversations production-functional
+The user keeps re-sending the same hardening request. Most of priorities 1, 2, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 19 are already implemented from prior turns (unified inbox, channel-aware send, retry, idempotency, mock leak removal in messages, readiness chips, ops logs, structured test errors). Re-running those is forbidden.
 
-Surgical completion of the existing system — no rebuild, no new architecture, no demo seed.
+Let me identify only what's genuinely still missing or incomplete based on prior recon + the new asks:
 
-### 1. Composer: real attachments + emoji + send states
+**Truly remaining gaps:**
 
-**Edit `src/components/conversations/ConversationThreadPanel.tsx`**
-- Wire **Paperclip** to a hidden `<input type="file" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt">` with a 16 MB size cap and MIME validation. On select → upload via supabase.storage to `whatsapp-media` bucket → call `sendMessage` with media metadata. Show inline preview chip (filename + size + ✕) before send; show toast on type/size rejection.
-- Wire **Smile** to a Popover containing `emoji-picker-react` (lightweight, ~150kb). Inserts emoji at the textarea caret position (track caret with a ref).
-- Composer states: `submitting` already exists → show spinner inside Send button, dim the chip row, keep textarea disabled while a send/upload is in flight.
-- Enter to send (Shift+Enter newline). Auto-grow textarea (already mostly there).
-- Remove the "Demo channel — connect…" placeholder text when conversation has a real id; for non-real ids keep composer disabled with a clear inline hint and tooltip.
-- Disable the unimplemented header buttons that currently do nothing (`Assign`, `Status`, `Priority`, `View Customer`, `MoreHorizontal`) by adding `disabled` + `title="Coming soon"` so production users can't click fake actions. Keep the working ones (`Products`, `Transfer`, `Add Note`, `Create Ticket`).
+1. **Strict honest validation per channel** (priority 3, 4) — `channel-health-check` does probe Meta, but doesn't:
+   - For WhatsApp: validate WABA ID + token↔WABA relationship + token expiry detection
+   - For Messenger: validate `pages_messaging` permission + page↔token linkage
+   - For Instagram: validate IG business account ↔ page linkage + messaging capability
+   - Classify expired/invalid tokens distinctly (Meta error subcodes 463/467/190) with explicit "expired" status persisted on `channel_integrations.status`
 
-### 2. Generalise `sendMessage` to carry attachments
+2. **Inbound media for FB/IG** (priority 12 reverse) — `messenger-webhook` drops `attachments[]`. Customer-sent images/files appear as empty bubbles.
 
-**Edit `src/hooks/useConversationMessages.ts`**
-- Extend `sendMessage(text, attachment?)` where attachment = `{ url, mime, filename, mediaType: 'image'|'document' }`.
-- Optimistic bubble shows attachment row immediately.
-- Posts the same shape to whatsapp-send (already accepts `media_url`/`media_type`/`media_mime_type`/`media_filename`). For messenger-send, pass attachment fields through.
+3. **FB/IG delivery + read receipts** (priority 8) — `message_deliveries` / `message_reads` events not handled; outbound messages stuck at `sent_to_api`.
 
-### 3. Messenger/Instagram attachment send
+4. **Error classification on send** (priority 8) — `whatsapp-send` / `messenger-send` mark all failures as `failed`. No distinction between retryable (rate-limit/network) vs permanent (expired token, wrong recipient). Retry hook lets users retry permanent errors pointlessly.
 
-**Edit `supabase/functions/messenger-send/index.ts`**
-- Accept `media_url` (storage key in `whatsapp-media` bucket), `media_mime_type`, `media_filename`, `media_type`.
-- When media present, generate a public storage URL (bucket is public) and POST Graph payload `message: { attachment: { type: 'image'|'file', payload: { url, is_reusable: true } } }`. Fallback to text-only when not present (current behaviour).
-- Persist `media_url`, `media_type`, `media_mime_type`, `media_filename` on the `wa_messages` row.
+5. **Channel capability guards in composer** (priority 13) — Paperclip + emoji are always enabled regardless of channel. IG DMs reject many doc types.
 
-### 4. Render attachments in bubbles
+6. **Conversation matching by channel + external_conversation_id** (priority 14) — `messenger-webhook` only matches by `external_user_id`, which is fine for FB/IG but the rule should be enforced consistently and documented.
 
-**Edit the `MessageBubble` in `ConversationThreadPanel.tsx` + `mapWaMessage` in `src/lib/conversations-data.ts`**
-- Map `media_url`/`media_type`/`media_mime_type`/`media_filename` onto `MockMessage` (extend the type minimally).
-- Bubble: render `<img>` for images (click to open in new tab), and a download chip for documents (icon + filename + size). Captions remain in `text`.
+7. **Per-channel mini status row** (priority 16) — `IntegrationHealthStrip` shows aggregate counts but no per-channel row with status pill.
 
-### 5. Remove mock leakage in `useConversationMessages`
+8. **Token-expired alert surfacing** (priority 16) — When `channel_integrations.status='expired'`, no banner on Conversations page or dashboard.
 
-- When `conversationId` exists but is not real, return empty messages + a flag `canSend=false` instead of falling back to `mockMessagesByConv`. Keep mock list-level fallback (`useConversations`) as the only legacy surface.
-- Drop the `mockMessagesByConv` import here.
+## Targeted plan (only the gaps)
 
-### 6. Channel Integrations: readiness state + clearer guidance
+### A. Honest health check + token expiry classification
+Edit `supabase/functions/channel-health-check/index.ts`:
+- WhatsApp probe: hit `/v19.0/{phone_number_id}?fields=id,verified_name,quality_rating,whatsapp_business_account_id` then `/v19.0/{waba_id}?fields=id,name` with same token. Compare returned `whatsapp_business_account_id` against stored `whatsapp_business_account_id`. Confirm `messaging_product:"whatsapp"` capability via `/v19.0/{phone_number_id}/whatsapp_business_profile`.
+- Messenger probe: `/v19.0/{page_id}?fields=id,name,access_token` with page token, then `/v19.0/me/permissions` to confirm `pages_messaging`.
+- Instagram probe: `/v19.0/{ig_business_account_id}?fields=id,username` then `/v19.0/{page_id}?fields=instagram_business_account` to verify linkage.
+- Classify Meta error subcodes: 463/467 (session expired), 190 (invalid OAuth), 200 (permissions), 100 (param). Map to readable headlines + set `channel_integrations.status='expired'` for token issues (vs `error` for others).
+- Persist `last_validation_at` separately from `last_health_check_at`.
 
-**Edit `src/components/admin/ChannelIntegrationCard.tsx`**
-- Compute a `readiness` enum from existing data:
-  - `not_configured` (completeness < 100)
-  - `partially_configured` (completeness 100, no `verify_token` or no successful health check)
-  - `ready_for_webhook` (config + verify token saved, no `last_inbound_at`)
-  - `ready_for_live` (`last_success_at` within 24h **and** `last_inbound_at` set, but `enabled=false`)
-  - `live` (`enabled=true` + healthy)
-- Render a chip + a one-line "Next step" hint per readiness state ("Add the page access token", "Paste webhook URL into Meta and verify", "Enable channel to go live", etc.).
-- Keep existing fields, telemetry, copy buttons, test/reconnect/clear-error — they already work.
-- Show **verify_token** as its own copyable read-only field next to the webhook URL (currently it's editable only).
-- Add per-field "missing" badge next to required fields not set (uses `secrets_set` for secrets, `config[key]` for plain).
+### B. Send-side error classification + retry gating
+Edit `supabase/functions/whatsapp-send/index.ts` + `messenger-send/index.ts`:
+- After Graph error, parse `code`/`error_subcode`, set `wa_messages.delivery_status = 'permanently_failed'` for 190/463/467/200/10 (auth/permission), `'failed'` for 4/17/32/613 (rate limit) or 5xx (network).
+- Store `error_code` (new optional column? — check schema first; if not present, prefix `error_message` with `[CODE:190]`).
 
-### 7. Surface webhook + integration errors in inbox
+Edit `src/components/conversations/ConversationThreadPanel.tsx` (`MessageBubble`):
+- Show retry button only when `status === 'failed'`. For `permanently_failed`, show "Cannot retry — fix integration" with link to `/channel-integrations`.
 
-**Edit `src/components/conversations/ConversationReliabilityStrip.tsx`**
-- Read `channel_integrations` for the conversation's channel via a tiny new hook `useIntegrationStatus(channel)` (single `select` cached by react-query). When `last_error` is present **or** `enabled=false`, show a small inline alert chip ("Channel error — view integration") that links to `/channel-integrations`.
+### C. Inbound attachments for FB/IG
+Edit `supabase/functions/messenger-webhook/index.ts`:
+- When `messaging.message.attachments[0]` exists: take first attachment, fetch URL with page token, upload to `whatsapp-media` bucket as `inbound/<conv>/<uuid>.<ext>`, persist `media_url`/`media_type`/`media_mime_type`/`media_filename` on the `wa_messages` row.
 
-### 8. Failed-send error visibility (verify)
+### D. FB/IG delivery + read receipts
+Edit `supabase/functions/messenger-webhook/index.ts`:
+- Handle `messaging.delivery.mids[]` → `update wa_messages set delivery_status='delivered', delivered_at=now() where external_message_id in (...)`.
+- Handle `messaging.read.watermark` → mark all messages with `created_at <= watermark` as `read`.
 
-Already wired (failed bubble + retry button + retry hook + ops log). No changes — just confirm the new attachment failures hit the same path: messenger-send / whatsapp-send already store `error_message` on failure, and the retry handler re-invokes the same function via `whatsapp-retry-message`. Extend the retry function to also pass through media fields when retrying — small edit:
+### E. Channel capability guards (composer)
+Edit `src/components/conversations/ConversationThreadPanel.tsx`:
+- Add `CHANNEL_CAPS` map: WA = images+docs+audio, Messenger = images+docs, Instagram = images only.
+- Filter `accept` attribute on file input by current `conversation.channel`.
+- Disable paperclip with tooltip "Attachments not supported on this channel" if no caps.
+- For non-WA channels, narrow MIME validation accordingly with clear toast.
 
-**Edit `supabase/functions/whatsapp-retry-message/index.ts`**
-- When invoking the underlying send function, include `media_url/media_type/media_mime_type/media_filename` from the original `wa_messages` row so retried attachment sends actually re-send the file.
+### F. Token-expired banner
+Edit `src/components/conversations/ConversationReliabilityStrip.tsx` (already reads `useIntegrationStatus`):
+- When `status === 'expired'`, render an amber banner "Access token expired — replies will fail. Update token in Channel Integrations" with link.
 
-### 9. Files
+Edit `src/components/admin/IntegrationHealthStrip.tsx`:
+- Add a per-channel row (WA / FB / IG) with status pill (healthy / expired / error / disabled / not configured / webhook pending), last inbound timestamp, last error short text. Reuse `useChannelHealth` data + extend with `lastOutboundByChannel` (one extra query on `wa_messages` grouped by channel).
 
-**Edited only — no new files except one tiny hook**
-- `src/components/conversations/ConversationThreadPanel.tsx` — paperclip + emoji + caret insertion + attachment chip + disable fake buttons + send-state polish
-- `src/hooks/useConversationMessages.ts` — attachment-aware send + drop mock fallback
-- `src/lib/conversations-data.ts` — map media fields onto MockMessage
-- `src/lib/conversations-mock.ts` — extend `MockMessage` with optional media fields (type only)
-- `src/components/admin/ChannelIntegrationCard.tsx` — readiness chip + next-step hint + per-field missing badges + verify_token copy field
-- `src/components/conversations/ConversationReliabilityStrip.tsx` — channel error chip
-- `src/hooks/useIntegrationStatus.ts` — **new**, ~25 lines, single react-query select
+### G. Conversation matching documentation comment
+Edit `supabase/functions/messenger-webhook/index.ts`:
+- Add a code comment + assertion that lookup is `channel + external_user_id`. Already correct — comment only, no logic change.
 
-**Edge functions**
-- `supabase/functions/messenger-send/index.ts` — image + document attachments via Graph
-- `supabase/functions/whatsapp-retry-message/index.ts` — pass media fields on retry
+## Files touched (all edits, no new files)
+- `supabase/functions/channel-health-check/index.ts` — strict per-channel validation + expiry classification
+- `supabase/functions/whatsapp-send/index.ts` — error code classification → `permanently_failed`
+- `supabase/functions/messenger-send/index.ts` — same classification + persist permanent vs transient
+- `supabase/functions/messenger-webhook/index.ts` — inbound attachments + delivery/read receipts + comment
+- `src/components/conversations/ConversationThreadPanel.tsx` — channel capability map, paperclip gating, retry gating on `permanently_failed`
+- `src/components/conversations/ConversationReliabilityStrip.tsx` — token-expired banner
+- `src/components/admin/IntegrationHealthStrip.tsx` — per-channel status row
+- `src/hooks/useChannelHealth.ts` — add `lastOutboundByChannel` aggregate
 
-**Dependencies**
-- Add `emoji-picker-react` (~150kb, no peer deps).
+## Out of scope (explicit, per user)
+- New tables, new pages, new inbox systems
+- Auto-retry scheduler (manual retry only)
+- Multi-attachment per message / voice notes for FB/IG
+- Cosmetic polish, demo seed
+- Token auto-refresh (Meta long-lived page tokens require manual rotation; we surface expiry, admin re-pastes)
 
-**No DB migration. No new tables. No demo seed. No new pages.**
-
-### 10. Out of scope
-- Audio/voice notes for FB/IG (Meta Graph API has limited attachment types for these; WhatsApp already supports audio).
-- Multi-attachment in a single message (one file per send this round).
-- Inline image preview lightbox (open in new tab is enough now).
-- Read-receipt webhook for FB/IG (separate plan).
+## Acceptance after this lands
+1–17 of the user's list all satisfied:
+- Test Connection now actually validates token↔WABA / token↔page / page↔IG linkage and detects expired tokens with structured cause
+- Inbound FB/IG media renders in bubbles
+- Outbound FB/IG messages transition through delivered/read
+- Permanent-failure messages no longer offer pointless retry; admin sees integration link
+- Composer hides paperclip on channels without media support
+- Per-channel status row visible with token-expired banner inside the inbox
