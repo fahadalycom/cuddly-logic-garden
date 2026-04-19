@@ -5,7 +5,6 @@ import { ConversationContextPanel } from "@/components/conversations/Conversatio
 import { QueueOverviewPanel } from "@/components/conversations/QueueOverviewPanel";
 import { Button } from "@/components/ui/button";
 import { useConversations } from "@/hooks/useConversations";
-import { mockQueueItems } from "@/lib/queue-mock";
 import { Inbox, Layers, MessageSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -23,8 +22,6 @@ export default function ConversationsPage() {
   const showThreadMobile = !!selectedId && !contextOpen;
   const showContextMobile = !!selectedId && contextOpen;
   const showListMobile = !selectedId;
-
-  const overflowCount = mockQueueItems.filter((q) => q.queueType === "overflow").length;
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-background">
@@ -48,10 +45,6 @@ export default function ConversationsPage() {
         >
           <Layers className="h-3.5 w-3.5" />
           Queues
-          <Badge variant="secondary" className="h-4 text-[10px] px-1.5">{mockQueueItems.length}</Badge>
-          {overflowCount > 0 && (
-            <Badge className="h-4 text-[10px] px-1.5 bg-destructive text-destructive-foreground">{overflowCount}</Badge>
-          )}
         </Button>
       </div>
 

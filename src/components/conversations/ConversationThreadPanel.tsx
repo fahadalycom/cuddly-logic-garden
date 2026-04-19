@@ -21,6 +21,7 @@ import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 import { useConversationMessages, type SendAttachment } from "@/hooks/useConversationMessages";
 import { useMessageRetry } from "@/hooks/useMessageRetry";
 import { isRealConversationId } from "@/lib/conversations-data";
+import { useIntegrationStatus } from "@/hooks/useIntegrationStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -100,7 +101,21 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
 
   const messages: MockMessage[] = liveMessages;
   const notes: MockInternalNote[] = mockNotesByConv[conversation.id] || [];
-  const canSend = isRealConversationId(conversation.id);
+  const integrationStatus = useIntegrationStatus(conversation.channel);
+  const isRealConv = isRealConversationId(conversation.id);
+  // Gate sending on both: real conversation AND integration is healthy/enabled
+  // (block sends when token expired, channel disabled, or integration in error).
+  const integrationBlocks =
+    integrationStatus !== null &&
+    (!integrationStatus.enabled || integrationStatus.isExpired);
+  const canSend = isRealConv && !integrationBlocks;
+  const sendBlockedReason = !isRealConv
+    ? `${conversation.channel} not connected — set up the integration to send`
+    : integrationStatus && !integrationStatus.enabled
+    ? `${conversation.channel} integration is disabled. Open Channel Integrations to enable it.`
+    : integrationStatus?.isExpired
+    ? `${conversation.channel} access token expired. Replace the token in Channel Integrations to resume sending.`
+    : null;
   const busy = submitting || uploading;
   const caps = CHANNEL_CAPS[conversation.channel] ?? DEFAULT_CAPS;
 
@@ -424,12 +439,12 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
                 placeholder={
                   canSend
                     ? `Reply on ${conversation.channel}...`
-                    : `${conversation.channel} not connected — set up the integration to send`
+                    : sendBlockedReason ?? `${conversation.channel} not connected`
                 }
                 className="min-h-[40px] max-h-[120px] text-sm resize-none bg-background/40 border-border/30 rounded-lg"
                 rows={1}
                 disabled={!canSend || busy}
-                title={canSend ? undefined : `Connect ${conversation.channel} in Channel Integrations to enable sending`}
+                title={canSend ? undefined : sendBlockedReason ?? undefined}
               />
               <Button
                 size="icon"
