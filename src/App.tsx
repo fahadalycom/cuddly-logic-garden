@@ -39,6 +39,7 @@ import VendorsPage from "./pages/Vendors";
 import TasksPage from "./pages/Tasks";
 import ReportsPage from "./pages/Reports";
 import TeamManagementPage from "./pages/TeamManagement";
+import ChannelIntegrationsPage from "./pages/ChannelIntegrations";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -83,6 +84,7 @@ const App = () => (
               <Route path="/settings/roles" element={<RolesPage />} />
               <Route path="/settings/templates" element={<TemplatesPage />} />
               <Route path="/settings/audit" element={<AuditLogsPage />} />
+              <Route path="/admin/channels" element={<ChannelIntegrationsPage />} />
             </Route>
             <Route element={<ProtectedRoute><FullBleedLayout /></ProtectedRoute>}>
               <Route path="/conversations" element={<ConversationsPage />} />
