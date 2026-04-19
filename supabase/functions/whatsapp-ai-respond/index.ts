@@ -189,43 +189,24 @@ Respond ONLY in this JSON format:
     }).select().single();
 
     if (shouldAutoSend && analysis.suggested_response) {
-      const { token, phoneId } = await resolveWhatsAppCreds(supabase);
-
-      if (token && phoneId) {
-        const sendResp = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            messaging_product: "whatsapp",
-            to: customer_phone,
-            type: "text",
-            text: { body: analysis.suggested_response },
-          }),
-        });
-
-        const sendResult = await sendResp.json();
-
-        if (sendResp.ok) {
-          await supabase.from("wa_messages").insert({
-            conversation_id,
-            sender_type: "ai",
-            content: analysis.suggested_response,
-            is_ai_generated: true,
-            whatsapp_message_id: sendResult.messages?.[0]?.id,
-            is_read: true,
-          });
-
-          await supabase
-            .from("wa_conversations")
-            .update({
-              last_message_preview: analysis.suggested_response,
-              last_message_at: new Date().toISOString(),
-            })
-            .eq("id", conversation_id);
-        }
+      // Route through the canonical whatsapp-send pipeline so AI replies
+      // obey the same transport, status, idempotency, retry, and logging rules
+      // as agent replies. No more direct Graph calls here.
+      const idempotencyKey = `ai_${conversation_id}_${Date.now()}`;
+      const { data: sendData, error: sendError } = await supabase.functions.invoke("whatsapp-send", {
+        body: {
+          conversation_id,
+          content: analysis.suggested_response,
+          idempotency_key: idempotencyKey,
+        },
+      });
+      if (sendError) {
+        console.error("AI send via whatsapp-send failed:", sendError);
+      } else if (sendData?.message?.id) {
+        // Mark the message row as AI-generated (whatsapp-send wrote it as agent).
+        await supabase.from("wa_messages")
+          .update({ sender_type: "ai", is_ai_generated: true })
+          .eq("id", sendData.message.id);
       }
     }
 
