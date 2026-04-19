@@ -214,12 +214,68 @@ export async function setEnabled(channel: ChannelType, enabled: boolean): Promis
   return data as unknown as ChannelIntegration;
 }
 
-async function invokeHealth(channel: ChannelType, action: "test_connection" | "refresh_health" | "clear_error") {
-  const { data, error } = await supabase.functions.invoke("channel-health-check", {
-    body: { channel_type: channel, action },
-  });
-  if (error) throw error;
-  return data as { ok: boolean; result?: any; integration?: ChannelIntegration; error?: string };
+export interface HealthInvokeResponse {
+  ok: boolean;
+  result?: {
+    ok: boolean;
+    field?: string;
+    error?: string;
+    hint?: string;
+    http_status?: number;
+    graph_error?: any;
+    endpoint?: string;
+    info?: any;
+  };
+  integration?: ChannelIntegration;
+  error?: string;
+  code?: string;
+  db_warning?: string;
+  /** http status of the edge function call itself */
+  _httpStatus?: number;
+}
+
+async function invokeHealth(
+  channel: ChannelType,
+  action: "test_connection" | "refresh_health" | "clear_error",
+): Promise<HealthInvokeResponse> {
+  // Use raw fetch so we can read the JSON error body even on non-2xx
+  // (supabase.functions.invoke swallows the body into a generic FunctionsHttpError).
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  const url = `${FUNCTIONS_BASE}/channel-health-check`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        apikey: (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) ?? "",
+      },
+      body: JSON.stringify({ channel_type: channel, action }),
+    });
+  } catch (networkErr: any) {
+    return { ok: false, error: `Network error reaching edge function: ${networkErr?.message ?? networkErr}`, code: "network" };
+  }
+
+  let parsed: any = null;
+  const text = await res.text();
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    parsed = { error: text || `HTTP ${res.status}` };
+  }
+
+  const out: HealthInvokeResponse = {
+    ok: !!parsed?.ok,
+    result: parsed?.result,
+    integration: parsed?.integration,
+    error: parsed?.error,
+    code: parsed?.code,
+    db_warning: parsed?.db_warning,
+    _httpStatus: res.status,
+  };
+  return out;
 }
 
 export async function testConnection(channel: ChannelType) {

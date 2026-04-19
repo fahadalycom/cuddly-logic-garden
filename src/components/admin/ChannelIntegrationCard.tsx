@@ -99,7 +99,7 @@ interface Props {
 
 export function ChannelIntegrationCard({ channel }: Props) {
   const { isAdmin } = useAuth();
-  const { integration, loading, saving, testing, toggling, save, test, toggle, clearError, reconnect } =
+  const { integration, loading, saving, testing, toggling, lastTestResult, save, test, toggle, clearError, reconnect } =
     useChannelIntegration(channel);
   const meta = CHANNEL_META[channel];
   const Icon = ICONS[channel];
@@ -351,6 +351,86 @@ export function ChannelIntegrationCard({ channel }: Props) {
             </Button>
           </div>
         </form>
+
+        {/* Last test result — verbose, copy-pasteable */}
+        {lastTestResult && (
+          <Alert variant={lastTestResult.ok && lastTestResult.result?.ok ? "default" : "destructive"}>
+            {lastTestResult.ok && lastTestResult.result?.ok ? (
+              <CheckCircle2 className="h-4 w-4" />
+            ) : (
+              <AlertTriangle className="h-4 w-4" />
+            )}
+            <AlertTitle>
+              {lastTestResult.ok && lastTestResult.result?.ok
+                ? "Test connection succeeded"
+                : "Test connection failed"}
+            </AlertTitle>
+            <AlertDescription className="space-y-2">
+              {/* Headline */}
+              {lastTestResult.ok && lastTestResult.result?.ok ? (
+                <p className="text-sm">
+                  Meta Graph responded OK
+                  {lastTestResult.result.http_status ? ` (HTTP ${lastTestResult.result.http_status})` : ""}.
+                  {lastTestResult.result.info?.verified_name && (
+                    <> Verified name: <strong>{lastTestResult.result.info.verified_name}</strong>.</>
+                  )}
+                  {lastTestResult.result.info?.name && !lastTestResult.result.info?.verified_name && (
+                    <> Name: <strong>{lastTestResult.result.info.name}</strong>.</>
+                  )}
+                  {lastTestResult.result.info?.username && (
+                    <> Username: <strong>@{lastTestResult.result.info.username}</strong>.</>
+                  )}
+                </p>
+              ) : (
+                <p className="text-sm font-medium">
+                  {lastTestResult.result?.error ?? lastTestResult.error ?? "Unknown error"}
+                  {lastTestResult.result?.http_status ? ` (Meta HTTP ${lastTestResult.result.http_status})` : ""}
+                  {!lastTestResult.result && lastTestResult._httpStatus
+                    ? ` (Edge function HTTP ${lastTestResult._httpStatus})`
+                    : ""}
+                </p>
+              )}
+
+              {/* Hint / suspected field */}
+              {!lastTestResult.ok && lastTestResult.result?.hint && (
+                <p className="text-xs opacity-90">💡 {lastTestResult.result.hint}</p>
+              )}
+              {!lastTestResult.ok && lastTestResult.result?.field && (
+                <p className="text-[11px] opacity-80">
+                  Suspected field: <code className="font-mono">{lastTestResult.result.field}</code>
+                </p>
+              )}
+              {!lastTestResult.ok && lastTestResult.code && !lastTestResult.result && (
+                <p className="text-[11px] opacity-80">
+                  Backend code: <code className="font-mono">{lastTestResult.code}</code>
+                </p>
+              )}
+
+              {/* Raw Meta Graph error body */}
+              {lastTestResult.result?.graph_error && (
+                <details className="text-[11px]">
+                  <summary className="cursor-pointer opacity-80 hover:opacity-100">
+                    Show raw Meta Graph response
+                  </summary>
+                  <pre className="mt-1.5 p-2 rounded bg-background/40 border border-border overflow-auto max-h-48 font-mono text-[10px]">
+{JSON.stringify(lastTestResult.result.graph_error, null, 2)}
+                  </pre>
+                  {lastTestResult.result.endpoint && (
+                    <p className="mt-1 opacity-70">
+                      Endpoint: <code className="font-mono break-all">{lastTestResult.result.endpoint}</code>
+                    </p>
+                  )}
+                </details>
+              )}
+
+              {lastTestResult.db_warning && (
+                <p className="text-[11px] opacity-80">
+                  Note: probe ran but DB write warning: {lastTestResult.db_warning}
+                </p>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Telemetry */}
         <div className="pt-4 border-t">
