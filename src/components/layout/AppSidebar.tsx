@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, CreditCard, Database, Users, RefreshCw,
   MessageSquare, BarChart3, Settings, LogOut, Truck, CheckCircle, Clock, Shield,
   FileText, UserCog, MessageCircle, Archive, Zap, UserPlus, LifeBuoy, KeyRound,
-  FlaskConical, Handshake, ListChecks, UsersRound, Plug,
+  FlaskConical, Handshake, ListChecks, UsersRound, Plug, Store,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
