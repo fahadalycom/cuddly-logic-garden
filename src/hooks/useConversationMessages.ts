@@ -9,6 +9,9 @@ import {
 const SELECT = "id,conversation_id,sender_type,content,media_type,media_url,media_mime_type,media_filename,delivery_status,direction,retry_count,error_message,created_at,idempotency_key";
 
 export interface SendAttachment {
+  /** Storage object key inside the whatsapp-media bucket (canonical). */
+  storageKey: string;
+  /** Public URL for UI preview AND fallback for channels that require URLs (Messenger/Instagram). */
   url: string;
   mime: string;
   filename: string;
@@ -130,6 +133,10 @@ export function useConversationMessages(conversationId: string | null) {
           content: trimmed,
           idempotency_key: idemKey,
           ...(attachment ? {
+            // Both fields sent so each channel uses what it needs:
+            //   whatsapp-send -> storage_key (uploads bytes to Meta)
+            //   messenger-send -> media_url (Meta fetches by URL)
+            storage_key: attachment.storageKey,
             media_url: attachment.url,
             media_type: attachment.mediaType,
             media_mime_type: attachment.mime,
