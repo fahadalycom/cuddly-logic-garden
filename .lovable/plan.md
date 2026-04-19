@@ -1,28 +1,84 @@
 
-The error `(#100) Tried accessing nonexisting field (whatsapp_business_account)` means our WhatsApp probe is asking Graph for a field that doesn't exist on `/v19.0/{phone_number_id}`. Looking at `channel-health-check/index.ts`, we request:
+Permanent fix plan for the WhatsApp send failure:
 
-```
-fields=verified_name,quality_rating,display_phone_number,messaging_limit_tier,whatsapp_business_account
-```
+## Diagnosis
+The error is real: Meta is rejecting the WhatsApp access token because it expired on 15-Apr-26.
 
-The correct field is `whatsapp_business_account_id` (or just omit it — phone numbers in v19+ don't all expose it). Meta returns code #100 when even one requested field is invalid for that node, which our classifier then misreports as "Phone Number ID does not exist".
+But the deeper app issue is why this keeps happening even after configuration updates:
+- `channel-health-check` already reads the newer WhatsApp token key: `meta_whatsapp_access_token`
+- `whatsapp-send`, `whatsapp-webhook`, and `whatsapp-ai-respond` still read older legacy keys like:
+  - `meta_whatsapp_token`
+  - `meta_whatsapp_phone_id`
+- the Channel Integrations page saves WhatsApp config in a different place:
+  - token → `meta_whatsapp_access_token`
+  - phone number id → `channel_integrations.config.phone_number_id`
+  - verify token → `channel_integrations.verify_token`
 
-## Fix
+So the system currently has multiple sources of truth. Result:
+- Test Connection can pass against one token
+- actual message sending can still use an old expired token
+- webhook verification can use a different verify token again
 
-**Edit `supabase/functions/channel-health-check/index.ts` — `probeWhatsApp`**
+That is the real root cause to resolve permanently.
 
-1. Change the phone-number probe field list to only universally-valid fields:
-   `fields=verified_name,quality_rating,display_phone_number,code_verification_status,platform_type`
-2. Discover the linked WABA via the dedicated endpoint instead of as a sub-field:
-   `GET /v19.0/{phone_number_id}?fields=...` for profile, then `GET /v19.0/{phone_number_id}/whatsapp_business_profile` is optional; for WABA linkage use `GET /v19.0/{waba_id}` only when `whatsapp_business_account_id` is configured.
-3. Drop the `linkedWaba` mismatch check (we no longer fetch it from the phone node). Keep the explicit WABA reachability check when `wabaId` is set.
-4. Improve error #100 classifier: when message contains `nonexisting field`, set `field='access_token'` with hint "Graph API field unsupported — please retry; the system has been updated" so legacy cached errors stay readable.
+## What I will change
+### 1) Unify WhatsApp credential resolution
+Use one canonical WhatsApp config source across all live paths:
+- access token: `meta_whatsapp_access_token`
+- phone number id: `channel_integrations.config.phone_number_id`
+- verify token: `channel_integrations.verify_token`
 
-## Files
-- `supabase/functions/channel-health-check/index.ts` — fix WhatsApp probe field list + remove sub-field WABA dependency
+Update these functions to use the same resolver:
+- `supabase/functions/whatsapp-send/index.ts`
+- `supabase/functions/whatsapp-webhook/index.ts`
+- `supabase/functions/whatsapp-ai-respond/index.ts`
 
-## Verification
-- Deploy `channel-health-check`
-- Call Test Connection on WhatsApp via the UI; expect `ok: true` with `verified_name` and `quality_rating` surfaced.
+### 2) Keep safe fallback only for migration
+Add fallback to old legacy keys only if canonical values are missing, so existing setups do not break during rollout:
+- `meta_whatsapp_token`
+- `meta_whatsapp_phone_id`
+- `meta_webhook_verify_token`
 
-No new tables, no schema change, no new files. One edge function edit.
+This avoids downtime while eliminating the stale-token trap.
+
+### 3) Fix admin config duplication
+Update the WhatsApp settings/admin flow so it no longer behaves like a separate conflicting config source:
+- make `src/components/settings/WhatsAppApiSettings.tsx` use the same canonical values as Channel Integrations
+- or explicitly turn it into a read-only mirror of the Channel Integrations WhatsApp configuration
+
+This prevents future “I updated the token but send still fails” situations.
+
+### 4) Improve expired-token handling everywhere
+When Meta returns token/session expiry:
+- keep message state as permanent failure
+- show exact reason clearly in Conversations
+- keep the token-expired banner in channel status
+- ensure Channel Integrations shows the real error and the affected field
+
+### 5) Verify webhook consistency
+Make WhatsApp webhook verification read the same verify token source used by the admin UI, so inbound setup cannot silently drift.
+
+## Files to update
+- `supabase/functions/whatsapp-send/index.ts`
+- `supabase/functions/whatsapp-webhook/index.ts`
+- `supabase/functions/whatsapp-ai-respond/index.ts`
+- `src/components/settings/WhatsAppApiSettings.tsx`
+- possibly a small shared helper pattern inside the affected edge functions
+- keep `supabase/functions/channel-health-check/index.ts` aligned with the same canonical keys if needed
+
+## Important reality
+The current token is already expired, so one admin action is still required once:
+- replace the expired WhatsApp token with a fresh valid one
+
+The permanent code fix is:
+- the app will then use that new token everywhere consistently
+- no hidden old token will continue breaking sends
+- future expiry will surface clearly instead of failing through mixed config sources
+
+## Expected result after implementation
+- one WhatsApp token source for send, test, webhook, and AI auto-send
+- one phone number id source
+- one verify token source
+- no stale legacy token causing hidden send failures
+- expired token errors shown clearly and consistently
+- replacing the token once will actually fix sending system-wide
