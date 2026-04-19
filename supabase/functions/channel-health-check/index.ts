@@ -91,6 +91,14 @@ function classifyMetaError(body: any, status: number): ClassifiedError {
       expired: false,
     };
   }
+  // Field-level query bug (our code asked for a non-existent field) — not a config issue
+  if (/nonexisting field/i.test(msg)) {
+    return {
+      field: "access_token",
+      hint: "Graph API rejected a requested field. The probe has been updated — please retry Test Connection.",
+      expired: false,
+    };
+  }
   // Bad object id (phone / page / IG id)
   if (status === 404 || code === 803 || code === 100 || /unknown path/i.test(msg) || /does not exist/i.test(msg) || /unsupported.*get.*request/i.test(msg)) {
     return {
