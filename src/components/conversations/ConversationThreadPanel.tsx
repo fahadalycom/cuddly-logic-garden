@@ -37,7 +37,18 @@ interface Props {
 type Tab = "messages" | "notes";
 
 const MAX_FILE_BYTES = 16 * 1024 * 1024; // 16 MB
-const ACCEPT_MIME = "image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt";
+
+// Per-channel attachment capabilities (Meta API limits):
+//   WhatsApp  — images, videos, audio, documents
+//   Messenger — images, documents
+//   Instagram — images only
+type ChannelCaps = { canAttach: boolean; accept: string; allowDocs: boolean; note?: string };
+const CHANNEL_CAPS: Record<string, ChannelCaps> = {
+  whatsapp:  { canAttach: true, accept: "image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt", allowDocs: true },
+  facebook:  { canAttach: true, accept: "image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt", allowDocs: true },
+  instagram: { canAttach: true, accept: "image/*", allowDocs: false, note: "Instagram DMs only support images." },
+};
+const DEFAULT_CAPS: ChannelCaps = { canAttach: false, accept: "", allowDocs: false, note: "Attachments not supported on this channel." };
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
