@@ -32,7 +32,7 @@ const navGroups: NavGroup[] = [
     { title: "Products", url: "/products", icon: Package, module: "products" },
   ]},
   { label: "Sales", items: [
-    { title: "New Order", url: "/orders/new", icon: ShoppingCart, module: "orders" },
+    { title: "POS", url: "/orders/new", icon: Store, module: "orders" },
     { title: "Orders", url: "/orders", icon: FileText, module: "orders" },
     { title: "Payments", url: "/payments", icon: CreditCard, module: "payments" },
   ]},
