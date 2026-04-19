@@ -28,7 +28,7 @@ import StaffPage from "./pages/Staff";
 import RolesPage from "./pages/Roles";
 import TemplatesPage from "./pages/Templates";
 import AuditLogsPage from "./pages/AuditLogs";
-import WhatsAppPage from "./pages/WhatsApp";
+
 import ConversationsPage from "./pages/Conversations";
 import LeadsPage from "./pages/Leads";
 import SupportPage from "./pages/Support";
@@ -89,7 +89,7 @@ const App = () => (
             <Route element={<ProtectedRoute><FullBleedLayout /></ProtectedRoute>}>
               <Route path="/conversations" element={<ConversationsPage />} />
             </Route>
-            <Route path="/whatsapp" element={<ProtectedRoute><WhatsAppPage /></ProtectedRoute>} />
+            <Route path="/whatsapp" element={<Navigate to="/conversations" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

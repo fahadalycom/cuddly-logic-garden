@@ -23,7 +23,6 @@ const navGroups: NavGroup[] = [
   ]},
   { label: "Inbox", items: [
     { title: "Conversations", url: "/conversations", icon: MessageSquare },
-    { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
   ]},
   { label: "Pipeline", items: [
     { title: "Leads", url: "/leads", icon: UserPlus },
