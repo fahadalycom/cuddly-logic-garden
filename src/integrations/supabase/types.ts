@@ -362,7 +362,6 @@ export type Database = {
         Row: {
           assigned_team_id: string | null
           created_at: string
-          email: string | null
           id: string
           is_archived: boolean
           name: string
@@ -372,12 +371,11 @@ export type Database = {
           tags: string[]
           trust_tag: Database["public"]["Enums"]["trust_tag"]
           updated_at: string
-          whatsapp_number: string | null
+          whatsapp_number: string
         }
         Insert: {
           assigned_team_id?: string | null
           created_at?: string
-          email?: string | null
           id?: string
           is_archived?: boolean
           name: string
@@ -387,12 +385,11 @@ export type Database = {
           tags?: string[]
           trust_tag?: Database["public"]["Enums"]["trust_tag"]
           updated_at?: string
-          whatsapp_number?: string | null
+          whatsapp_number: string
         }
         Update: {
           assigned_team_id?: string | null
           created_at?: string
-          email?: string | null
           id?: string
           is_archived?: boolean
           name?: string
@@ -402,7 +399,7 @@ export type Database = {
           tags?: string[]
           trust_tag?: Database["public"]["Enums"]["trust_tag"]
           updated_at?: string
-          whatsapp_number?: string | null
+          whatsapp_number?: string
         }
         Relationships: [
           {
@@ -2954,6 +2951,7 @@ export type Database = {
         Returns: Json
       }
       scan_overdue_vendor_followups: { Args: never; Returns: Json }
+      upsert_client_by_whatsapp: { Args: { _wa: string }; Returns: string }
     }
     Enums: {
       account_status: "available" | "assigned" | "exhausted" | "expired"

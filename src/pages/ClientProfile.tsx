@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { LoadingState } from "@/components/shared/PageStates";
 import { formatCurrency } from "@/lib/template-engine";
 import { toast } from "sonner";
-import { ArrowLeft, Phone, Mail, Calendar, FileText, RefreshCw, StickyNote, Send } from "lucide-react";
+import { ArrowLeft, Phone, Calendar, FileText, RefreshCw, StickyNote, Send } from "lucide-react";
 import type { Client, Order, Subscription, ClientNote } from "@/types/database";
 
 export default function ClientProfilePage() {
@@ -73,10 +73,9 @@ export default function ClientProfilePage() {
       </div>
 
       {/* Info Cards */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {[
-          { icon: Phone, label: "Phone", value: client.phone || "—" },
-          { icon: Mail, label: "Email", value: client.email || "—" },
+          { icon: Phone, label: "WhatsApp", value: client.whatsapp_number || "—" },
           { icon: Calendar, label: "Since", value: new Date(client.created_at).toLocaleDateString() },
         ].map((item) => (
           <div key={item.label} className="premium-card !p-4 flex items-center gap-3">

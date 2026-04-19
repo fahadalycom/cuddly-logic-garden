@@ -22,7 +22,6 @@ export default function NewOrderPage() {
   const [selectedVariant, setSelectedVariant] = useState("");
   const [selectedDuration, setSelectedDuration] = useState("");
   const [clientPhone, setClientPhone] = useState("");
-  const [clientName, setClientName] = useState("");
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState("");
   const { user } = useAuth();
@@ -51,7 +50,7 @@ export default function NewOrderPage() {
 
   const generatePreInvoice = () => {
     const lines = [
-      `📋 *Pre-Invoice*`, ``, `👤 Client: ${clientName}`, `📱 Phone: ${clientPhone}`, ``, `🛒 *Order Details:*`,
+      `📋 *Pre-Invoice*`, ``, `📱 WhatsApp: ${clientPhone}`, ``, `🛒 *Order Details:*`,
       `• Product: ${product?.name}`,
       variant ? `• Plan: ${variant.name}` : null,
       duration ? `• Duration: ${duration.duration_value} ${duration.duration_type}(s)` : null,
@@ -63,27 +62,18 @@ export default function NewOrderPage() {
   };
 
   const createOrder = () => run(async () => {
-    if (!product || !clientName.trim() || !clientPhone.trim()) {
-      toast.error("Please fill all required fields");
+    if (!product || !clientPhone.trim()) {
+      toast.error("Please enter a WhatsApp number and select a product");
       return;
     }
     if (lineTotal < 0) {
       toast.error("Discount cannot exceed price");
       return;
     }
-    // Use maybeSingle to avoid throwing when phone doesn't exist yet
-    const { data: existing, error: lookupErr } = await supabase
-      .from("clients").select("id").eq("phone", clientPhone.trim()).maybeSingle();
-    if (lookupErr) { toast.error(lookupErr.message); return; }
-
-    let clientId = existing?.id;
-    if (!clientId) {
-      const { data: newClient, error } = await supabase.from("clients").insert({
-        name: clientName.trim(), phone: clientPhone.trim(), whatsapp_number: clientPhone.trim(),
-      }).select("id").single();
-      if (error) { toast.error(error.message); return; }
-      clientId = newClient.id;
-    }
+    // Auto-upsert client by WhatsApp number (auto-generates "Client N" name if new)
+    const { data: clientId, error: upsertErr } = await supabase
+      .rpc("upsert_client_by_whatsapp", { _wa: clientPhone.trim() });
+    if (upsertErr || !clientId) { toast.error(upsertErr?.message || "Could not resolve client"); return; }
 
     const { data: order, error: orderErr } = await supabase.from("orders").insert({
       client_id: clientId,
@@ -132,17 +122,19 @@ export default function NewOrderPage() {
       <div className="premium-card !p-6 space-y-4">
         <div className="flex items-center gap-2 mb-2">
           <User className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Client Information</h3>
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Client</h3>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Client Name *</Label>
-            <Input value={clientName} onChange={(e) => setClientName(e.target.value)} className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl" />
-          </div>
-          <div>
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Phone / WhatsApp *</Label>
-            <Input value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl" />
-          </div>
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">WhatsApp Number *</Label>
+          <Input
+            value={clientPhone}
+            onChange={(e) => setClientPhone(e.target.value)}
+            placeholder="e.g. 923001234567"
+            className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl"
+          />
+          <p className="text-[11px] text-muted-foreground/60 mt-1.5">
+            New numbers are auto-registered with a generated name (Client 1, Client 2, …).
+          </p>
         </div>
       </div>
 
@@ -218,7 +210,7 @@ export default function NewOrderPage() {
         </Button>
         <Button
           onClick={createOrder}
-          disabled={!product || !clientName.trim() || !clientPhone.trim() || submitting}
+          disabled={!product || !clientPhone.trim() || submitting}
           className="flex-1 rounded-xl gradient-primary text-white border-0 h-11 shadow-lg shadow-primary/20"
         >
           {submitting ? (

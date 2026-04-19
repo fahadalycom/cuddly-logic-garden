@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, Phone, Mail, Package, RefreshCw, CreditCard, Ticket, StickyNote, FileText, ShoppingCart, ArrowRightLeft } from "lucide-react";
+import { X, Phone, Package, RefreshCw, CreditCard, Ticket, StickyNote, FileText, ShoppingCart, ArrowRightLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -131,7 +131,6 @@ export function ConversationContextPanel({ conversation, onClose }: Props) {
             </div>
             <div className="space-y-1.5 text-xs">
               <Row icon={Phone} text={ctx.phone} />
-              {ctx.email && <Row icon={Mail} text={ctx.email} />}
               {(conversation as any).externalUserId && (
                 <p className="text-[10px] text-muted-foreground/70 font-mono pl-5 truncate">
                   {conversation.channel}: {(conversation as any).externalUserId}
