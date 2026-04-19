@@ -21,6 +21,10 @@ export interface MockMessage {
   retryCount?: number;
   errorMessage?: string;
   direction?: "inbound" | "outbound";
+  mediaUrl?: string | null;
+  mediaType?: "image" | "document" | "audio" | "video" | "text" | null;
+  mediaMimeType?: string | null;
+  mediaFilename?: string | null;
 }
 
 export interface MockInternalNote {

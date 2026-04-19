@@ -103,6 +103,9 @@ export interface WaMessageRow {
   sender_type: string;
   content: string | null;
   media_type: string | null;
+  media_url?: string | null;
+  media_mime_type?: string | null;
+  media_filename?: string | null;
   delivery_status: string | null;
   direction: string | null;
   retry_count: number | null;
@@ -114,12 +117,13 @@ export interface WaMessageRow {
 export function mapWaMessage(row: WaMessageRow): MockMessage {
   const isAgent = row.sender_type === "agent" || row.sender_type === "ai";
   const isSystem = row.sender_type === "system";
+  const mediaType = (row.media_type as MockMessage["mediaType"]) ?? null;
   return {
     id: row.id,
     conversationId: dbToRealId(row.conversation_id),
     sender: isSystem ? "system" : isAgent ? "agent" : "customer",
     senderName: isSystem ? undefined : isAgent ? "You" : undefined,
-    text: row.content ?? (row.media_type && row.media_type !== "text" ? `[${row.media_type}]` : ""),
+    text: row.content ?? "",
     time: fmtTime(row.created_at),
     type: (row.media_type === "image" || row.media_type === "document"
       ? (row.media_type === "document" ? "file" : "image")
@@ -128,5 +132,9 @@ export function mapWaMessage(row: WaMessageRow): MockMessage {
     status: isAgent ? ((row.delivery_status as DeliveryStatus) ?? "delivered") : undefined,
     retryCount: row.retry_count ?? 0,
     errorMessage: row.error_message ?? undefined,
+    mediaUrl: row.media_url ?? null,
+    mediaType,
+    mediaMimeType: row.media_mime_type ?? null,
+    mediaFilename: row.media_filename ?? null,
   };
 }
