@@ -1,70 +1,71 @@
 
-Goal: harden the existing unified messaging system end-to-end without rebuilding it.
+Let me explore the relevant files to understand current client structure.
+<lov-tool-use id="toolu_vrtx_01S1prMbPqNKQdFbq9E5wboo" name="code--exec" integration-id="code" data="{\"command\": \"grep -rn \\\"email\\\" src/pages/Clients.tsx src/pages/ClientProfile.tsx src/pages/NewOrder.tsx src/components/conversations/ConversationContextPanel.tsx 2>/dev/null | head -50\", \"user_facing_description\": \"Scanning client-related files for email references\"}">
+</lov-tool-use>
 
-What I found from the current code:
-- The core architecture is already correct: one inbox, channel-aware send functions, retries, webhooks, status model, health UI.
-- The main production breakage is in the last-mile wiring, not the architecture.
-- Biggest concrete bug: outbound WhatsApp attachments are inconsistent. The UI stores a public URL, but `whatsapp-send` expects a storage object key and tries to download it from storage. That makes WhatsApp file/image sending fail.
-- The composer still allows sends when a channel is expired/disabled/error, so users hit avoidable runtime failures.
-- `whatsapp-retry-message` still allows retrying `permanently_failed` messages at backend level.
-- AI auto-replies bypass the unified outbound pipeline and write incomplete message rows, which can create inconsistent status/history behavior.
-- The live inbox still falls back to mock conversations/queue counts when DB data is empty, which can hide real webhook/send problems instead of exposing them.
+<lov-tool-use id="toolu_vrtx_01Q4FKXQb3bsUypadFe1D7n5" name="supabase--read_query" integration-id="supabase" data="{\"query\": \"SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='clients' ORDER BY ordinal_position;\"}">
+</lov-tool-use>
 
-Plan
+<lov-tool-use id="toolu_vrtx_01W2db5UUwnVrSjeX9pbecCa" name="supabase--read_query" integration-id="supabase" data="{\"query\": \"SELECT count(*) as total, count(email) as with_email, count(DISTINCT phone) as unique_phones, count(*) FILTER (WHERE phone IS NULL) as null_phones FROM public.clients;\"}">
+</lov-tool-use>
 
-1. Normalize the outbound media contract
-- Make attachments use one consistent payload shape across UI + edge functions.
-- Store the storage key for WhatsApp sends, and keep a separate preview URL for UI display.
-- Update Messenger/Instagram send path to convert storage keys to usable public/proxy URLs when needed.
-- Result: image/document sending works reliably on real channels.
+<lov-tool-use id="toolu_vrtx_01FuNduorRnNj5hJ3gHEiBp6" name="code--search_files" integration-id="code" data="{\"query\": \"clients?\\\\.\\\\??email|client\\\\.email|client_email|clients\\\\.email\", \"include_patterns\": \"*.ts,*.tsx\"}">
+</lov-tool-use>
 
-2. Block bad sends before they happen
-- Tie the composer to actual integration health, not just “real conversation id”.
-- If token is expired, channel is disabled, or integration is broken, disable send and show the exact reason with a link to Channel Integrations.
-- Keep the existing error banner, but make it authoritative for send gating.
+<lov-tool-use id="toolu_vrtx_01WGcUjcgz4FMC8vinYwtzU1" name="supabase--read_query" integration-id="supabase" data="{\"query\": \"SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='clients' ORDER BY ordinal_position;\"}">
+</lov-tool-use>
 
-3. Harden outbound send functions
-- Add strict preflight validation in `whatsapp-send` and `messenger-send` for missing recipient ids, missing config, unsupported attachment/channel combinations, and malformed media payloads.
-- Keep storing exact `error_code`, `error_message`, and `provider_response`.
-- Return clearer structured failures so the UI shows the real cause.
+<lov-tool-use id="toolu_vrtx_016K5p4u6kVeHZq4s5xqhL9v" name="supabase--read_query" integration-id="supabase" data="{\"query\": \"SELECT count(*) total, count(email) with_email, count(*) FILTER (WHERE phone IS NULL OR phone='') no_phone FROM public.clients;\"}">
+</lov-tool-use>
 
-4. Fix retry behavior permanently
-- Prevent backend retries for `permanently_failed` messages.
-- Allow retry only for truly retryable states.
-- Keep manual retry, but stop pointless replays for expired-token / permission / config failures.
+<lov-tool-use id="toolu_vrtx_01EES8gGxKjuugYBLEN3ZmUJ" name="code--search_files" integration-id="code" data="{\"query\": \"client\\\\.email|clients\\\\.email|\\\\.email\\\\b\", \"include_patterns\": \"src/pages/Clients.tsx,src/pages/ClientProfile.tsx,src/pages/NewOrder.tsx,src/pages/Reminders.tsx,src/pages/Renewals.tsx,src/pages/OldClients.tsx\"}">
+</lov-tool-use>
 
-5. Route AI replies through the same message pipeline
-- Stop direct Graph sending from `whatsapp-ai-respond`.
-- Reuse the existing send path or at minimum write the same fields (`direction`, `channel`, `delivery_status`, `sent_at`, provider ids/errors).
-- Result: AI messages obey the same transport, status, logging, and retry rules.
+<lov-tool-use id="toolu_vrtx_01KdvfwUQU7eAnFhuR3ywnbg" name="code--search_files" integration-id="code" data="{\"query\": \"email\", \"include_patterns\": \"src/components/conversations/ConversationContextPanel.tsx,src/lib/template-engine.ts,src/lib/conversations-data.ts\"}">
+</lov-tool-use>
 
-6. Remove remaining production mock leaks
-- Remove fallback to `mockConversationsList` in the live inbox flow.
-- Remove mock queue counts from the Conversations page, or clearly isolate them away from the live messaging workflow.
-- Show a real empty state when there are no conversations instead of demo data.
+<lov-tool-use id="toolu_vrtx_01UpbFoKpzVbNz6pEvon1hZT" name="code--search_files" integration-id="code" data="{\"include_patterns\": \"src/**/*.ts,src/**/*.tsx,supabase/functions/**/*.ts\", \"query\": \"email\", \"exclude_patterns\": \"src/integrations/supabase/types.ts,src/components/ui/*\"}">
+</lov-tool-use>
 
-7. Improve operator/debug visibility inside the inbox
-- Expand message loading so the thread can use richer failure metadata where available.
-- Improve failed message bubbles and ops logs so admins can see exact channel failure reasons without checking code.
-- Keep current integration health cards, but make live message failures and integration failures feel connected.
+<lov-tool-use id="toolu_vrtx_018vi3en1Qptnz7nqA225Tgs" name="code--view" integration-id="code" data="{\"file_path\": \"src/pages/NewOrder.tsx\"}">
+</lov-tool-use>
 
-Files to update
-- `src/components/conversations/ConversationThreadPanel.tsx`
-- `src/hooks/useConversationMessages.ts`
-- `src/hooks/useConversations.ts`
-- `src/pages/Conversations.tsx`
-- `src/components/conversations/ConversationReliabilityStrip.tsx`
-- `src/components/admin/OperationalLogsPanel.tsx`
-- `supabase/functions/whatsapp-send/index.ts`
-- `supabase/functions/messenger-send/index.ts`
-- `supabase/functions/whatsapp-retry-message/index.ts`
-- `supabase/functions/whatsapp-ai-respond/index.ts`
+<lov-tool-use id="toolu_vrtx_01EbMpKA1cfRjb2sb7zB1VDf" name="code--search_files" integration-id="code" data="{\"include_patterns\": \"supabase/functions/whatsapp-webhook/index.ts,supabase/functions/messenger-webhook/index.ts\", \"query\": \"clients|email|name:\"}">
+</lov-tool-use>
 
-Acceptance after implementation
-- Real text sends work from the unified inbox.
-- Real image/document sends work, especially on WhatsApp.
-- Expired/disabled integrations block sending clearly before failure.
-- Permanent failures are visible but not retryable.
-- AI replies no longer bypass the transport system.
-- No mock conversations or fake queue counts leak into the live messaging workflow.
-- Admins can see exactly why sends fail from the UI itself.
+<lov-tool-use id="toolu_vrtx_01PiQoEhcbDG7AqSdAyk6yjd" name="code--view" integration-id="code" data="{\"file_path\": \"src/components/conversations/ConversationContextPanel.tsx\", \"lines\": \"120-150\"}">
+</lov-tool-use>
+I have enough context. Let me present the plan.
+
+<lov-plan>
+## Plan: Remove email from clients only; identify by WhatsApp number with auto-generated names
+
+### Database (migration)
+1. Drop `clients.email` column.
+2. Make `clients.whatsapp_number` `NOT NULL` and add a `UNIQUE` index.
+3. Backfill `whatsapp_number` from `phone` where missing; deduplicate any collisions by archiving older duplicates.
+4. Add Postgres function `public.upsert_client_by_whatsapp(_wa text)` that:
+   - Normalizes the number,
+   - Returns existing client id if found,
+   - Otherwise inserts a new client with auto name `Client N` using a sequence (`clients_auto_name_seq`).
+5. Update `whatsapp-webhook` insert to call this function instead of inserting `name = customerName || from` (no email, name auto-generated as `Client N`). Same in `messenger-webhook`.
+
+Vendor/staff/profile email is untouched. Only `public.clients.email` is removed.
+
+### Frontend changes
+1. **`src/pages/Clients.tsx`** — remove Email column; search now matches `name` + `whatsapp_number`; remove email from row rendering.
+2. **`src/pages/ClientProfile.tsx`** — remove Email info card; show only WhatsApp number + Since.
+3. **`src/pages/NewOrder.tsx`** — replace Name+Phone form with a single **WhatsApp Number** input. On submit, call the new RPC `upsert_client_by_whatsapp` to get the client id (auto-create if needed). Remove `clientName` state and validation. Pre-invoice uses returned auto name.
+4. **`src/components/conversations/ConversationContextPanel.tsx`** — remove the `{ctx.email && ...}` row.
+5. **`src/lib/conversations-data.ts` / context mapper** — drop `email` from customer context object (keep type optional but never populated).
+6. Any other client-form/dialog references to email: remove (none currently exist outside the above based on grep).
+
+### Out of scope (kept as-is)
+- `staff_profiles.email`, `auth.users` email, vendor `contact_email`, invoice `customerEmail`, channel "email", agent panels — untouched.
+- `mock-data.ts` provisioning emails (account pool emails, not client emails).
+
+### Verification
+- Send a new WhatsApp message from an unknown number → client auto-created as `Client N`, conversation linked, no email anywhere in UI.
+- Create order with only a WhatsApp number → existing client linked or new one auto-created.
+- Clients list / profile / context panel show no email field.
+- Existing clients still load (email column gone, no UI breakage).
