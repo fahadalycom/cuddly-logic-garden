@@ -9,6 +9,7 @@ export interface ChannelHealthSummary {
   webhookFailuresToday: number;
   needsAttention: ChannelIntegration[];
   lastInboundByChannel: Record<string, string | null>;
+  lastOutboundByChannel: Record<string, string | null>;
 }
 
 const startOfTodayISO = () => {
@@ -23,7 +24,7 @@ export function useChannelHealth() {
     queryFn: async () => {
       const todayISO = startOfTodayISO();
 
-      const [intRes, failedRes, webhookFailRes, lastInboundRes] = await Promise.all([
+      const [intRes, failedRes, webhookFailRes, lastInboundRes, lastOutboundRes] = await Promise.all([
         supabase.from("channel_integrations").select("*").order("channel_type"),
         supabase.from("wa_messages")
           .select("id", { count: "exact", head: true })
@@ -37,12 +38,22 @@ export function useChannelHealth() {
           .select("channel, received_at")
           .order("received_at", { ascending: false })
           .limit(50),
+        supabase.from("wa_messages")
+          .select("channel, sent_at")
+          .eq("direction", "outbound")
+          .not("sent_at", "is", null)
+          .order("sent_at", { ascending: false })
+          .limit(50),
       ]);
 
       const integrations = (intRes.data ?? []) as unknown as ChannelIntegration[];
       const lastInboundByChannel: Record<string, string | null> = {};
       for (const row of (lastInboundRes.data ?? []) as Array<{ channel: string; received_at: string }>) {
         if (!lastInboundByChannel[row.channel]) lastInboundByChannel[row.channel] = row.received_at;
+      }
+      const lastOutboundByChannel: Record<string, string | null> = {};
+      for (const row of (lastOutboundRes.data ?? []) as Array<{ channel: string; sent_at: string }>) {
+        if (!lastOutboundByChannel[row.channel]) lastOutboundByChannel[row.channel] = row.sent_at;
       }
 
       const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
@@ -61,6 +72,7 @@ export function useChannelHealth() {
         webhookFailuresToday: webhookFailRes.count ?? 0,
         needsAttention,
         lastInboundByChannel,
+        lastOutboundByChannel,
       };
     },
     refetchInterval: 30_000,
