@@ -2529,6 +2529,45 @@ export type Database = {
         }
         Relationships: []
       }
+      wa_inbound_events: {
+        Row: {
+          channel: string
+          conversation_id: string | null
+          error_message: string | null
+          event_type: Database["public"]["Enums"]["inbound_event_type"]
+          external_message_id: string | null
+          id: string
+          processed_at: string | null
+          processing_status: Database["public"]["Enums"]["inbound_event_processing_status"]
+          raw_payload: Json
+          received_at: string
+        }
+        Insert: {
+          channel?: string
+          conversation_id?: string | null
+          error_message?: string | null
+          event_type?: Database["public"]["Enums"]["inbound_event_type"]
+          external_message_id?: string | null
+          id?: string
+          processed_at?: string | null
+          processing_status?: Database["public"]["Enums"]["inbound_event_processing_status"]
+          raw_payload: Json
+          received_at?: string
+        }
+        Update: {
+          channel?: string
+          conversation_id?: string | null
+          error_message?: string | null
+          event_type?: Database["public"]["Enums"]["inbound_event_type"]
+          external_message_id?: string | null
+          id?: string
+          processed_at?: string | null
+          processing_status?: Database["public"]["Enums"]["inbound_event_processing_status"]
+          raw_payload?: Json
+          received_at?: string
+        }
+        Relationships: []
+      }
       wa_internal_notes: {
         Row: {
           author_id: string
@@ -2563,54 +2602,96 @@ export type Database = {
       }
       wa_messages: {
         Row: {
+          channel: string
           content: string | null
           conversation_id: string
           created_at: string
+          delivered_at: string | null
+          delivery_status: Database["public"]["Enums"]["message_delivery_status"]
+          direction: Database["public"]["Enums"]["message_direction"]
+          error_code: string | null
+          error_message: string | null
+          external_message_id: string | null
           id: string
+          idempotency_key: string | null
           is_ai_generated: boolean
           is_read: boolean
+          last_retry_at: string | null
+          max_retries: number
           media_filename: string | null
           media_mime_type: string | null
           media_type: Database["public"]["Enums"]["wa_media_type"]
           media_url: string | null
+          provider_response: Json | null
           reactions: Json | null
+          read_at: string | null
           reply_to_message_id: string | null
+          retry_count: number
           sender_id: string | null
           sender_type: Database["public"]["Enums"]["wa_sender_type"]
+          sent_at: string | null
           whatsapp_message_id: string | null
         }
         Insert: {
+          channel?: string
           content?: string | null
           conversation_id: string
           created_at?: string
+          delivered_at?: string | null
+          delivery_status?: Database["public"]["Enums"]["message_delivery_status"]
+          direction?: Database["public"]["Enums"]["message_direction"]
+          error_code?: string | null
+          error_message?: string | null
+          external_message_id?: string | null
           id?: string
+          idempotency_key?: string | null
           is_ai_generated?: boolean
           is_read?: boolean
+          last_retry_at?: string | null
+          max_retries?: number
           media_filename?: string | null
           media_mime_type?: string | null
           media_type?: Database["public"]["Enums"]["wa_media_type"]
           media_url?: string | null
+          provider_response?: Json | null
           reactions?: Json | null
+          read_at?: string | null
           reply_to_message_id?: string | null
+          retry_count?: number
           sender_id?: string | null
           sender_type?: Database["public"]["Enums"]["wa_sender_type"]
+          sent_at?: string | null
           whatsapp_message_id?: string | null
         }
         Update: {
+          channel?: string
           content?: string | null
           conversation_id?: string
           created_at?: string
+          delivered_at?: string | null
+          delivery_status?: Database["public"]["Enums"]["message_delivery_status"]
+          direction?: Database["public"]["Enums"]["message_direction"]
+          error_code?: string | null
+          error_message?: string | null
+          external_message_id?: string | null
           id?: string
+          idempotency_key?: string | null
           is_ai_generated?: boolean
           is_read?: boolean
+          last_retry_at?: string | null
+          max_retries?: number
           media_filename?: string | null
           media_mime_type?: string | null
           media_type?: Database["public"]["Enums"]["wa_media_type"]
           media_url?: string | null
+          provider_response?: Json | null
           reactions?: Json | null
+          read_at?: string | null
           reply_to_message_id?: string | null
+          retry_count?: number
           sender_id?: string | null
           sender_type?: Database["public"]["Enums"]["wa_sender_type"]
+          sent_at?: string | null
           whatsapp_message_id?: string | null
         }
         Relationships: [
@@ -2673,6 +2754,50 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "wa_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_send_jobs: {
+        Row: {
+          attempt_count: number
+          created_at: string
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          message_id: string | null
+          next_attempt_at: string | null
+          status: Database["public"]["Enums"]["send_job_status"]
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          last_error?: string | null
+          message_id?: string | null
+          next_attempt_at?: string | null
+          status?: Database["public"]["Enums"]["send_job_status"]
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          last_error?: string | null
+          message_id?: string | null
+          next_attempt_at?: string | null
+          status?: Database["public"]["Enums"]["send_job_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_send_jobs_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "wa_messages"
             referencedColumns: ["id"]
           },
         ]
@@ -2859,6 +2984,12 @@ export type Database = {
         | "trial_offer"
       duration_type: "day" | "week" | "month" | "year"
       feedback_type: "review" | "feedback" | "follow_up"
+      inbound_event_processing_status:
+        | "pending"
+        | "processed"
+        | "failed"
+        | "duplicate"
+      inbound_event_type: "message" | "status" | "error" | "unknown"
       invoice_discount_type: "none" | "fixed" | "percent"
       invoice_status: "draft" | "sent" | "paid" | "cancelled"
       issue_status:
@@ -2891,6 +3022,16 @@ export type Database = {
         | "referral"
         | "other"
       lead_status: "new" | "interested" | "follow_up" | "converted" | "dead"
+      message_delivery_status:
+        | "queued"
+        | "sending"
+        | "sent_to_api"
+        | "delivered"
+        | "read"
+        | "failed"
+        | "retrying"
+        | "permanently_failed"
+      message_direction: "inbound" | "outbound"
       order_fulfillment_status:
         | "not_started"
         | "ready"
@@ -2933,6 +3074,7 @@ export type Database = {
         | "revisit_later"
         | "undecided"
       research_status: "not_started" | "in_progress" | "completed" | "on_hold"
+      send_job_status: "pending" | "running" | "done" | "failed"
       staff_availability: "active" | "on_break" | "offline" | "inactive"
       subscription_status:
         | "active"
@@ -3190,6 +3332,13 @@ export const Constants = {
       ],
       duration_type: ["day", "week", "month", "year"],
       feedback_type: ["review", "feedback", "follow_up"],
+      inbound_event_processing_status: [
+        "pending",
+        "processed",
+        "failed",
+        "duplicate",
+      ],
+      inbound_event_type: ["message", "status", "error", "unknown"],
       invoice_discount_type: ["none", "fixed", "percent"],
       invoice_status: ["draft", "sent", "paid", "cancelled"],
       issue_status: [
@@ -3225,6 +3374,17 @@ export const Constants = {
         "other",
       ],
       lead_status: ["new", "interested", "follow_up", "converted", "dead"],
+      message_delivery_status: [
+        "queued",
+        "sending",
+        "sent_to_api",
+        "delivered",
+        "read",
+        "failed",
+        "retrying",
+        "permanently_failed",
+      ],
+      message_direction: ["inbound", "outbound"],
       order_fulfillment_status: [
         "not_started",
         "ready",
@@ -3272,6 +3432,7 @@ export const Constants = {
         "undecided",
       ],
       research_status: ["not_started", "in_progress", "completed", "on_hold"],
+      send_job_status: ["pending", "running", "done", "failed"],
       staff_availability: ["active", "on_break", "offline", "inactive"],
       subscription_status: [
         "active",

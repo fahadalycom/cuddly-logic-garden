@@ -49,6 +49,57 @@ serve(async (req) => {
     const changes = entry?.changes?.[0];
     const value = changes?.value;
 
+    // Handle status callbacks (sent / delivered / read / failed)
+    if (value?.statuses?.length) {
+      for (const st of value.statuses) {
+        const externalId = st.id;
+        // Dedupe + log
+        const { data: dup } = await supabase
+          .from("wa_inbound_events")
+          .select("id")
+          .eq("channel", "whatsapp")
+          .eq("external_message_id", externalId)
+          .eq("event_type", "status")
+          .maybeSingle();
+        if (dup) continue;
+
+        const { data: evt } = await supabase.from("wa_inbound_events").insert({
+          channel: "whatsapp",
+          event_type: "status",
+          raw_payload: st,
+          external_message_id: externalId,
+          processing_status: "pending",
+        }).select().single();
+
+        try {
+          const newStatus = st.status === "sent" ? "sent_to_api"
+            : st.status === "delivered" ? "delivered"
+            : st.status === "read" ? "read"
+            : st.status === "failed" ? "failed"
+            : null;
+          if (newStatus) {
+            const updates: Record<string, unknown> = { delivery_status: newStatus };
+            if (newStatus === "delivered") updates.delivered_at = new Date().toISOString();
+            if (newStatus === "read") updates.read_at = new Date().toISOString();
+            if (newStatus === "failed") {
+              updates.error_code = String(st.errors?.[0]?.code ?? "");
+              updates.error_message = st.errors?.[0]?.title || st.errors?.[0]?.message || "Delivery failed";
+            }
+            await supabase.from("wa_messages")
+              .update(updates)
+              .eq("external_message_id", externalId);
+          }
+          await supabase.from("wa_inbound_events")
+            .update({ processing_status: "processed", processed_at: new Date().toISOString() })
+            .eq("id", evt!.id);
+        } catch (e) {
+          await supabase.from("wa_inbound_events")
+            .update({ processing_status: "failed", error_message: (e as Error).message })
+            .eq("id", evt!.id);
+        }
+      }
+    }
+
     if (!value?.messages?.length) {
       return new Response(JSON.stringify({ status: "no_messages" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -59,6 +110,24 @@ serve(async (req) => {
       const from = message.from;
       const waId = value.contacts?.[0]?.wa_id;
       const customerName = value.contacts?.[0]?.profile?.name || null;
+
+      // Log raw inbound event (deduped by external_message_id)
+      const { data: dupMsg } = await supabase
+        .from("wa_inbound_events")
+        .select("id")
+        .eq("channel", "whatsapp")
+        .eq("external_message_id", message.id)
+        .eq("event_type", "message")
+        .maybeSingle();
+      if (dupMsg) continue;
+
+      const { data: evtRow } = await supabase.from("wa_inbound_events").insert({
+        channel: "whatsapp",
+        event_type: "message",
+        raw_payload: message,
+        external_message_id: message.id,
+        processing_status: "pending",
+      }).select().single();
 
       // Find or create conversation
       let { data: conversation } = await supabase
@@ -72,49 +141,29 @@ serve(async (req) => {
 
       if (!conversation) {
         let { data: client } = await supabase
-          .from("clients")
-          .select("id")
-          .eq("whatsapp_number", from)
-          .single();
-
+          .from("clients").select("id").eq("whatsapp_number", from).single();
         if (!client) {
-          const { data: newClient } = await supabase
-            .from("clients")
+          const { data: newClient } = await supabase.from("clients")
             .insert({ name: customerName || from, whatsapp_number: from, phone: from })
-            .select("id")
-            .single();
+            .select("id").single();
           client = newClient;
         }
-
         const assignedAgent = await findAvailableAgent(supabase);
         const status = assignedAgent ? "active" : "waiting";
-
-        const { data: newConv } = await supabase
-          .from("wa_conversations")
-          .insert({
-            customer_phone: from,
-            customer_name: customerName,
-            customer_whatsapp_id: waId,
-            client_id: client?.id,
-            assigned_agent_id: assignedAgent,
-            status,
-          })
-          .select()
-          .single();
-
+        const { data: newConv } = await supabase.from("wa_conversations").insert({
+          customer_phone: from, customer_name: customerName, customer_whatsapp_id: waId,
+          client_id: client?.id, assigned_agent_id: assignedAgent, status,
+        }).select().single();
         conversation = newConv;
-
         if (!assignedAgent && conversation) {
           await supabase.from("wa_queue").insert({
-            conversation_id: conversation.id,
-            reason: "No available agent",
+            conversation_id: conversation.id, reason: "No available agent",
           });
         }
       }
 
       if (!conversation) continue;
 
-      // Determine media
       let content = message.text?.body || null;
       let mediaType = "text";
       let mediaUrl: string | null = null;
@@ -122,71 +171,58 @@ serve(async (req) => {
       let mediaFilename: string | null = null;
 
       if (message.type === "image") {
-        mediaType = "image";
-        mediaMimeType = message.image.mime_type;
+        mediaType = "image"; mediaMimeType = message.image.mime_type;
         content = message.image.caption || null;
-        try { mediaUrl = await downloadAndUploadToStorage(supabase, message.image.id, mediaMimeType); } catch (e) { console.error("Image upload failed:", e); }
+        try { mediaUrl = await downloadAndUploadToStorage(supabase, message.image.id, mediaMimeType); } catch (e) { console.error(e); }
       } else if (message.type === "video") {
-        mediaType = "video";
-        mediaMimeType = message.video.mime_type;
+        mediaType = "video"; mediaMimeType = message.video.mime_type;
         content = message.video.caption || null;
-        try { mediaUrl = await downloadAndUploadToStorage(supabase, message.video.id, mediaMimeType); } catch (e) { console.error("Video upload failed:", e); }
+        try { mediaUrl = await downloadAndUploadToStorage(supabase, message.video.id, mediaMimeType); } catch (e) { console.error(e); }
       } else if (message.type === "audio") {
-        mediaType = "audio";
-        mediaMimeType = message.audio.mime_type;
-        try { mediaUrl = await downloadAndUploadToStorage(supabase, message.audio.id, mediaMimeType); } catch (e) { console.error("Audio upload failed:", e); }
+        mediaType = "audio"; mediaMimeType = message.audio.mime_type;
+        try { mediaUrl = await downloadAndUploadToStorage(supabase, message.audio.id, mediaMimeType); } catch (e) { console.error(e); }
       } else if (message.type === "document") {
-        mediaType = "document";
-        mediaMimeType = message.document.mime_type;
+        mediaType = "document"; mediaMimeType = message.document.mime_type;
         mediaFilename = message.document.filename;
         content = message.document.caption || null;
-        try { mediaUrl = await downloadAndUploadToStorage(supabase, message.document.id, mediaMimeType); } catch (e) { console.error("Document upload failed:", e); }
+        try { mediaUrl = await downloadAndUploadToStorage(supabase, message.document.id, mediaMimeType); } catch (e) { console.error(e); }
       } else if (message.type === "sticker") {
-        mediaType = "sticker";
-        mediaMimeType = "image/webp";
-        try { mediaUrl = await downloadAndUploadToStorage(supabase, message.sticker.id, "image/webp"); } catch (e) { console.error("Sticker upload failed:", e); }
+        mediaType = "sticker"; mediaMimeType = "image/webp";
+        try { mediaUrl = await downloadAndUploadToStorage(supabase, message.sticker.id, "image/webp"); } catch (e) { console.error(e); }
       }
 
-      // Store message
       await supabase.from("wa_messages").insert({
         conversation_id: conversation.id,
         sender_type: "customer",
-        content,
-        media_type: mediaType,
-        media_url: mediaUrl,
-        media_mime_type: mediaMimeType,
-        media_filename: mediaFilename,
+        content, media_type: mediaType, media_url: mediaUrl,
+        media_mime_type: mediaMimeType, media_filename: mediaFilename,
         whatsapp_message_id: message.id,
+        external_message_id: message.id,
+        direction: "inbound",
+        delivery_status: "delivered",
+        channel: "whatsapp",
       });
 
-      await supabase
-        .from("wa_conversations")
-        .update({
-          last_message_preview: content || `[${mediaType}]`,
-          last_message_at: new Date().toISOString(),
-          unread_count: (conversation.unread_count || 0) + 1,
-          customer_name: customerName || conversation.customer_name,
-        })
-        .eq("id", conversation.id);
+      await supabase.from("wa_conversations").update({
+        last_message_preview: content || `[${mediaType}]`,
+        last_message_at: new Date().toISOString(),
+        unread_count: (conversation.unread_count || 0) + 1,
+        customer_name: customerName || conversation.customer_name,
+      }).eq("id", conversation.id);
 
-      // Trigger AI auto-response for text messages
+      // Mark inbound event processed
+      await supabase.from("wa_inbound_events")
+        .update({ processing_status: "processed", processed_at: new Date().toISOString(), conversation_id: conversation.id })
+        .eq("id", evtRow!.id);
+
       if (content && mediaType === "text") {
         try {
           await fetch(`${supabaseUrl}/functions/v1/whatsapp-ai-respond`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${supabaseKey}`,
-            },
-            body: JSON.stringify({
-              conversation_id: conversation.id,
-              message_content: content,
-              customer_phone: from,
-            }),
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${supabaseKey}` },
+            body: JSON.stringify({ conversation_id: conversation.id, message_content: content, customer_phone: from }),
           });
-        } catch (e) {
-          console.error("AI auto-response error:", e);
-        }
+        } catch (e) { console.error("AI auto-response error:", e); }
       }
     }
 

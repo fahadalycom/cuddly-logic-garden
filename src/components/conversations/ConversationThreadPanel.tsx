@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
-  ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, CheckCheck, RefreshCw, AlertTriangle, Package, ArrowRightLeft,
+  ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, RefreshCw, AlertTriangle, Package, ArrowRightLeft, RotateCw,
 } from "lucide-react";
 import { ProductSelectorPanel } from "./ProductSelectorPanel";
 import { TicketDialog } from "@/components/support/TicketDialog";
@@ -12,6 +12,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChannelIcon } from "./ChannelIcon";
 import { ConvStatusBadge, QueueBadge } from "./ConvStatusBadge";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
+import { MessageStatusIndicator } from "./MessageStatusIndicator";
+import { ConversationReliabilityStrip } from "./ConversationReliabilityStrip";
+import { isFailedStatus, isPendingStatus, type DeliveryStatus } from "@/lib/message-status";
+import { useSubmitGuard } from "@/hooks/useSubmitGuard";
+import { toast } from "sonner";
 import {
   mockMessagesByConv, mockNotesByConv, type MockConversation, type MockMessage, type MockInternalNote,
 } from "@/lib/conversations-mock";
@@ -33,6 +38,10 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const [ticketOpen, setTicketOpen] = useState(false);
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [handoffSuggestion, setHandoffSuggestion] = useState<{ queue: HandoffQueue; reason: string } | undefined>();
+  const [localMessages, setLocalMessages] = useState<MockMessage[]>([]);
+  const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
+  const idemRef = useRef<Map<string, string>>(new Map());
+  const { submitting, run } = useSubmitGuard();
 
   if (!conversation) {
     return (
@@ -47,8 +56,50 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
     );
   }
 
-  const messages: MockMessage[] = mockMessagesByConv[conversation.id] || [];
+  const baseMessages: MockMessage[] = mockMessagesByConv[conversation.id] || [];
+  const messages: MockMessage[] = [
+    ...baseMessages,
+    ...localMessages.filter((m) => m.conversationId === conversation.id),
+  ];
   const notes: MockInternalNote[] = mockNotesByConv[conversation.id] || [];
+
+  // Demo send: simulate queued -> sending -> sent_to_api -> delivered transitions
+  const handleSend = () => run(async () => {
+    const text = draft.trim();
+    if (!text) return;
+    const id = `local_${crypto.randomUUID()}`;
+    idemRef.current.set(id, crypto.randomUUID()); // idempotency_key per send
+    const now = new Date();
+    const time = `${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
+    const newMsg: MockMessage = {
+      id, conversationId: conversation.id, sender: "agent", senderName: "You",
+      text, time, direction: "outbound", status: "queued",
+    };
+    setLocalMessages((prev) => [...prev, newMsg]);
+    setDraft("");
+    // Simulated transport pipeline
+    setTimeout(() => updateLocalStatus(id, "sending"), 200);
+    setTimeout(() => updateLocalStatus(id, "sent_to_api"), 700);
+    setTimeout(() => updateLocalStatus(id, "delivered"), 1500);
+  });
+
+  const updateLocalStatus = (id: string, status: DeliveryStatus, extra?: Partial<MockMessage>) => {
+    setLocalMessages((prev) => prev.map((m) => m.id === id ? { ...m, status, ...extra } : m));
+  };
+
+  const handleRetry = async (m: MockMessage) => {
+    if (retryingIds.has(m.id) || isPendingStatus(m.status)) return;
+    setRetryingIds((prev) => new Set(prev).add(m.id));
+    updateLocalStatus(m.id, "retrying", { retryCount: (m.retryCount ?? 0) + 1 });
+    toast.success("Retrying message…");
+    // Simulated retry result
+    setTimeout(() => {
+      const success = Math.random() > 0.4;
+      updateLocalStatus(m.id, success ? "delivered" : "failed", success ? { errorMessage: undefined } : { errorMessage: m.errorMessage || "Retry failed" });
+      if (!success) toast.error("Retry failed");
+      setRetryingIds((prev) => { const n = new Set(prev); n.delete(m.id); return n; });
+    }, 1200);
+  };
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background/20 min-w-0">
@@ -75,6 +126,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
               </span>
             </div>
           </div>
+          <ConversationReliabilityStrip channel={conversation.channel} messages={messages} lastSyncLabel="just now" className="hidden" />
           <Button variant="ghost" size="icon" className="h-8 w-8 lg:hidden" onClick={onToggleContext}>
             <User className="h-4 w-4" />
           </Button>
@@ -151,11 +203,21 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
         </div>
       )}
 
+      {/* Reliability strip */}
+      <ConversationReliabilityStrip channel={conversation.channel} messages={messages} lastSyncLabel="just now" />
+
       {/* Body */}
       <ScrollArea className="flex-1">
         {tab === "messages" ? (
           <div className="p-3 space-y-3">
-            {messages.map((m) => <MessageBubble key={m.id} m={m} />)}
+            {messages.map((m) => (
+              <MessageBubble
+                key={m.id}
+                m={m}
+                onRetry={() => handleRetry(m)}
+                isRetrying={retryingIds.has(m.id)}
+              />
+            ))}
             {messages.length === 0 && (
               <p className="text-center text-xs text-muted-foreground py-8">No messages yet.</p>
             )}
@@ -198,7 +260,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
               className="min-h-[40px] max-h-[120px] text-sm resize-none bg-background/40 border-border/30 rounded-lg"
               rows={1}
             />
-            <Button size="icon" className="h-9 w-9 shrink-0" disabled={!draft.trim()} onClick={() => setDraft("")}>
+            <Button size="icon" className="h-9 w-9 shrink-0" disabled={!draft.trim() || submitting} onClick={handleSend}>
               <Send className="h-4 w-4" />
             </Button>
           </div>
@@ -268,7 +330,7 @@ function ActionBtn({ icon: Icon, label, onClick }: { icon: any; label: string; o
   );
 }
 
-function MessageBubble({ m }: { m: MockMessage }) {
+function MessageBubble({ m, onRetry, isRetrying }: { m: MockMessage; onRetry?: () => void; isRetrying?: boolean }) {
   if (m.sender === "system") {
     return (
       <div className="flex justify-center">
@@ -277,23 +339,57 @@ function MessageBubble({ m }: { m: MockMessage }) {
     );
   }
   const isAgent = m.sender === "agent";
+  const failed = isAgent && isFailedStatus(m.status);
+  const pending = isAgent && isPendingStatus(m.status);
+
   return (
-    <div className={cn("flex", isAgent ? "justify-end" : "justify-start")}>
-      <div className={cn(
-        "max-w-[80%] rounded-2xl px-3 py-2 text-sm",
-        isAgent
-          ? "bg-primary text-primary-foreground rounded-br-md"
-          : "bg-muted/40 text-foreground rounded-bl-md border border-border/30",
-      )}>
-        {!isAgent && m.senderName && (
-          <p className="text-[10px] font-medium opacity-70 mb-0.5">{m.senderName}</p>
-        )}
-        <p className="leading-snug whitespace-pre-wrap break-words">{m.text}</p>
-        <div className={cn("flex items-center gap-1 mt-1 text-[10px]", isAgent ? "text-primary-foreground/70 justify-end" : "text-muted-foreground")}>
-          <span>{m.time}</span>
-          {isAgent && <CheckCheck className="h-3 w-3" />}
+    <div className={cn("flex flex-col gap-1", isAgent ? "items-end" : "items-start")}>
+      <div className={cn("flex w-full", isAgent ? "justify-end" : "justify-start")}>
+        <div className={cn(
+          "max-w-[80%] rounded-2xl px-3 py-2 text-sm",
+          isAgent
+            ? failed
+              ? "bg-destructive/10 border border-destructive/40 text-foreground rounded-br-md"
+              : "bg-primary text-primary-foreground rounded-br-md"
+            : "bg-muted/40 text-foreground rounded-bl-md border border-border/30",
+          pending && "opacity-80",
+        )}>
+          {!isAgent && m.senderName && (
+            <p className="text-[10px] font-medium opacity-70 mb-0.5">{m.senderName}</p>
+          )}
+          <p className="leading-snug whitespace-pre-wrap break-words">{m.text}</p>
+          <div className={cn("flex items-center gap-1 mt-1 text-[10px]", isAgent && !failed ? "text-primary-foreground/70 justify-end" : "text-muted-foreground justify-end")}>
+            <span>{m.time}</span>
+            {isAgent && (
+              <MessageStatusIndicator
+                status={m.status ?? "delivered"}
+                errorMessage={m.errorMessage}
+                retryCount={m.retryCount}
+              />
+            )}
+          </div>
         </div>
       </div>
+      {failed && (
+        <div className="flex items-center gap-2 px-2">
+          <span className="text-[10px] text-destructive max-w-[260px] truncate">
+            {m.errorMessage || "Failed to deliver"}
+          </span>
+          {(m.retryCount ?? 0) > 0 && (
+            <span className="text-[10px] text-muted-foreground">· {m.retryCount}× retried</span>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-[10px] px-2 gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+            disabled={isRetrying || m.status === "permanently_failed"}
+            onClick={onRetry}
+          >
+            <RotateCw className={cn("h-3 w-3", isRetrying && "animate-spin")} />
+            {m.status === "permanently_failed" ? "Cannot retry" : "Retry"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
