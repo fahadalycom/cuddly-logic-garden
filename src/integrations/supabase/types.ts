@@ -214,6 +214,66 @@ export type Database = {
           },
         ]
       }
+      channel_integrations: {
+        Row: {
+          channel_type: Database["public"]["Enums"]["channel_type"]
+          config: Json
+          created_at: string
+          enabled: boolean
+          id: string
+          last_error: string | null
+          last_error_at: string | null
+          last_error_field: string | null
+          last_health_check_at: string | null
+          last_inbound_at: string | null
+          last_outbound_at: string | null
+          last_success_at: string | null
+          secrets_set: Json
+          status: Database["public"]["Enums"]["channel_status"]
+          updated_at: string
+          verify_token: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          channel_type: Database["public"]["Enums"]["channel_type"]
+          config?: Json
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_error_field?: string | null
+          last_health_check_at?: string | null
+          last_inbound_at?: string | null
+          last_outbound_at?: string | null
+          last_success_at?: string | null
+          secrets_set?: Json
+          status?: Database["public"]["Enums"]["channel_status"]
+          updated_at?: string
+          verify_token?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          channel_type?: Database["public"]["Enums"]["channel_type"]
+          config?: Json
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_error_field?: string | null
+          last_health_check_at?: string | null
+          last_inbound_at?: string | null
+          last_outbound_at?: string | null
+          last_success_at?: string | null
+          secrets_set?: Json
+          status?: Database["public"]["Enums"]["channel_status"]
+          updated_at?: string
+          verify_token?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       client_notes: {
         Row: {
           author_id: string
@@ -2760,6 +2820,13 @@ export type Database = {
         | "research_analyst"
         | "vendor_coordinator"
         | "qa_reviewer"
+      channel_status:
+        | "not_configured"
+        | "healthy"
+        | "warning"
+        | "error"
+        | "disabled"
+      channel_type: "whatsapp" | "messenger" | "instagram"
       client_status: "active" | "inactive" | "blocked"
       conversation_channel:
         | "whatsapp"
@@ -3079,6 +3146,14 @@ export const Constants = {
         "vendor_coordinator",
         "qa_reviewer",
       ],
+      channel_status: [
+        "not_configured",
+        "healthy",
+        "warning",
+        "error",
+        "disabled",
+      ],
+      channel_type: ["whatsapp", "messenger", "instagram"],
       client_status: ["active", "inactive", "blocked"],
       conversation_channel: [
         "whatsapp",
