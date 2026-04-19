@@ -214,7 +214,9 @@ serve(async (req) => {
     let waMessageId: string | null = null;
     let providerResponse: any = null;
     let errorCode: string | null = null;
+    let errorSubcode: number | null = null;
     let errorMessage: string | null = null;
+    let httpStatus: number | null = null;
     let deliveryFailed = false;
 
     try {
@@ -226,10 +228,12 @@ serve(async (req) => {
           body: JSON.stringify(messagePayload),
         }
       );
+      httpStatus = waResponse.status;
       providerResponse = await waResponse.json();
       if (!waResponse.ok) {
         deliveryFailed = true;
         errorCode = String(providerResponse?.error?.code ?? waResponse.status);
+        errorSubcode = providerResponse?.error?.error_subcode ?? null;
         errorMessage = providerResponse?.error?.message || "Meta API error";
       } else {
         waMessageId = providerResponse.messages?.[0]?.id || null;
@@ -239,12 +243,24 @@ serve(async (req) => {
       errorMessage = (apiErr as Error).message;
     }
 
+    // Classify Meta error: permanent (auth/perm/bad-recipient) vs transient (rate/network).
+    // Permanent codes: 190 (invalid OAuth), subcodes 463/467 (expired session),
+    //   200/10 (permission), 100 (param/recipient invalid), 131009 (unsupported message),
+    //   131026 (recipient not opted-in), 131031 (unable to deliver — wrong number).
+    const PERMANENT_CODES = new Set(["190", "200", "10", "100", "131009", "131026", "131031", "131051", "131056"]);
+    const PERMANENT_SUBCODES = new Set([463, 467, 458, 460]);
+    const isPermanent = deliveryFailed && (
+      (errorCode && PERMANENT_CODES.has(errorCode)) ||
+      (errorSubcode != null && PERMANENT_SUBCODES.has(errorSubcode)) ||
+      httpStatus === 401 || httpStatus === 403
+    );
+
     // Transition message to final transport state
     const updates: Record<string, unknown> = {
       provider_response: providerResponse,
     };
     if (deliveryFailed) {
-      updates.delivery_status = "failed";
+      updates.delivery_status = isPermanent ? "permanently_failed" : "failed";
       updates.error_code = errorCode;
       updates.error_message = errorMessage;
     } else {
