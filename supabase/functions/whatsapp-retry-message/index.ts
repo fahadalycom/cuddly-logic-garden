@@ -46,9 +46,14 @@ serve(async (req) => {
       })
       .eq("id", message_id);
 
-    // Re-invoke send pipeline with same idempotency_key
+    // Re-invoke send pipeline with same idempotency_key — dispatch by channel
     const idempotencyKey = msg.idempotency_key ?? crypto.randomUUID();
-    const { error: sendErr } = await supabase.functions.invoke("whatsapp-send", {
+    const channel = msg.channel ?? "whatsapp";
+    const sendFn = (channel === "facebook" || channel === "instagram")
+      ? "messenger-send"
+      : "whatsapp-send";
+
+    const { error: sendErr } = await supabase.functions.invoke(sendFn, {
       body: {
         conversation_id: msg.conversation_id,
         content: msg.content,

@@ -132,6 +132,11 @@ export function ConversationContextPanel({ conversation, onClose }: Props) {
             <div className="space-y-1.5 text-xs">
               <Row icon={Phone} text={ctx.phone} />
               {ctx.email && <Row icon={Mail} text={ctx.email} />}
+              {(conversation as any).externalUserId && (
+                <p className="text-[10px] text-muted-foreground/70 font-mono pl-5 truncate">
+                  {conversation.channel}: {(conversation as any).externalUserId}
+                </p>
+              )}
             </div>
             {ctx.tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">

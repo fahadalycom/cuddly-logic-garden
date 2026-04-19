@@ -59,6 +59,9 @@ export interface MockConversation {
   lastMessage: string;
   lastTime: string;
   unread: number;
+  externalUserId?: string | null;
+  externalConversationId?: string | null;
+  integrationId?: string | null;
   context: MockCustomerContext;
 }
 

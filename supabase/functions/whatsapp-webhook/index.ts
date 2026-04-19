@@ -28,6 +28,14 @@ serve(async (req) => {
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
+  // Resolve WhatsApp integration id once per request for stamping inbound events
+  const { data: waIntegration } = await supabase
+    .from("channel_integrations")
+    .select("id")
+    .eq("channel_type", "whatsapp")
+    .maybeSingle();
+  const waIntegrationId = waIntegration?.id ?? null;
+
   try {
     // Webhook verification (GET)
     if (req.method === "GET") {
@@ -65,6 +73,7 @@ serve(async (req) => {
 
         const { data: evt } = await supabase.from("wa_inbound_events").insert({
           channel: "whatsapp",
+          integration_id: waIntegrationId,
           event_type: "status",
           raw_payload: st,
           external_message_id: externalId,
@@ -123,6 +132,7 @@ serve(async (req) => {
 
       const { data: evtRow } = await supabase.from("wa_inbound_events").insert({
         channel: "whatsapp",
+        integration_id: waIntegrationId,
         event_type: "message",
         raw_payload: message,
         external_message_id: message.id,

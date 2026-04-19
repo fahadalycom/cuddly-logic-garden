@@ -2421,7 +2421,10 @@ export type Database = {
           customer_name: string | null
           customer_phone: string
           customer_whatsapp_id: string | null
+          external_conversation_id: string | null
+          external_user_id: string | null
           id: string
+          integration_id: string | null
           last_agent_reply_at: string | null
           last_message_at: string | null
           last_message_preview: string | null
@@ -2444,7 +2447,10 @@ export type Database = {
           customer_name?: string | null
           customer_phone: string
           customer_whatsapp_id?: string | null
+          external_conversation_id?: string | null
+          external_user_id?: string | null
           id?: string
+          integration_id?: string | null
           last_agent_reply_at?: string | null
           last_message_at?: string | null
           last_message_preview?: string | null
@@ -2467,7 +2473,10 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string
           customer_whatsapp_id?: string | null
+          external_conversation_id?: string | null
+          external_user_id?: string | null
           id?: string
+          integration_id?: string | null
           last_agent_reply_at?: string | null
           last_message_at?: string | null
           last_message_preview?: string | null
@@ -2486,6 +2495,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_conversations_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "channel_integrations"
             referencedColumns: ["id"]
           },
         ]
@@ -2537,6 +2553,7 @@ export type Database = {
           event_type: Database["public"]["Enums"]["inbound_event_type"]
           external_message_id: string | null
           id: string
+          integration_id: string | null
           processed_at: string | null
           processing_status: Database["public"]["Enums"]["inbound_event_processing_status"]
           raw_payload: Json
@@ -2549,6 +2566,7 @@ export type Database = {
           event_type?: Database["public"]["Enums"]["inbound_event_type"]
           external_message_id?: string | null
           id?: string
+          integration_id?: string | null
           processed_at?: string | null
           processing_status?: Database["public"]["Enums"]["inbound_event_processing_status"]
           raw_payload: Json
@@ -2561,12 +2579,21 @@ export type Database = {
           event_type?: Database["public"]["Enums"]["inbound_event_type"]
           external_message_id?: string | null
           id?: string
+          integration_id?: string | null
           processed_at?: string | null
           processing_status?: Database["public"]["Enums"]["inbound_event_processing_status"]
           raw_payload?: Json
           received_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "wa_inbound_events_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "channel_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       wa_internal_notes: {
         Row: {
