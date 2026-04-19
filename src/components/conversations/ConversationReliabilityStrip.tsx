@@ -1,7 +1,9 @@
-import { Activity, AlertTriangle, CheckCircle2, RefreshCw, Radio } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, RefreshCw, Radio, PlugZap } from "lucide-react";
+import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { computeReliability } from "@/lib/message-status";
 import { ChannelIcon } from "./ChannelIcon";
+import { useIntegrationStatus } from "@/hooks/useIntegrationStatus";
 import type { ConvChannel } from "@/lib/conversations-mock";
 
 interface Props {
@@ -42,6 +44,8 @@ export function ConversationReliabilityStrip({
   className,
 }: Props) {
   const r = computeReliability(messages);
+  const integration = useIntegrationStatus(typeof channel === "string" ? channel : null);
+  const integrationProblem = integration && (!integration.enabled || !!integration.last_error);
 
   const healthMeta = {
     healthy:  { icon: CheckCircle2, label: "Healthy",  cls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30" },
@@ -52,7 +56,6 @@ export function ConversationReliabilityStrip({
   const HealthIcon = healthMeta.icon;
   const syncLabel = lastSyncLabel ?? formatRelative(lastInboundAt);
 
-  // Brand-aware channel chip: warm amber for live transport, muted for demo/mock
   const channelChipCls = isRealtime
     ? "text-primary bg-primary/10 border-primary/30"
     : "text-muted-foreground bg-muted/30 border-border/40";
@@ -96,6 +99,16 @@ export function ConversationReliabilityStrip({
           <RefreshCw className="h-2.5 w-2.5" />
           {r.pending} pending
         </span>
+      )}
+      {integrationProblem && (
+        <Link
+          to="/channel-integrations"
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/30 shrink-0 hover:bg-destructive/20 transition-colors"
+          title={integration?.last_error ?? "Channel disabled"}
+        >
+          <PlugZap className="h-2.5 w-2.5" />
+          {integration?.enabled ? "Channel error" : "Channel disabled"}
+        </Link>
       )}
       {r.total > 0 && (
         <span className="text-muted-foreground/70 shrink-0 inline-flex items-center gap-1">
