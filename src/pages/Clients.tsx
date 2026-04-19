@@ -25,7 +25,8 @@ export default function ClientsPage() {
   }, []);
 
   const filtered = clients.filter((c) => {
-    const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search);
+    const q = search.toLowerCase();
+    const matchSearch = c.name.toLowerCase().includes(q) || (c.whatsapp_number ?? "").toLowerCase().includes(q);
     const matchTag = tagFilter === "all" || c.trust_tag === tagFilter;
     return matchSearch && matchTag;
   });
@@ -61,8 +62,7 @@ export default function ClientsPage() {
             <TableHeader>
               <TableRow className="border-border/20 hover:bg-transparent">
                 <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/50">Name</TableHead>
-                <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/50">Phone</TableHead>
-                <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/50">Email</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/50">WhatsApp</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/50">Trust</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/50">Since</TableHead>
                 <TableHead></TableHead>
@@ -71,8 +71,7 @@ export default function ClientsPage() {
             <TableBody>{filtered.map((c) => (
               <TableRow key={c.id} className="border-border/10 hover:bg-card/40 transition-colors cursor-pointer" onClick={() => navigate(`/clients/${c.id}`)}>
                 <TableCell className="font-medium text-sm">{c.name}</TableCell>
-                <TableCell className="mono text-xs text-muted-foreground">{c.phone}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{c.email || "—"}</TableCell>
+                <TableCell className="mono text-xs text-muted-foreground">{c.whatsapp_number}</TableCell>
                 <TableCell><StatusBadge status={c.trust_tag} /></TableCell>
                 <TableCell className="text-xs text-muted-foreground/60">{new Date(c.created_at).toLocaleDateString()}</TableCell>
                 <TableCell>

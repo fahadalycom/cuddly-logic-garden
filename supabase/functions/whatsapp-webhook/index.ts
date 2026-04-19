@@ -176,14 +176,9 @@ serve(async (req) => {
         .single();
 
       if (!conversation) {
-        let { data: client } = await supabase
-          .from("clients").select("id").eq("whatsapp_number", from).single();
-        if (!client) {
-          const { data: newClient } = await supabase.from("clients")
-            .insert({ name: customerName || from, whatsapp_number: from, phone: from })
-            .select("id").single();
-          client = newClient;
-        }
+        // Auto-upsert by WhatsApp number; auto-generates "Client N" if new.
+        const { data: clientId } = await supabase.rpc("upsert_client_by_whatsapp", { _wa: from });
+        const client = clientId ? { id: clientId as unknown as string } : null;
         const assignedAgent = await findAvailableAgent(supabase);
         const status = assignedAgent ? "active" : "waiting";
         const { data: newConv } = await supabase.from("wa_conversations").insert({
