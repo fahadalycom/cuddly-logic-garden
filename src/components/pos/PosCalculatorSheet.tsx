@@ -255,17 +255,17 @@ export function PosCalculatorSheet({
           </div>
         </ScrollArea>
 
-        <div className="border-t border-border/40 p-3 flex gap-2 shrink-0 bg-background/95 backdrop-blur">
-          <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
-            Back to POS
+        <div className="border-t border-border/40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-2 shrink-0 bg-background/95 backdrop-blur">
+          <Button variant="outline" className="flex-1 h-11" onClick={() => onOpenChange(false)}>
+            Back
           </Button>
           <Button
-            className="flex-1 gap-1.5"
+            className="flex-[2] h-11 gap-1.5 font-semibold"
             onClick={onPreInvoice}
             disabled={lineItems.length === 0}
           >
             <FileText className="h-4 w-4" />
-            Pre-Invoice
+            Generate Pre-Invoice
           </Button>
         </div>
       </SheetContent>
