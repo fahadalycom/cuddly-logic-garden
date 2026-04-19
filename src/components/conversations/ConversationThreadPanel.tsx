@@ -38,6 +38,10 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const [ticketOpen, setTicketOpen] = useState(false);
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [handoffSuggestion, setHandoffSuggestion] = useState<{ queue: HandoffQueue; reason: string } | undefined>();
+  const [localMessages, setLocalMessages] = useState<MockMessage[]>([]);
+  const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
+  const idemRef = useRef<Map<string, string>>(new Map());
+  const { submitting, run } = useSubmitGuard();
 
   if (!conversation) {
     return (
@@ -52,8 +56,50 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
     );
   }
 
-  const messages: MockMessage[] = mockMessagesByConv[conversation.id] || [];
+  const baseMessages: MockMessage[] = mockMessagesByConv[conversation.id] || [];
+  const messages: MockMessage[] = [
+    ...baseMessages,
+    ...localMessages.filter((m) => m.conversationId === conversation.id),
+  ];
   const notes: MockInternalNote[] = mockNotesByConv[conversation.id] || [];
+
+  // Demo send: simulate queued -> sending -> sent_to_api -> delivered transitions
+  const handleSend = () => run(async () => {
+    const text = draft.trim();
+    if (!text) return;
+    const id = `local_${crypto.randomUUID()}`;
+    idemRef.current.set(id, crypto.randomUUID()); // idempotency_key per send
+    const now = new Date();
+    const time = `${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
+    const newMsg: MockMessage = {
+      id, conversationId: conversation.id, sender: "agent", senderName: "You",
+      text, time, direction: "outbound", status: "queued",
+    };
+    setLocalMessages((prev) => [...prev, newMsg]);
+    setDraft("");
+    // Simulated transport pipeline
+    setTimeout(() => updateLocalStatus(id, "sending"), 200);
+    setTimeout(() => updateLocalStatus(id, "sent_to_api"), 700);
+    setTimeout(() => updateLocalStatus(id, "delivered"), 1500);
+  });
+
+  const updateLocalStatus = (id: string, status: DeliveryStatus, extra?: Partial<MockMessage>) => {
+    setLocalMessages((prev) => prev.map((m) => m.id === id ? { ...m, status, ...extra } : m));
+  };
+
+  const handleRetry = async (m: MockMessage) => {
+    if (retryingIds.has(m.id) || isPendingStatus(m.status)) return;
+    setRetryingIds((prev) => new Set(prev).add(m.id));
+    updateLocalStatus(m.id, "retrying", { retryCount: (m.retryCount ?? 0) + 1 });
+    toast.success("Retrying message…");
+    // Simulated retry result
+    setTimeout(() => {
+      const success = Math.random() > 0.4;
+      updateLocalStatus(m.id, success ? "delivered" : "failed", success ? { errorMessage: undefined } : { errorMessage: m.errorMessage || "Retry failed" });
+      if (!success) toast.error("Retry failed");
+      setRetryingIds((prev) => { const n = new Set(prev); n.delete(m.id); return n; });
+    }, 1200);
+  };
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background/20 min-w-0">
