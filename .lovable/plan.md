@@ -1,98 +1,105 @@
 
-## Channel Integrations Admin Page
 
-Build a dedicated admin page at `/admin/channels` that controls Meta WhatsApp Cloud API, Facebook Messenger, and Instagram Messaging connections. Each channel is independent with its own credentials, health snapshot, and lifecycle controls. This is a control center only — chat rendering stays in the existing Conversations module.
+Looking at the current Conversations module: it uses mock data (`conversations-mock.ts`) with simple `MockMessage` type (sender, text, time). The real WhatsApp module (`/whatsapp`) already has `wa_messages` with a `whatsapp_message_id` field, but no proper status tracking. The existing `ChannelIntegrations` admin page is wired up but Conversations doesn't yet talk to it.
 
-### 1. Database (one new migration)
+I need to extend the data model + UI without rebuilding either. The approach:
 
-New table `channel_integrations` (one row per channel type):
+1. **DB**: extend `wa_messages` with transport status fields, create `wa_inbound_events` for raw webhook logging, create `wa_send_jobs` for idempotent sending. Reuse `wa_conversations` (already has channel context via the integration we're building).
+2. **Edge functions**: refactor `whatsapp-send` to write `queued` → `sending` → `sent_to_api`, log errors, support retry. Refactor `whatsapp-webhook` to log to `wa_inbound_events` first, then process status callbacks (`sent/delivered/read/failed`).
+3. **Mock layer**: extend `MockMessage` with status, retry_count, error so the existing `Conversations` page can demo the states immediately.
+4. **UI**: add `MessageStatusIndicator` (ticks/spinner/error icon), `RetryButton` on failed bubbles, conversation header reliability strip, all inside existing `ConversationThreadPanel` and the real `ChatWindow`.
 
-```text
-id              uuid pk
-channel_type    enum: 'whatsapp' | 'messenger' | 'instagram'  (unique)
-enabled         boolean        default false
-status          enum: 'not_configured' | 'healthy' | 'warning' | 'error' | 'disabled'
-config          jsonb          (non-secret IDs: app_id, page_id, phone_number_id, ig_business_id, business_account_id)
-secrets_set     jsonb          (booleans: { app_secret: true, access_token: true, ... } — never store actual secrets here)
-verify_token    text           (webhook verify token, treated as secret-ish but readable to admin)
-webhook_url     text           generated, read-only
-last_health_check_at  timestamptz
-last_inbound_at       timestamptz
-last_outbound_at      timestamptz
-last_success_at       timestamptz
-last_error            text
-last_error_at         timestamptz
-last_error_field      text     (which field/area likely caused error)
-created_at, updated_at
-```
+Let me check questions worth asking — channel scope is clear (WhatsApp is real today; Messenger/IG are stub-ready since their webhooks aren't wired yet). Retry strategy + auto-retry behavior is the main open question.
 
-- RLS: admins full CRUD; staff read-only.
-- Actual secret values stay in `system_settings` (existing pattern, `is_secret = true`) keyed per channel: `meta_whatsapp_token`, `meta_messenger_page_token`, `meta_messenger_app_secret`, `meta_instagram_token`, etc. Seeds 3 rows on migration (one per channel, `not_configured`).
-- Add to `automation_logs`-style trail: reuse `audit_logs` for save/test/enable/disable events.
+## Plan: Transport-aware Conversations
 
-### 2. Edge function: `channel-health-check`
+Extend the existing Conversations module with real message transport state, retry, webhook event logging, and channel-aware reliability indicators. Reuse existing `wa_messages` and `wa_conversations` — do not introduce a parallel table.
 
-Single function, takes `{ channel_type, action }` where action is `test_connection | refresh_health | clear_error`. Performs:
-- WhatsApp: `GET graph.facebook.com/v19.0/{phone_id}?fields=verified_name,quality_rating` with bearer token.
-- Messenger: `GET graph.facebook.com/v19.0/{page_id}?fields=name,id` with page token.
-- Instagram: `GET graph.facebook.com/v19.0/{ig_business_id}?fields=username,name` with token.
+### 1. Database (one migration)
 
-Updates `channel_integrations` row with `status`, `last_health_check_at`, `last_success_at`, or `last_error` + `last_error_field`. Returns structured result for the UI.
+**Extend `wa_messages`**:
+- `direction` enum (`inbound` | `outbound`), default by `sender_type`
+- `delivery_status` enum: `queued | sending | sent_to_api | delivered | read | failed | retrying | permanently_failed`
+- `external_message_id` (rename concept from existing `whatsapp_message_id`, keep both for back-compat)
+- `channel` text (default `whatsapp`)
+- `retry_count` int default 0, `last_retry_at` timestamptz, `max_retries` int default 3
+- `error_code` text, `error_message` text, `provider_response` jsonb
+- `sent_at`, `delivered_at`, `read_at` timestamptz
+- `idempotency_key` uuid unique (prevents duplicate inserts on retry)
 
-### 3. Frontend
+Backfill existing rows: outbound = agent/ai/system, status `delivered` if has `whatsapp_message_id` else `sent_to_api`.
 
-**Route**: `/admin/channels` mounted in `AppLayout` (admin-only via existing `RoleGate`).
+**New table `wa_inbound_events`** (raw webhook log, never deleted):
+- `id`, `channel`, `event_type` (`message | status | error`), `raw_payload` jsonb, `external_message_id`, `conversation_id` (nullable), `received_at`, `processed_at`, `processing_status` (`pending | processed | failed | duplicate`), `error_message`. Unique index on `(channel, external_message_id, event_type)` to dedupe.
 
-**Sidebar**: new item under **Admin** group → "Channel Integrations" (icon: `Plug` or `Radio`).
+**New table `wa_send_jobs`** (resend-safe queue):
+- `id`, `message_id` fk, `idempotency_key` unique, `status` (`pending | running | done | failed`), `attempt_count`, `next_attempt_at`, `last_error`, `created_at`. Used to coordinate retries and prevent double-sends.
 
-**Page layout** (`src/pages/ChannelIntegrations.tsx`):
-- `PageHeader` with title + subtitle.
-- Top status strip: 3 mini cards showing each channel's current status badge + last health time.
-- `Tabs` with 3 tabs: WhatsApp / Messenger / Instagram, each rendering one shared `<ChannelIntegrationCard channel="..." />`.
+RLS: staff read both, admin/system write `wa_inbound_events`, staff insert/update `wa_send_jobs`.
 
-**Component** `src/components/admin/ChannelIntegrationCard.tsx` (reused for all 3 channels, schema-driven):
-- Header: icon, channel name, big status badge (healthy=green, warning=amber, error=red, not_configured=muted), enable/disable `Switch`.
-- Section A — **Configuration form** (zod + react-hook-form):
-  - WhatsApp: `app_id`, `app_secret` (masked), `access_token` (masked), `verify_token`, `phone_number_id`, `whatsapp_business_account_id`.
-  - Messenger: `app_id`, `app_secret` (masked), `page_access_token` (masked), `verify_token`, `page_id`.
-  - Instagram: `app_id`, `app_secret` (masked), `access_token` (masked), `verify_token`, `instagram_business_account_id`, `connected_page_id`.
-  - Masked fields use show/hide toggle and only display `••••••` after save (never re-rendered).
-  - Webhook callback URL displayed read-only with copy button (per channel: `…/functions/v1/whatsapp-webhook`, `…/functions/v1/messenger-webhook` placeholder, `…/functions/v1/instagram-webhook` placeholder — endpoints can be wired later).
-  - Buttons: **Save Configuration**, **Test Connection**, **Reconnect** (forces full re-test + clears cached status), **Clear Error**.
-- Section B — **Health & telemetry** grid (read-only):
-  - Connection status, Webhook status, Token status, Config completeness (computed from required fields), Last inbound, Last outbound, Last successful API call, Last successful webhook event, Last health check, Last error (with field hint).
-- Section C — **Error alert** (only when `last_error`): destructive `Alert` with channel-specific message, the field hint (e.g. "access_token likely invalid"), and dismiss → calls `clear_error`.
+### 2. Edge functions
 
-**Schema/data layer** `src/lib/channel-integrations.ts`:
-- Per-channel field schemas (zod) + required-field lists for completeness %.
-- `loadIntegration(channel)`, `saveIntegration(channel, values)` (writes config to table + secrets to `system_settings`), `testConnection(channel)`, `setEnabled(channel, bool)`, `clearError(channel)`.
+**`whatsapp-send` (refactor existing)**:
+- Accept `idempotency_key` from client; if a `wa_messages` row already exists with that key, return it (no duplicate send).
+- Insert message with status `queued` → update to `sending` → call Graph API → on success update to `sent_to_api` + store `external_message_id` + `provider_response`; on error update to `failed` + populate `error_code/error_message`.
+- Increment `retry_count` when called via retry path.
+- Existing daily limit logic preserved.
 
-**Hook** `src/hooks/useChannelIntegration.ts`: wraps the lib + React Query for fetch/refresh, exposes `{ integration, loading, saving, testing, save, test, toggle, clearError, reconnect }`.
+**`whatsapp-webhook` (refactor existing)**:
+- First step: insert raw payload into `wa_inbound_events` with `processing_status='pending'`. Dedupe via unique index → if duplicate, mark and return 200.
+- Then process: for `messages` events keep current behavior. For `statuses` events (currently ignored) update matching `wa_messages` row by `external_message_id`: set `delivered_status` to `delivered`/`read`/`failed`, populate `delivered_at`/`read_at`/`error_*`.
+- Update event row to `processed` (or `failed` with reason).
 
-### 4. UX & safety
-- All write actions guarded by existing `useSubmitGuard` to prevent double clicks.
-- Toasts on save / test success / test failure.
-- Status colors mirror existing `StatusBadge` palette already used app-wide.
-- Empty / not_configured state shows a muted "Not configured yet" banner with CTA pointing at the form.
-- Non-admin users hitting `/admin/channels` see read-only health view; form inputs disabled.
+**New `whatsapp-retry-message`**:
+- Input `{ message_id }`. Validates row is `failed`/`permanently_failed`, capped by `max_retries`. Sets status `retrying`, calls send pipeline with same idempotency_key, updates `retry_count`, `last_retry_at`. If retries exhausted → `permanently_failed`.
+
+### 3. Frontend — extend, do not redesign
+
+**Mock data (`src/lib/conversations-mock.ts`)**: add `status`, `retryCount`, `errorMessage`, `direction` to `MockMessage`. Add 4-5 demo messages across existing conversations covering each state (sending, sent, delivered, read, failed, retrying, permanently_failed) so the UI is testable without live API.
+
+**New shared component `src/components/conversations/MessageStatusIndicator.tsx`**:
+- WhatsApp-style ticks: clock (queued/sending), single check (sent_to_api), double check (delivered), blue double check (read), red exclamation (failed/permanently_failed), spinner (retrying). Tooltip on hover with status + error.
+
+**`ConversationThreadPanel.tsx` (existing, edit)**:
+- `MessageBubble` shows `MessageStatusIndicator` for outbound messages.
+- Failed bubbles get a destructive border + "Retry" button + retry count chip.
+- Composer uses `useSubmitGuard` already in project; generates `idempotency_key` (`crypto.randomUUID()`) per send.
+- Add a thin reliability strip in the header: channel icon, last delivery health (computed from recent messages), failed-count badge, last sync indicator.
+
+**`src/components/whatsapp/ChatWindow.tsx` (real module, edit)**:
+- Same `MessageStatusIndicator` integration on real messages.
+- Retry button calls `supabase.functions.invoke('whatsapp-retry-message', { body: { message_id } })`.
+- Realtime subscription already exists for `wa_messages` inserts — extend to listen to UPDATEs so status transitions appear live without refresh.
+
+**New hook `src/hooks/useMessageRetry.ts`**: wraps retry invoke + optimistic UI update + toast.
+
+**New helper `src/lib/message-status.ts`**: status → label/color/icon maps; conversation-level health rollup (counts of failed in last N messages).
+
+### 4. Resend-safe architecture
+- Client always generates `idempotency_key` before send; server uses it as unique constraint.
+- `useSubmitGuard` blocks double-clicks.
+- Retry button disabled while message status is `retrying` or `sending`.
+- Webhook deduplicates via unique `(channel, external_message_id, event_type)`.
 
 ### 5. Files
 
 **Created**
-- `supabase/migrations/<ts>_channel_integrations.sql` — table, enums, RLS, seed rows.
-- `supabase/functions/channel-health-check/index.ts` — test/health endpoint.
-- `src/pages/ChannelIntegrations.tsx`
-- `src/components/admin/ChannelIntegrationCard.tsx`
-- `src/components/admin/ChannelStatusStrip.tsx`
-- `src/lib/channel-integrations.ts`
-- `src/hooks/useChannelIntegration.ts`
+- `supabase/migrations/<ts>_message_transport_state.sql`
+- `supabase/functions/whatsapp-retry-message/index.ts`
+- `src/components/conversations/MessageStatusIndicator.tsx`
+- `src/components/conversations/ConversationReliabilityStrip.tsx`
+- `src/hooks/useMessageRetry.ts`
+- `src/lib/message-status.ts`
 
 **Edited**
-- `src/App.tsx` — add `/admin/channels` route under `AppLayout`.
-- `src/components/layout/AppSidebar.tsx` — add nav item under Admin.
-- `supabase/config.toml` — register the new edge function (default `verify_jwt = false` is fine; admin auth enforced via service-role check inside).
+- `supabase/functions/whatsapp-send/index.ts` — idempotency, status transitions
+- `supabase/functions/whatsapp-webhook/index.ts` — raw event log, status callbacks
+- `src/components/conversations/ConversationThreadPanel.tsx` — bubbles + retry + header strip
+- `src/components/whatsapp/ChatWindow.tsx` — status indicators + retry + realtime UPDATE subscription
+- `src/lib/conversations-mock.ts` — extended type + demo states
+- `src/integrations/supabase/types.ts` — auto-regenerates after migration
 
-### 6. Out of scope (explicit)
-- Actually subscribing/handling Messenger + Instagram webhook events — endpoints are stubs, the existing `whatsapp-webhook` keeps working unchanged.
-- Routing inbound non-WhatsApp messages into Conversations — that is a follow-up step.
-- OAuth flows with Meta's Login for Business — manual token entry only this round.
+### 6. Out of scope
+- Messenger/Instagram inbound webhooks (their integrations exist as configs only — adding their webhook endpoints is the next step after credentials are entered).
+- Auto-retry scheduler (cron). This round = manual retry button + idempotent send pipeline. Background retry can be layered on `wa_send_jobs` later.
+
