@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, CreditCard, Database, Users, RefreshCw,
   MessageSquare, BarChart3, Settings, LogOut, Truck, CheckCircle, Clock, Shield,
   FileText, UserCog, MessageCircle, Archive, Zap, UserPlus, LifeBuoy, KeyRound,
-  FlaskConical, Handshake, ListChecks, UsersRound,
+  FlaskConical, Handshake, ListChecks, UsersRound, Plug,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -63,6 +63,7 @@ const navGroups: NavGroup[] = [
     { title: "Analytics", url: "/analytics", icon: BarChart3, module: "analytics" },
   ]},
   { label: "Admin", items: [
+    { title: "Channel Integrations", url: "/admin/channels", icon: Plug, module: "settings" },
     { title: "Team Management", url: "/team", icon: UsersRound },
     { title: "Staff & Teams", url: "/settings/staff", icon: UserCog, module: "settings" },
     { title: "Roles", url: "/settings/roles", icon: Shield, module: "settings" },
