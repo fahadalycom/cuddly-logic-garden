@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { mockConversationsList, type MockConversation } from "@/lib/conversations-mock";
-import { mapWaConversation, type WaConversationRow, dbToRealId } from "@/lib/conversations-data";
+import type { MockConversation } from "@/lib/conversations-mock";
+import { mapWaConversation, type WaConversationRow } from "@/lib/conversations-data";
 
 const SELECT = "id,customer_phone,customer_name,channel,queue,status,priority,assigned_agent_id,previous_agent_id,reassignment_count,auto_summary,last_message_preview,last_message_at,unread_count,client_id,external_user_id,external_conversation_id,integration_id";
 
 /**
- * Fetches real wa_conversations and merges them with the legacy mock
- * conversations (used to demo non-WhatsApp channels). Subscribes to realtime
- * INSERT/UPDATE on wa_conversations so the inbox stays live.
+ * Fetches real wa_conversations and subscribes to realtime INSERT/UPDATE on
+ * wa_conversations so the inbox stays live. Returns ONLY real rows — no mock
+ * fallback — so an empty inbox surfaces real connectivity/webhook problems
+ * instead of hiding them behind demo data.
  */
 export function useConversations() {
   const [realRows, setRealRows] = useState<WaConversationRow[]>([]);
@@ -49,12 +50,10 @@ export function useConversations() {
     };
   }, []);
 
-  const conversations = useMemo<MockConversation[]>(() => {
-    const real = realRows.map(mapWaConversation);
-    if (real.length > 0) return real;
-    // Fallback to mock data only when DB is empty (first-run / demo)
-    return mockConversationsList;
-  }, [realRows]);
+  const conversations = useMemo<MockConversation[]>(
+    () => realRows.map(mapWaConversation),
+    [realRows],
+  );
 
   return { conversations, loading };
 }
