@@ -1,71 +1,104 @@
+## Plan: Convert "New Order" → Mobile-First POS (reusing existing logic)
 
-Let me explore the relevant files to understand current client structure.
-<lov-tool-use id="toolu_vrtx_01S1prMbPqNKQdFbq9E5wboo" name="code--exec" integration-id="code" data="{\"command\": \"grep -rn \\\"email\\\" src/pages/Clients.tsx src/pages/ClientProfile.tsx src/pages/NewOrder.tsx src/components/conversations/ConversationContextPanel.tsx 2>/dev/null | head -50\", \"user_facing_description\": \"Scanning client-related files for email references\"}">
-</lov-tool-use>
+### Reuse strategy
 
-<lov-tool-use id="toolu_vrtx_01Q4FKXQb3bsUypadFe1D7n5" name="supabase--read_query" integration-id="supabase" data="{\"query\": \"SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='clients' ORDER BY ordinal_position;\"}">
-</lov-tool-use>
+The existing `ProductSelectorPanel` already implements: product/bundle loading, multi-select, plan picking, discount math (`fixed` / `percent`), pre-invoice text generation (`generatePricingMessage`), product description generation (`generateProductMessage`), invoice persistence (`saveInvoice`), and order persistence (`saveOrder`). I will **extract its core logic into a shared hook** and **render a new mobile POS shell** that uses it. No duplication.
 
-<lov-tool-use id="toolu_vrtx_01W2db5UUwnVrSjeX9pbecCa" name="supabase--read_query" integration-id="supabase" data="{\"query\": \"SELECT count(*) as total, count(email) as with_email, count(DISTINCT phone) as unique_phones, count(*) FILTER (WHERE phone IS NULL) as null_phones FROM public.clients;\"}">
-</lov-tool-use>
+### Refactor (one shared core)
 
-<lov-tool-use id="toolu_vrtx_01FuNduorRnNj5hJ3gHEiBp6" name="code--search_files" integration-id="code" data="{\"query\": \"clients?\\\\.\\\\??email|client\\\\.email|client_email|clients\\\\.email\", \"include_patterns\": \"*.ts,*.tsx\"}">
-</lov-tool-use>
+- **Create `src/hooks/usePosEngine.ts**` — extracted from `ProductSelectorPanel`:
+  - state: `selected`, `selectedBundles`, `discountMode`, `discountValue`, `bundleQty`, `bundlePriceOverride`
+  - actions: `toggleProduct`, `setPlanFor`, `setQty`, `setPriceOverride`, `toggleBundle`, `clearAll`
+  - derived: `lineItems`, `subtotal`, `discountAmount`, `finalTotal`
+  - generators: `generateProductMessage()`, `generatePricingMessage()`
+  - persisters: `saveInvoice(status)`, `saveOrder(status, paymentStatus, fulfillmentStatus, clientId)`
+- **Refactor `ProductSelectorPanel**` to consume this hook (zero behavior change for Conversations).
 
-<lov-tool-use id="toolu_vrtx_01WGcUjcgz4FMC8vinYwtzU1" name="supabase--read_query" integration-id="supabase" data="{\"query\": \"SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='clients' ORDER BY ordinal_position;\"}">
-</lov-tool-use>
+### New POS UI (`src/pages/NewOrder.tsx` becomes the POS)
 
-<lov-tool-use id="toolu_vrtx_016K5p4u6kVeHZq4s5xqhL9v" name="supabase--read_query" integration-id="supabase" data="{\"query\": \"SELECT count(*) total, count(email) with_email, count(*) FILTER (WHERE phone IS NULL OR phone='') no_phone FROM public.clients;\"}">
-</lov-tool-use>
+Replace the current form with a full-bleed mobile POS:
 
-<lov-tool-use id="toolu_vrtx_01EES8gGxKjuugYBLEN3ZmUJ" name="code--search_files" integration-id="code" data="{\"query\": \"client\\\\.email|clients\\\\.email|\\\\.email\\\\b\", \"include_patterns\": \"src/pages/Clients.tsx,src/pages/ClientProfile.tsx,src/pages/NewOrder.tsx,src/pages/Reminders.tsx,src/pages/Renewals.tsx,src/pages/OldClients.tsx\"}">
-</lov-tool-use>
+```text
+┌─────────────────────────────┐
+│  🔍 Search products…   [📋] │  ← header + recent invoices button
+├─────────────────────────────┤
+│ [img] [img] [img]           │
+│ name  name  name            │  ← 3-col grid
+│ Info  Info  Info            │
+│ [img] [img] [img]           │
+│  …scroll…                   │
+├─────────────────────────────┤
+│ 3 selected   [Copy] [💰 Calc]│  ← sticky bottom, shows when ≥1
+└─────────────────────────────┘
+```
 
-<lov-tool-use id="toolu_vrtx_01KdvfwUQU7eAnFhuR3ywnbg" name="code--search_files" integration-id="code" data="{\"query\": \"email\", \"include_patterns\": \"src/components/conversations/ConversationContextPanel.tsx,src/lib/template-engine.ts,src/lib/conversations-data.ts\"}">
-</lov-tool-use>
+**Components/files:**
 
-<lov-tool-use id="toolu_vrtx_01UpbFoKpzVbNz6pEvon1hZT" name="code--search_files" integration-id="code" data="{\"include_patterns\": \"src/**/*.ts,src/**/*.tsx,supabase/functions/**/*.ts\", \"query\": \"email\", \"exclude_patterns\": \"src/integrations/supabase/types.ts,src/components/ui/*\"}">
-</lov-tool-use>
+1. `src/pages/NewOrder.tsx` — POS shell:
+  - Sticky search input (real-time filter, matches name first)
+  - 3-col product grid (`grid-cols-3`, scrollable, tap to toggle, ring highlight when selected)
+  - Each card: image (or initial fallback), name, small "Info" button
+  - Sticky bottom action bar (appears when `totalSelected > 0`): "Copy" + "Price Calculator" + selection count
+2. `src/components/pos/ProductInfoSheet.tsx` — modal/sheet showing product `description`, `features`, `usage_instructions`, `faq_content` (existing fields). Stays inside POS.
+3. `src/components/pos/PosCalculatorSheet.tsx` — full-screen `Sheet` reusing `usePosEngine`:
+  - Cart list of selected items with plan select, qty +/-, price override
+  - Discount mode (none/fixed/percent) + value
+  - Live totals
+  - Buttons: Back to POS, Generate Pre-Invoice
+4. `src/components/pos/PreInvoiceSheet.tsx` — shows `<InvoicePreview />` with:
+  - "Copy Invoice" (uses `generatePricingMessage`)
+  - "Back to POS"
+  - "Place Order" → opens phone-only sheet
+5. `src/components/pos/PlaceOrderSheet.tsx` — single input: WhatsApp number → calls `upsert_client_by_whatsapp` RPC → calls `saveOrder(...)` from hook → toast + clear.
+6. `src/components/pos/RecentInvoicesSheet.tsx` — lists last 20 invoices for current user; tap to re-open `<PreInvoiceSheet>` with that invoice (re-hydrates selection from `invoice_items` so user can edit/place order).
 
-<lov-tool-use id="toolu_vrtx_018vi3en1Qptnz7nqA225Tgs" name="code--view" integration-id="code" data="{\"file_path\": \"src/pages/NewOrder.tsx\"}">
-</lov-tool-use>
+### Copy behaviors
 
-<lov-tool-use id="toolu_vrtx_01EbMpKA1cfRjb2sb7zB1VDf" name="code--search_files" integration-id="code" data="{\"include_patterns\": \"supabase/functions/whatsapp-webhook/index.ts,supabase/functions/messenger-webhook/index.ts\", \"query\": \"clients|email|name:\"}">
-</lov-tool-use>
+- **Copy products** (top-bar bottom action): builds WhatsApp text from `generateProductMessage()` (descriptions of all selected products, no pricing) → `navigator.clipboard.writeText` → toast "Copied". POS stays open.
+- **Copy invoice** (inside PreInvoice): uses `generatePricingMessage()`.
 
-<lov-tool-use id="toolu_vrtx_01PiQoEhcbDG7AqSdAyk6yjd" name="code--view" integration-id="code" data="{\"file_path\": \"src/components/conversations/ConversationContextPanel.tsx\", \"lines\": \"120-150\"}">
-</lov-tool-use>
-I have enough context. Let me present the plan.
+### Order flow (no name/email)
 
-<lov-plan>
-## Plan: Remove email from clients only; identify by WhatsApp number with auto-generated names
+- Place Order asks only for WhatsApp number.
+- Calls existing `supabase.rpc("upsert_client_by_whatsapp", { _wa })` (already created last migration) → returns `client_id`.
+- Calls `saveOrder(status: "pending_payment", paymentStatus: "unpaid", fulfillmentStatus: "not_started", clientId)` from the hook → reuses existing `orders` + `order_items` + `order_status_history` writes.
 
-### Database (migration)
-1. Drop `clients.email` column.
-2. Make `clients.whatsapp_number` `NOT NULL` and add a `UNIQUE` index.
-3. Backfill `whatsapp_number` from `phone` where missing; deduplicate any collisions by archiving older duplicates.
-4. Add Postgres function `public.upsert_client_by_whatsapp(_wa text)` that:
-   - Normalizes the number,
-   - Returns existing client id if found,
-   - Otherwise inserts a new client with auto name `Client N` using a sequence (`clients_auto_name_seq`).
-5. Update `whatsapp-webhook` insert to call this function instead of inserting `name = customerName || from` (no email, name auto-generated as `Client N`). Same in `messenger-webhook`.
+### Recent invoices access
 
-Vendor/staff/profile email is untouched. Only `public.clients.email` is removed.
+- `RecentInvoicesSheet` queries `invoices` (status in draft/sent) joined with `invoice_items`. On tap, hydrate `usePosEngine` selection from items and open `PreInvoiceSheet` directly. Can re-copy or place order.
 
-### Frontend changes
-1. **`src/pages/Clients.tsx`** — remove Email column; search now matches `name` + `whatsapp_number`; remove email from row rendering.
-2. **`src/pages/ClientProfile.tsx`** — remove Email info card; show only WhatsApp number + Since.
-3. **`src/pages/NewOrder.tsx`** — replace Name+Phone form with a single **WhatsApp Number** input. On submit, call the new RPC `upsert_client_by_whatsapp` to get the client id (auto-create if needed). Remove `clientName` state and validation. Pre-invoice uses returned auto name.
-4. **`src/components/conversations/ConversationContextPanel.tsx`** — remove the `{ctx.email && ...}` row.
-5. **`src/lib/conversations-data.ts` / context mapper** — drop `email` from customer context object (keep type optional but never populated).
-6. Any other client-form/dialog references to email: remove (none currently exist outside the above based on grep).
+### Search
 
-### Out of scope (kept as-is)
-- `staff_profiles.email`, `auth.users` email, vendor `contact_email`, invoice `customerEmail`, channel "email", agent panels — untouched.
-- `mock-data.ts` provisioning emails (account pool emails, not client emails).
+- Pure client-side `useMemo` filter on already-loaded products: matches startsWith first, then includes (name + category).
 
-### Verification
-- Send a new WhatsApp message from an unknown number → client auto-created as `Client N`, conversation linked, no email anywhere in UI.
-- Create order with only a WhatsApp number → existing client linked or new one auto-created.
-- Clients list / profile / context panel show no email field.
-- Existing clients still load (email column gone, no UI breakage).
+### What is NOT changed
+
+- Conversations `ProductSelectorPanel` keeps working (now backed by the same hook).
+- `InvoicePreview`, `OrderPreview`, `formatCurrency`, `upsert_client_by_whatsapp` RPC, `orders`/`invoices` tables — untouched.
+- No new database tables.
+- Route stays `/orders/new`.
+
+### Files
+
+- new: `src/hooks/usePosEngine.ts`
+- new: `src/components/pos/ProductInfoSheet.tsx`
+- new: `src/components/pos/PosCalculatorSheet.tsx`
+- new: `src/components/pos/PreInvoiceSheet.tsx`
+- new: `src/components/pos/PlaceOrderSheet.tsx`
+- new: `src/components/pos/RecentInvoicesSheet.tsx`
+- rewrite: `src/pages/NewOrder.tsx`
+- refactor (no behavior change): `src/components/conversations/ProductSelectorPanel.tsx` to consume `usePosEngine`
+
+### Verification after implementation
+
+1. Open `/orders/new` on mobile viewport → 3-col grid, search filters live.
+2. Tap multiple products → bottom bar appears with count, Copy, Calculator.
+3. Tap Info → product details sheet opens, close returns to POS.
+4. Tap Copy → WhatsApp-formatted descriptions copied, toast shown, POS still open.
+5. Tap Calculator → cart with plan/qty/discount, totals update.
+6. Generate Pre-Invoice → invoice preview, Copy works, Back returns to calculator.
+7. Place Order → WhatsApp number only → client auto-created/found → order created → toast.
+8. Recent Invoices button → list → tap → reopens pre-invoice with same items.
+9. Conversations product selector still behaves identically.
+
+Ensure state persistence across all POS views, proper invoice rehydration (products, variants, quantities, pricing), consistent WhatsApp message formatting, prevention of duplicate order submissions, and handling of edge cases such as empty selections and search performance.
