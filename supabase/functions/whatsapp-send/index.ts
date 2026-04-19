@@ -112,13 +112,30 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
-    const { conversation_id, content, media_url, media_type, media_mime_type, media_filename, sender_id } = await req.json();
+    const {
+      conversation_id, content, media_url, media_type, media_mime_type, media_filename, sender_id,
+      idempotency_key, retry_of_message_id,
+    } = await req.json();
 
     if (!conversation_id || (!content && !media_url)) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Idempotency: if a message with this key already exists, return it (no double send)
+    if (idempotency_key && !retry_of_message_id) {
+      const { data: existing } = await supabase
+        .from("wa_messages")
+        .select("*")
+        .eq("idempotency_key", idempotency_key)
+        .maybeSingle();
+      if (existing) {
+        return new Response(JSON.stringify({ success: true, message: existing, deduped: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const { data: conversation } = await supabase
@@ -134,6 +151,38 @@ serve(async (req) => {
       });
     }
 
+    // Insert/locate message row in queued state
+    let messageId: string;
+    if (retry_of_message_id) {
+      messageId = retry_of_message_id;
+      await supabase.from("wa_messages")
+        .update({ delivery_status: "sending" })
+        .eq("id", messageId);
+    } else {
+      const { data: inserted, error: insErr } = await supabase.from("wa_messages").insert({
+        conversation_id,
+        sender_type: "agent",
+        sender_id,
+        content,
+        media_url,
+        media_type: media_type || "text",
+        media_mime_type: media_mime_type || null,
+        media_filename: media_filename || null,
+        is_read: true,
+        direction: "outbound",
+        delivery_status: "sending",
+        idempotency_key: idempotency_key || null,
+        channel: "whatsapp",
+      }).select().single();
+      if (insErr || !inserted) {
+        return new Response(JSON.stringify({ error: insErr?.message || "Insert failed" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      messageId = inserted.id;
+    }
+
     const token = await getSettingValue(supabase, "meta_whatsapp_token", "META_WHATSAPP_TOKEN");
     const phoneId = await getSettingValue(supabase, "meta_whatsapp_phone_id", "META_WHATSAPP_PHONE_ID");
 
@@ -145,18 +194,12 @@ serve(async (req) => {
     if (media_type && media_type !== "text" && media_url) {
       const waMediaType = media_type === "audio" ? "audio" : media_type;
       const actualMime = media_mime_type || (waMediaType === "audio" ? "audio/ogg" : "application/octet-stream");
-      
-      console.log(`Sending media: type=${waMediaType}, mime=${actualMime}, key=${media_url}`);
-      
       const mediaId = await uploadMediaToWhatsApp(supabase, media_url, actualMime, token, phoneId);
-
       if (mediaId) {
         messagePayload.type = waMediaType;
         messagePayload[waMediaType] = { id: mediaId };
         if (content) messagePayload[waMediaType].caption = content;
       } else {
-        // Fallback: try with proxy link via edge function
-        console.warn("Direct upload failed, falling back to proxy link");
         const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
         const proxyUrl = `${supabaseUrl}/functions/v1/whatsapp-media?key=${encodeURIComponent(media_url)}&apikey=${encodeURIComponent(anonKey)}`;
         messagePayload.type = waMediaType;
@@ -169,6 +212,9 @@ serve(async (req) => {
     }
 
     let waMessageId: string | null = null;
+    let providerResponse: any = null;
+    let errorCode: string | null = null;
+    let errorMessage: string | null = null;
     let deliveryFailed = false;
 
     try {
@@ -176,41 +222,43 @@ serve(async (req) => {
         `https://graph.facebook.com/v19.0/${phoneId}/messages`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify(messagePayload),
         }
       );
-
-      const waResult = await waResponse.json();
-
+      providerResponse = await waResponse.json();
       if (!waResponse.ok) {
-        console.error("WhatsApp API error:", JSON.stringify(waResult));
         deliveryFailed = true;
+        errorCode = String(providerResponse?.error?.code ?? waResponse.status);
+        errorMessage = providerResponse?.error?.message || "Meta API error";
       } else {
-        waMessageId = waResult.messages?.[0]?.id || null;
-        console.log("Message sent, wa_id:", waMessageId);
+        waMessageId = providerResponse.messages?.[0]?.id || null;
       }
     } catch (apiErr) {
-      console.error("WhatsApp API fetch error:", apiErr);
       deliveryFailed = true;
+      errorMessage = (apiErr as Error).message;
     }
 
-    // Store message
-    const { data: storedMessage } = await supabase.from("wa_messages").insert({
-      conversation_id,
-      sender_type: "agent",
-      sender_id,
-      content,
-      media_url,
-      media_type: media_type || "text",
-      media_mime_type: media_mime_type || null,
-      media_filename: media_filename || null,
-      whatsapp_message_id: waMessageId,
-      is_read: true,
-    }).select().single();
+    // Transition message to final transport state
+    const updates: Record<string, unknown> = {
+      provider_response: providerResponse,
+    };
+    if (deliveryFailed) {
+      updates.delivery_status = "failed";
+      updates.error_code = errorCode;
+      updates.error_message = errorMessage;
+    } else {
+      updates.delivery_status = "sent_to_api";
+      updates.external_message_id = waMessageId;
+      updates.whatsapp_message_id = waMessageId;
+      updates.sent_at = new Date().toISOString();
+    }
+    const { data: storedMessage } = await supabase
+      .from("wa_messages")
+      .update(updates)
+      .eq("id", messageId)
+      .select()
+      .single();
 
     await supabase
       .from("wa_conversations")
@@ -220,29 +268,23 @@ serve(async (req) => {
       })
       .eq("id", conversation_id);
 
-    // Increment agent daily message count
     if (sender_id) {
       const today = new Date().toISOString().split("T")[0];
       const { data: agentConfig } = await supabase
-        .from("wa_agent_config")
-        .select("*")
-        .eq("agent_id", sender_id)
-        .single();
-
+        .from("wa_agent_config").select("*").eq("agent_id", sender_id).single();
       if (agentConfig) {
         const count = agentConfig.last_reset_date === today ? agentConfig.messages_sent_today + 1 : 1;
-        await supabase
-          .from("wa_agent_config")
+        await supabase.from("wa_agent_config")
           .update({ messages_sent_today: count, last_reset_date: today })
           .eq("id", agentConfig.id);
       }
     }
 
     if (deliveryFailed) {
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: "Message saved but WhatsApp delivery failed.", 
-        message: storedMessage 
+      return new Response(JSON.stringify({
+        success: false,
+        error: errorMessage || "Message saved but WhatsApp delivery failed.",
+        message: storedMessage,
       }), {
         status: 207,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -254,7 +296,7 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Send error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
