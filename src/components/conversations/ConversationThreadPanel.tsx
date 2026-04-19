@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, RefreshCw, AlertTriangle, Package, ArrowRightLeft, RotateCw,
 } from "lucide-react";
@@ -43,6 +43,8 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const { submitting, run } = useSubmitGuard();
   const { messages: liveMessages, sendMessage, isRealtime } = useConversationMessages(conversation?.id ?? null);
   const { retry: retryRemote, isRetrying } = useMessageRetry();
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
   if (!conversation) {
     return (
