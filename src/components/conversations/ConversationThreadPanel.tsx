@@ -63,6 +63,26 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const notes: MockInternalNote[] = mockNotesByConv[conversation.id] || [];
   const canSend = isRealConversationId(conversation.id);
 
+  const { latestFailedId, lastInboundAt } = useMemo(() => {
+    let failed: string | null = null;
+    let inbound: string | null = null;
+    for (const m of messages) {
+      if (m.sender === "agent" && isFailedStatus(m.status)) failed = m.id;
+      if (m.sender === "customer" || m.direction === "inbound") inbound = m.time;
+    }
+    return { latestFailedId: failed, lastInboundAt: inbound };
+  }, [messages]);
+
+  const handleJumpToFailed = () => {
+    if (!latestFailedId) return;
+    const el = messageRefs.current[latestFailedId];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightedId(latestFailedId);
+      window.setTimeout(() => setHighlightedId(null), 1500);
+    }
+  };
+
   const handleSend = () => run(async () => {
     const text = draft.trim();
     if (!text) return;
