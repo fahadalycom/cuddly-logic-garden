@@ -32,9 +32,9 @@ serve(async (req) => {
   try {
     const {
       conversation_id, content, sender_id, idempotency_key, retry_of_message_id,
-      media_url, media_type, media_mime_type, media_filename,
+      media_url, storage_key, media_type, media_mime_type, media_filename,
     } = await req.json();
-    if (!conversation_id || (!content && !media_url)) {
+    if (!conversation_id || (!content && !media_url && !storage_key)) {
       return json({ error: "Missing required fields" }, 400);
     }
 
@@ -54,10 +54,18 @@ serve(async (req) => {
       .eq("id", conversation_id)
       .single();
     if (!conversation) return json({ error: "Conversation not found" }, 404);
+    if (!conversation.external_user_id) {
+      return json({ error: "Conversation missing external recipient id (PSID/IGSID)" }, 400);
+    }
 
     const convChannel: string = conversation.channel;
     const intType = INT_TYPE[convChannel];
     if (!intType) return json({ error: `Unsupported channel: ${convChannel}` }, 400);
+
+    // Instagram only supports image attachments.
+    if (intType === "instagram" && media_type && media_type !== "text" && media_type !== "image") {
+      return json({ error: "Instagram DMs only support image attachments." }, 400);
+    }
 
     const { data: integration } = await supabase
       .from("channel_integrations")
@@ -71,6 +79,14 @@ serve(async (req) => {
     // Insert / locate message row
     let messageId: string;
     if (retry_of_message_id) {
+      const { data: existing } = await supabase
+        .from("wa_messages")
+        .select("delivery_status")
+        .eq("id", retry_of_message_id)
+        .maybeSingle();
+      if (existing?.delivery_status === "permanently_failed") {
+        return json({ error: "Message is permanently failed and cannot be retried" }, 400);
+      }
       messageId = retry_of_message_id;
       await supabase.from("wa_messages").update({ delivery_status: "sending" }).eq("id", messageId);
     } else {

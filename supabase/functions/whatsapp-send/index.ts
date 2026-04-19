@@ -151,11 +151,11 @@ serve(async (req) => {
 
   try {
     const {
-      conversation_id, content, media_url, media_type, media_mime_type, media_filename, sender_id,
+      conversation_id, content, media_url, storage_key, media_type, media_mime_type, media_filename, sender_id,
       idempotency_key, retry_of_message_id,
     } = await req.json();
 
-    if (!conversation_id || (!content && !media_url)) {
+    if (!conversation_id || (!content && !media_url && !storage_key)) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -189,9 +189,28 @@ serve(async (req) => {
       });
     }
 
+    if (!conversation.customer_phone) {
+      return new Response(JSON.stringify({ error: "Conversation has no recipient phone number" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Insert/locate message row in queued state
     let messageId: string;
     if (retry_of_message_id) {
+      // Block retrying messages that are already permanently failed.
+      const { data: existing } = await supabase
+        .from("wa_messages")
+        .select("delivery_status")
+        .eq("id", retry_of_message_id)
+        .maybeSingle();
+      if (existing?.delivery_status === "permanently_failed") {
+        return new Response(JSON.stringify({ error: "Message is permanently failed and cannot be retried" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       messageId = retry_of_message_id;
       await supabase.from("wa_messages")
         .update({ delivery_status: "sending" })
@@ -245,19 +264,43 @@ serve(async (req) => {
       to: conversation.customer_phone,
     };
 
-    if (media_type && media_type !== "text" && media_url) {
+    // Attachment handling — prefer canonical storage_key, but accept media_url for back-compat.
+    // We try to resolve a storage object key from any of these inputs:
+    //   1. storage_key (canonical, set by UI)
+    //   2. media_url that points to our whatsapp-media bucket (parse the path)
+    //   3. media_url that is itself a bare object key
+    function deriveStorageKey(): string | null {
+      if (storage_key && typeof storage_key === "string") return storage_key;
+      if (!media_url || typeof media_url !== "string") return null;
+      // Public URL: .../storage/v1/object/public/whatsapp-media/<key>
+      const marker = `/${BUCKET}/`;
+      const idx = media_url.indexOf(marker);
+      if (idx >= 0) return decodeURIComponent(media_url.slice(idx + marker.length).split("?")[0]);
+      // External URL — not a storage object; we will fall back to link-mode below.
+      if (/^https?:\/\//i.test(media_url)) return null;
+      // Treat as bare key.
+      return media_url;
+    }
+
+    if (media_type && media_type !== "text" && (media_url || storage_key)) {
       const waMediaType = media_type === "audio" ? "audio" : media_type;
       const actualMime = media_mime_type || (waMediaType === "audio" ? "audio/ogg" : "application/octet-stream");
-      const mediaId = await uploadMediaToWhatsApp(supabase, media_url, actualMime, token, phoneId);
+      const key = deriveStorageKey();
+      let mediaId: string | null = null;
+      if (key) {
+        mediaId = await uploadMediaToWhatsApp(supabase, key, actualMime, token, phoneId);
+      }
       if (mediaId) {
         messagePayload.type = waMediaType;
         messagePayload[waMediaType] = { id: mediaId };
         if (content) messagePayload[waMediaType].caption = content;
       } else {
-        const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
-        const proxyUrl = `${supabaseUrl}/functions/v1/whatsapp-media?key=${encodeURIComponent(media_url)}&apikey=${encodeURIComponent(anonKey)}`;
+        // Last-resort link mode (Meta will fetch the URL itself).
+        const linkUrl = key
+          ? `${supabaseUrl}/functions/v1/whatsapp-media?key=${encodeURIComponent(key)}&apikey=${encodeURIComponent(Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "")}`
+          : media_url;
         messagePayload.type = waMediaType;
-        messagePayload[waMediaType] = { link: proxyUrl };
+        messagePayload[waMediaType] = { link: linkUrl };
         if (content) messagePayload[waMediaType].caption = content;
       }
     } else {
