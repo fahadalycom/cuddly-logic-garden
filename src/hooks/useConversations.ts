@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { mockConversationsList, type MockConversation } from "@/lib/conversations-mock";
 import { mapWaConversation, type WaConversationRow, dbToRealId } from "@/lib/conversations-data";
 
-const SELECT = "id,customer_phone,customer_name,channel,queue,status,priority,assigned_agent_id,previous_agent_id,reassignment_count,auto_summary,last_message_preview,last_message_at,unread_count,client_id";
+const SELECT = "id,customer_phone,customer_name,channel,queue,status,priority,assigned_agent_id,previous_agent_id,reassignment_count,auto_summary,last_message_preview,last_message_at,unread_count,client_id,external_user_id,external_conversation_id,integration_id";
 
 /**
  * Fetches real wa_conversations and merges them with the legacy mock
@@ -51,11 +51,9 @@ export function useConversations() {
 
   const conversations = useMemo<MockConversation[]>(() => {
     const real = realRows.map(mapWaConversation);
-    const realIds = new Set(realRows.map((r) => dbToRealId(r.id)));
-    // Keep mock entries (non-WhatsApp demo) but avoid clashes with real ids.
-    const mocks = mockConversationsList.filter((m) => !realIds.has(m.id));
-    // Sort: real first (by last_message_at already sorted), then mocks.
-    return [...real, ...mocks];
+    if (real.length > 0) return real;
+    // Fallback to mock data only when DB is empty (first-run / demo)
+    return mockConversationsList;
   }, [realRows]);
 
   return { conversations, loading };

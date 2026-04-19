@@ -56,27 +56,37 @@ export interface WaConversationRow {
   last_message_at: string | null;
   unread_count: number | null;
   client_id: string | null;
+  external_user_id?: string | null;
+  external_conversation_id?: string | null;
+  integration_id?: string | null;
 }
 
 export function mapWaConversation(row: WaConversationRow): MockConversation {
+  const channel = ((row.channel as ConvChannel) ?? "whatsapp");
+  const displayPhone = row.customer_phone?.includes(":")
+    ? `${channel} user`
+    : row.customer_phone;
   return {
     id: dbToRealId(row.id),
-    customerName: row.customer_name || row.customer_phone || "Unknown",
-    customerPhone: row.customer_phone,
-    channel: ((row.channel as ConvChannel) ?? "whatsapp"),
+    customerName: row.customer_name || displayPhone || "Unknown",
+    customerPhone: displayPhone,
+    channel,
     queue: ((row.queue as ConvQueue) ?? "general"),
     status: ((row.status as ConvStatus) ?? "active"),
     priority: ((row.priority as ConvPriority) ?? "medium"),
-    assignedAgent: row.assigned_agent_id, // raw uuid; UI shows it as label
+    assignedAgent: row.assigned_agent_id,
     reassignmentCount: row.reassignment_count ?? 0,
     previousAgent: row.previous_agent_id ?? null,
     autoSummary: row.auto_summary ?? undefined,
     lastMessage: row.last_message_preview ?? "",
     lastTime: fmtAgo(row.last_message_at),
     unread: row.unread_count ?? 0,
+    externalUserId: row.external_user_id ?? null,
+    externalConversationId: row.external_conversation_id ?? null,
+    integrationId: row.integration_id ?? null,
     context: {
-      name: row.customer_name || row.customer_phone || "Unknown",
-      phone: row.customer_phone,
+      name: row.customer_name || displayPhone || "Unknown",
+      phone: displayPhone,
       tags: [],
       status: "active",
       recentOrders: [],
