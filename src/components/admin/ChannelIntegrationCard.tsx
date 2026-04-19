@@ -134,6 +134,22 @@ export function ChannelIntegrationCard({ channel }: Props) {
 
   const disabled = !isAdmin;
 
+  // Compute readiness state from existing telemetry
+  const readiness: Readiness = (() => {
+    if (!integration || completeness < 100) return "not_configured";
+    if (!integration.verify_token || !integration.last_health_check_at) return "partially_configured";
+    if (!integration.last_inbound_at) return "ready_for_webhook";
+    if (!integration.enabled) return "ready_for_live";
+    return "live";
+  })();
+  const readinessMeta = READINESS_META[readiness];
+
+  const isFieldMissing = (key: string, secret: boolean | undefined) => {
+    if (secret) return !integration?.secrets_set?.[key];
+    if (key === "verify_token") return !integration?.verify_token;
+    return !integration?.config?.[key];
+  };
+
   return (
     <Card className="overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between gap-4 border-b">
