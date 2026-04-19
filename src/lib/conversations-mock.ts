@@ -6,6 +6,8 @@ export type ConvStatus = "new" | "active" | "waiting_customer" | "waiting_intern
 export type ConvQueue = "sales" | "support" | "payments" | "renewals" | "general";
 export type ConvPriority = "low" | "medium" | "high" | "urgent";
 
+import type { DeliveryStatus } from "@/lib/message-status";
+
 export interface MockMessage {
   id: string;
   conversationId: string;
@@ -14,6 +16,11 @@ export interface MockMessage {
   text: string;
   time: string; // display time
   type?: "text" | "image" | "file";
+  /** outbound transport state — only meaningful for sender === "agent" */
+  status?: DeliveryStatus;
+  retryCount?: number;
+  errorMessage?: string;
+  direction?: "inbound" | "outbound";
 }
 
 export interface MockInternalNote {
