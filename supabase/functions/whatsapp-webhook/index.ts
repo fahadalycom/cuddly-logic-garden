@@ -14,9 +14,35 @@ async function getSettingValue(supabase: any, key: string, envFallback?: string)
     .from("system_settings")
     .select("value")
     .eq("key", key)
-    .single();
+    .maybeSingle();
   if (data?.value) return data.value;
   return envFallback ? (Deno.env.get(envFallback) || "") : "";
+}
+
+/** Canonical WhatsApp access token resolver (mirrors whatsapp-send). */
+async function resolveWhatsAppToken(supabase: any): Promise<string> {
+  return (
+    (await getSettingValue(supabase, "meta_whatsapp_access_token")) ||
+    (await getSettingValue(supabase, "meta_whatsapp_token")) ||
+    Deno.env.get("META_WHATSAPP_TOKEN") ||
+    ""
+  );
+}
+
+/** Canonical webhook verify token resolver. */
+async function resolveVerifyToken(supabase: any): Promise<string> {
+  // 1. channel_integrations.verify_token (canonical, set by Channel Integrations UI)
+  const { data: integ } = await supabase
+    .from("channel_integrations")
+    .select("verify_token")
+    .eq("channel_type", "whatsapp")
+    .maybeSingle();
+  if (integ?.verify_token) return integ.verify_token;
+  // 2. Legacy system_settings key
+  const legacy = await getSettingValue(supabase, "meta_webhook_verify_token");
+  if (legacy) return legacy;
+  // 3. Env var
+  return Deno.env.get("META_WEBHOOK_VERIFY_TOKEN") || "";
 }
 
 serve(async (req) => {
@@ -43,7 +69,7 @@ serve(async (req) => {
       const mode = url.searchParams.get("hub.mode");
       const token = url.searchParams.get("hub.verify_token");
       const challenge = url.searchParams.get("hub.challenge");
-      const verifyToken = await getSettingValue(supabase, "meta_webhook_verify_token", "META_WEBHOOK_VERIFY_TOKEN");
+      const verifyToken = await resolveVerifyToken(supabase);
 
       if (mode === "subscribe" && token === verifyToken) {
         return new Response(challenge, { status: 200 });
@@ -288,7 +314,7 @@ async function findAvailableAgent(supabase: any): Promise<string | null> {
  */
 async function downloadAndUploadToStorage(supabase: any, mediaId: string, mimeType: string): Promise<string | null> {
   try {
-    const token = await getSettingValue(supabase, "meta_whatsapp_token", "META_WHATSAPP_TOKEN");
+    const token = await resolveWhatsAppToken(supabase);
 
     // Step 1: Get media URL from Meta
     const mediaResp = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
