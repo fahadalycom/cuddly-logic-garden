@@ -159,7 +159,7 @@ export function ChannelIntegrationCard({ channel }: Props) {
           </div>
           <div>
             <CardTitle className="text-base">{meta.label}</CardTitle>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
               <span
                 className={cn(
                   "text-[10px] px-2 py-0.5 rounded-full border font-medium",
@@ -167,6 +167,16 @@ export function ChannelIntegrationCard({ channel }: Props) {
                 )}
               >
                 {STATUS_LABELS[status]}
+              </span>
+              <span
+                className={cn(
+                  "text-[10px] px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1",
+                  readinessMeta.cls,
+                )}
+                title={readinessMeta.hint}
+              >
+                {readiness === "live" && <Radio className="h-2.5 w-2.5" />}
+                {readinessMeta.label}
               </span>
               <span className="text-[11px] text-muted-foreground">
                 Config {completeness}% complete
@@ -188,6 +198,15 @@ export function ChannelIntegrationCard({ channel }: Props) {
       </CardHeader>
 
       <CardContent className="p-5 space-y-5">
+        {/* Next step guidance based on readiness */}
+        {readiness !== "live" && !integration?.last_error && (
+          <Alert>
+            <ArrowRight className="h-4 w-4" />
+            <AlertTitle>Next step</AlertTitle>
+            <AlertDescription className="text-sm">{readinessMeta.hint}</AlertDescription>
+          </Alert>
+        )}
+
         {/* Error alert */}
         {integration?.last_error && (
           <Alert variant="destructive">
