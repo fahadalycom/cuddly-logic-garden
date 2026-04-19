@@ -1,225 +1,209 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { useClipboard } from "@/hooks/useClipboard";
-import { useSubmitGuard } from "@/hooks/useSubmitGuard";
-import { formatCurrency } from "@/lib/template-engine";
-import { Button } from "@/components/ui/button";
+import { useMemo, useState } from "react";
+import { Search, Package, Info, Copy, Calculator, Receipt, X, History } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingState } from "@/components/shared/PageStates";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
-import { ShoppingCart, User, Package, Receipt, Copy, ArrowRight, Loader2 } from "lucide-react";
-import type { Product, ProductVariant, ProductDuration } from "@/types/database";
+import { cn } from "@/lib/utils";
+import { usePosEngine, type ProductWithPlans } from "@/hooks/usePosEngine";
+import { ProductInfoSheet } from "@/components/pos/ProductInfoSheet";
+import { PosCalculatorSheet } from "@/components/pos/PosCalculatorSheet";
+import { PreInvoiceSheet } from "@/components/pos/PreInvoiceSheet";
+import { RecentInvoicesSheet } from "@/components/pos/RecentInvoicesSheet";
 
 export default function NewOrderPage() {
-  const [products, setProducts] = useState<(Product & { product_variants: ProductVariant[]; product_durations: ProductDuration[] })[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedProduct, setSelectedProduct] = useState("");
-  const [selectedVariant, setSelectedVariant] = useState("");
-  const [selectedDuration, setSelectedDuration] = useState("");
-  const [clientPhone, setClientPhone] = useState("");
-  const [discount, setDiscount] = useState(0);
-  const [notes, setNotes] = useState("");
-  const { user } = useAuth();
-  const { copy } = useClipboard();
-  const navigate = useNavigate();
-  const { submitting, run } = useSubmitGuard();
+  const engine = usePosEngine();
+  const [search, setSearch] = useState("");
+  const [infoProduct, setInfoProduct] = useState<ProductWithPlans | null>(null);
+  const [calcOpen, setCalcOpen] = useState(false);
+  const [preInvoiceOpen, setPreInvoiceOpen] = useState(false);
+  const [recentOpen, setRecentOpen] = useState(false);
 
-  useEffect(() => {
-    supabase.from("products").select("*, product_variants(*), product_durations(*)").eq("is_active", true).then(({ data }) => {
-      setProducts((data as any) || []);
-      setLoading(false);
-    });
-  }, []);
-
-  const product = products.find((p) => p.id === selectedProduct);
-  const variant = product?.product_variants?.find((v) => v.id === selectedVariant);
-  const duration = product?.product_durations?.find((d) => d.id === selectedDuration);
-
-  const unitPrice = variant ? Number(variant.price) : product ? Number(product.base_price) : 0;
-  const multiplier = duration ? Number(duration.price_multiplier) : 1;
-  const maxDiscountPercent = variant ? Number(variant.max_discount_percent) : 0;
-  const maxDiscountFixed = variant ? Number(variant.max_discount_fixed) : 0;
-  const maxDiscount = Math.max(unitPrice * maxDiscountPercent / 100, maxDiscountFixed);
-  const effectiveDiscount = Math.min(discount, maxDiscount || discount);
-  const lineTotal = (unitPrice * multiplier) - effectiveDiscount;
-
-  const generatePreInvoice = () => {
-    const lines = [
-      `📋 *Pre-Invoice*`, ``, `📱 WhatsApp: ${clientPhone}`, ``, `🛒 *Order Details:*`,
-      `• Product: ${product?.name}`,
-      variant ? `• Plan: ${variant.name}` : null,
-      duration ? `• Duration: ${duration.duration_value} ${duration.duration_type}(s)` : null,
-      `• Price: ${formatCurrency(unitPrice * multiplier)}`,
-      effectiveDiscount > 0 ? `• Discount: -${formatCurrency(effectiveDiscount)}` : null,
-      ``, `💰 *Total Due: ${formatCurrency(lineTotal)}*`, ``, `Please confirm to proceed with payment.`,
-    ].filter(Boolean).join("\n");
-    copy(lines, "Pre-invoice");
-  };
-
-  const createOrder = () => run(async () => {
-    if (!product || !clientPhone.trim()) {
-      toast.error("Please enter a WhatsApp number and select a product");
-      return;
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return engine.products;
+    const starts: ProductWithPlans[] = [];
+    const includes: ProductWithPlans[] = [];
+    for (const p of engine.products) {
+      const name = p.name.toLowerCase();
+      const cat = (p.category ?? "").toLowerCase();
+      if (name.startsWith(q)) starts.push(p);
+      else if (name.includes(q) || cat.includes(q)) includes.push(p);
     }
-    if (lineTotal < 0) {
-      toast.error("Discount cannot exceed price");
-      return;
+    return [...starts, ...includes];
+  }, [engine.products, search]);
+
+  function handleCopyProducts() {
+    if (engine.totalSelected === 0) return;
+    const msg = engine.generateProductMessage();
+    navigator.clipboard.writeText(msg);
+    toast.success(`${engine.totalSelected} product${engine.totalSelected > 1 ? "s" : ""} copied`);
+  }
+
+  async function handlePickRecent(invoiceId: string) {
+    setRecentOpen(false);
+    const preview = await engine.hydrateFromInvoice(invoiceId);
+    if (preview) {
+      setPreInvoiceOpen(true);
+    } else {
+      toast.error("Failed to load invoice");
     }
-    // Auto-upsert client by WhatsApp number (auto-generates "Client N" name if new)
-    const { data: clientId, error: upsertErr } = await supabase
-      .rpc("upsert_client_by_whatsapp", { _wa: clientPhone.trim() });
-    if (upsertErr || !clientId) { toast.error(upsertErr?.message || "Could not resolve client"); return; }
+  }
 
-    const { data: order, error: orderErr } = await supabase.from("orders").insert({
-      client_id: clientId,
-      created_by: user!.id,
-      status: "pending_payment",
-      total_amount: lineTotal,
-      discount_amount: effectiveDiscount,
-      remaining_due: lineTotal,
-      notes: notes.trim() || null,
-    }).select("id").single();
-    if (orderErr) { toast.error(orderErr.message); return; }
-
-    const { error: itemErr } = await supabase.from("order_items").insert({
-      order_id: order.id,
-      product_id: product.id,
-      variant_id: variant?.id || null,
-      duration_type: duration?.duration_type || null,
-      duration_value: duration?.duration_value || 1,
-      unit_price: unitPrice,
-      discount: effectiveDiscount,
-      line_total: lineTotal,
-    });
-    if (itemErr) {
-      toast.error(`Order created but item failed: ${itemErr.message}`);
-      return;
-    }
-
-    await supabase.from("order_status_history").insert({
-      order_id: order.id, to_status: "pending_payment", changed_by: user!.id,
-    });
-    toast.success("Order created!");
-    generatePreInvoice();
-    navigate("/orders");
-  });
-
-  if (loading) return <LoadingState />;
+  if (engine.loading) return <LoadingState />;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="page-header">
-        <h1 className="page-title flex items-center gap-2"><ShoppingCart className="h-6 w-6 text-primary" />New Order</h1>
-        <p className="page-subtitle">Create a new order and generate pre-invoice</p>
-      </div>
-
-      {/* Client Info */}
-      <div className="premium-card !p-6 space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <User className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Client</h3>
-        </div>
-        <div>
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">WhatsApp Number *</Label>
-          <Input
-            value={clientPhone}
-            onChange={(e) => setClientPhone(e.target.value)}
-            placeholder="e.g. 923001234567"
-            className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl"
-          />
-          <p className="text-[11px] text-muted-foreground/60 mt-1.5">
-            New numbers are auto-registered with a generated name (Client 1, Client 2, …).
-          </p>
-        </div>
-      </div>
-
-      {/* Product Selection */}
-      <div className="premium-card !p-6 space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Package className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Product Selection</h3>
-        </div>
-        <div>
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Product *</Label>
-          <Select value={selectedProduct} onValueChange={(v) => { setSelectedProduct(v); setSelectedVariant(""); setSelectedDuration(""); }}>
-            <SelectTrigger className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl"><SelectValue placeholder="Select product" /></SelectTrigger>
-            <SelectContent className="glass-strong rounded-xl border-border/30">
-              {products.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} — {formatCurrency(Number(p.base_price))}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        {product?.product_variants && product.product_variants.length > 0 && (
-          <div>
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Plan / Variant</Label>
-            <Select value={selectedVariant} onValueChange={setSelectedVariant}>
-              <SelectTrigger className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl"><SelectValue placeholder="Select plan" /></SelectTrigger>
-              <SelectContent className="glass-strong rounded-xl border-border/30">
-                {product.product_variants.map((v) => <SelectItem key={v.id} value={v.id}>{v.name} — {formatCurrency(Number(v.price))}</SelectItem>)}
-              </SelectContent>
-            </Select>
+    <div className="fixed inset-0 sm:relative sm:inset-auto sm:h-[calc(100vh-4rem)] flex flex-col bg-background">
+      {/* Header: search + recent */}
+      <div className="shrink-0 px-3 pt-3 pb-2 border-b border-border/40 bg-background/95 backdrop-blur sticky top-0 z-10">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search products…"
+              className="pl-9 h-10 rounded-xl"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-muted"
+              >
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            )}
           </div>
-        )}
-        {product?.product_durations && product.product_durations.length > 0 && (
-          <div>
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Duration</Label>
-            <Select value={selectedDuration} onValueChange={setSelectedDuration}>
-              <SelectTrigger className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl"><SelectValue placeholder="Select duration" /></SelectTrigger>
-              <SelectContent className="glass-strong rounded-xl border-border/30">
-                {product.product_durations.map((d) => <SelectItem key={d.id} value={d.id}>{d.duration_value} {d.duration_type}(s) — ×{Number(d.price_multiplier)}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Discount {maxDiscount > 0 && `(max: ${formatCurrency(maxDiscount)})`}</Label>
-            <Input type="number" value={discount} onChange={(e) => setDiscount(Number(e.target.value))} className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl" />
-          </div>
-        </div>
-        <div>
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Notes</Label>
-          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1.5 bg-secondary/30 border-border/30 rounded-xl" />
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-10 w-10 rounded-xl shrink-0"
+            onClick={() => setRecentOpen(true)}
+            title="Recent invoices"
+          >
+            <History className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
-      {/* Summary */}
-      <div className="premium-card !p-6 space-y-3">
-        <div className="flex items-center gap-2 mb-2">
-          <Receipt className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Order Summary</h3>
-        </div>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span className="mono font-medium text-foreground">{formatCurrency(unitPrice * multiplier)}</span></div>
-          {effectiveDiscount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Discount</span><span className="mono font-medium text-red-400">-{formatCurrency(effectiveDiscount)}</span></div>}
-          <div className="flex justify-between font-bold text-lg border-t border-border/20 pt-3 mt-3">
-            <span>Total Due</span>
-            <span className="mono text-gradient">{formatCurrency(lineTotal)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex gap-3">
-        <Button onClick={generatePreInvoice} variant="outline" disabled={!product} className="flex-1 rounded-xl border-border/20 bg-card/40 hover:bg-card/60 h-11">
-          <Copy className="h-4 w-4 mr-2" /> Copy Pre-Invoice
-        </Button>
-        <Button
-          onClick={createOrder}
-          disabled={!product || !clientPhone.trim() || submitting}
-          className="flex-1 rounded-xl gradient-primary text-white border-0 h-11 shadow-lg shadow-primary/20"
-        >
-          {submitting ? (
-            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Creating…</>
+      {/* Product grid */}
+      <ScrollArea className="flex-1">
+        <div className="p-3 pb-32">
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <Package className="h-10 w-10 mb-2 opacity-50" />
+              <p className="text-sm">No products found</p>
+            </div>
           ) : (
-            <>Create Order <ArrowRight className="h-4 w-4 ml-2" /></>
+            <div className="grid grid-cols-3 gap-2">
+              {filtered.map((p) => {
+                const isSelected = !!engine.selected[p.id];
+                return (
+                  <div
+                    key={p.id}
+                    className={cn(
+                      "relative rounded-xl border bg-card/40 overflow-hidden transition-all flex flex-col",
+                      isSelected
+                        ? "border-primary ring-2 ring-primary/40 bg-primary/5"
+                        : "border-border/40 active:scale-95",
+                    )}
+                  >
+                    {isSelected && (
+                      <div className="absolute top-1 right-1 z-10 h-5 w-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shadow">
+                        ✓
+                      </div>
+                    )}
+                    <button
+                      onClick={() => engine.toggleProduct(p)}
+                      className="aspect-square w-full bg-gradient-to-br from-muted/40 to-muted/10 flex items-center justify-center overflow-hidden"
+                    >
+                      {p.image_url ? (
+                        <img
+                          src={p.image_url}
+                          alt={p.name}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <span className="text-2xl font-bold text-primary/60">
+                          {p.name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </button>
+                    <div className="p-1.5 flex flex-col gap-1">
+                      <button
+                        onClick={() => engine.toggleProduct(p)}
+                        className="text-[11px] font-medium leading-tight line-clamp-2 text-left min-h-[2.2em]"
+                      >
+                        {p.name}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInfoProduct(p);
+                        }}
+                        className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground hover:text-primary border border-border/40 rounded-md py-1 transition"
+                      >
+                        <Info className="h-2.5 w-2.5" />
+                        Info
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
-        </Button>
-      </div>
+        </div>
+      </ScrollArea>
+
+      {/* Sticky bottom action bar */}
+      {engine.totalSelected > 0 && (
+        <div className="absolute bottom-0 left-0 right-0 z-20 border-t border-border/50 bg-background/95 backdrop-blur p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-4">
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="h-9 px-3 rounded-xl text-xs font-semibold shrink-0">
+              {engine.totalSelected} selected
+            </Badge>
+            <Button
+              variant="outline"
+              onClick={handleCopyProducts}
+              className="flex-1 h-10 rounded-xl gap-1.5"
+            >
+              <Copy className="h-4 w-4" /> Copy
+            </Button>
+            <Button onClick={() => setCalcOpen(true)} className="flex-1 h-10 rounded-xl gap-1.5">
+              <Calculator className="h-4 w-4" /> Calc
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Sheets */}
+      <ProductInfoSheet
+        product={infoProduct}
+        open={!!infoProduct}
+        onOpenChange={(o) => !o && setInfoProduct(null)}
+      />
+      <PosCalculatorSheet
+        open={calcOpen}
+        onOpenChange={setCalcOpen}
+        engine={engine}
+        onPreInvoice={() => {
+          setCalcOpen(false);
+          setPreInvoiceOpen(true);
+        }}
+      />
+      <PreInvoiceSheet
+        open={preInvoiceOpen}
+        onOpenChange={setPreInvoiceOpen}
+        engine={engine}
+        onPlaced={() => {
+          // After placing, fully reset
+          engine.clearAll();
+        }}
+      />
+      <RecentInvoicesSheet open={recentOpen} onOpenChange={setRecentOpen} onPick={handlePickRecent} />
     </div>
   );
 }
