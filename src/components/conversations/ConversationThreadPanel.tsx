@@ -46,6 +46,16 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
+  const { latestFailedId, lastInboundAt } = useMemo(() => {
+    let failed: string | null = null;
+    let inbound: string | null = null;
+    for (const m of liveMessages) {
+      if (m.sender === "agent" && isFailedStatus(m.status)) failed = m.id;
+      if (m.sender === "customer" || m.direction === "inbound") inbound = m.time;
+    }
+    return { latestFailedId: failed, lastInboundAt: inbound };
+  }, [liveMessages]);
+
   if (!conversation) {
     return (
       <div className="flex-1 flex items-center justify-center text-center p-8 bg-background/20">
@@ -62,16 +72,6 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const messages: MockMessage[] = liveMessages;
   const notes: MockInternalNote[] = mockNotesByConv[conversation.id] || [];
   const canSend = isRealConversationId(conversation.id);
-
-  const { latestFailedId, lastInboundAt } = useMemo(() => {
-    let failed: string | null = null;
-    let inbound: string | null = null;
-    for (const m of messages) {
-      if (m.sender === "agent" && isFailedStatus(m.status)) failed = m.id;
-      if (m.sender === "customer" || m.direction === "inbound") inbound = m.time;
-    }
-    return { latestFailedId: failed, lastInboundAt: inbound };
-  }, [messages]);
 
   const handleJumpToFailed = () => {
     if (!latestFailedId) return;
