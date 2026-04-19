@@ -55,7 +55,7 @@ export default function NewOrderPage() {
   if (engine.loading) return <LoadingState />;
 
   return (
-    <div className="fixed inset-0 sm:relative sm:inset-auto sm:h-[calc(100vh-4rem)] flex flex-col bg-background">
+    <div className="relative h-full flex flex-col bg-background overflow-hidden">
       {/* Header: search + recent */}
       <div className="shrink-0 px-3 pt-3 pb-2 border-b border-border/40 bg-background/95 backdrop-blur sticky top-0 z-10">
         <div className="flex items-center gap-2">
