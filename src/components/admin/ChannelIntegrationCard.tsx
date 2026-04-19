@@ -99,7 +99,7 @@ interface Props {
 
 export function ChannelIntegrationCard({ channel }: Props) {
   const { isAdmin } = useAuth();
-  const { integration, loading, saving, testing, toggling, save, test, toggle, clearError, reconnect } =
+  const { integration, loading, saving, testing, toggling, lastTestResult, save, test, toggle, clearError, reconnect } =
     useChannelIntegration(channel);
   const meta = CHANNEL_META[channel];
   const Icon = ICONS[channel];
