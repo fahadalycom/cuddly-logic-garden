@@ -484,6 +484,7 @@ export const mockMessagesByConv: Record<string, MockMessage[]> = {
   ],
   conv_3: [
     { id: "m1", conversationId: "conv_3", sender: "customer", senderName: "John", text: "Send me renewal invoice please", time: "08:40", direction: "inbound" },
+    { id: "m2", conversationId: "conv_3", sender: "agent", senderName: "Bilal", text: "Sending renewal invoice now…", time: "08:42", direction: "outbound", status: "failed", retryCount: 1, errorMessage: "Messenger 24h window expired — needs message tag" },
   ],
   conv_4: [
     { id: "m1", conversationId: "conv_4", sender: "customer", senderName: "Hina", text: "Payment proof attached", time: "07:30", type: "image", direction: "inbound" },
@@ -496,6 +497,8 @@ export const mockMessagesByConv: Record<string, MockMessage[]> = {
   ],
   conv_6: [
     { id: "m1", conversationId: "conv_6", sender: "customer", senderName: "Sana", text: "Can I get a discount on yearly plan?", time: "06:10", direction: "inbound" },
+    { id: "m2", conversationId: "conv_6", sender: "agent", senderName: "Sara", text: "Let me check the yearly bundle for you.", time: "06:11", direction: "outbound", status: "delivered" },
+    { id: "m3", conversationId: "conv_6", sender: "agent", senderName: "Sara", text: "Sending offer details now…", time: "06:12", direction: "outbound", status: "retrying", retryCount: 1, errorMessage: "Instagram API rate limit — auto-retry queued" },
   ],
   conv_7: [
     { id: "m1", conversationId: "conv_7", sender: "customer", senderName: "Daniyal", text: "Hi, do you offer Netflix?", time: "04:00", direction: "inbound" },
