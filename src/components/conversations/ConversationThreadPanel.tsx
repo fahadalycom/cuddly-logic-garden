@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
-  ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, CheckCheck, RefreshCw, AlertTriangle, Package, ArrowRightLeft,
+  ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, RefreshCw, AlertTriangle, Package, ArrowRightLeft, RotateCw,
 } from "lucide-react";
 import { ProductSelectorPanel } from "./ProductSelectorPanel";
 import { TicketDialog } from "@/components/support/TicketDialog";
@@ -12,6 +12,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChannelIcon } from "./ChannelIcon";
 import { ConvStatusBadge, QueueBadge } from "./ConvStatusBadge";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
+import { MessageStatusIndicator } from "./MessageStatusIndicator";
+import { ConversationReliabilityStrip } from "./ConversationReliabilityStrip";
+import { isFailedStatus, isPendingStatus, type DeliveryStatus } from "@/lib/message-status";
+import { useSubmitGuard } from "@/hooks/useSubmitGuard";
+import { toast } from "sonner";
 import {
   mockMessagesByConv, mockNotesByConv, type MockConversation, type MockMessage, type MockInternalNote,
 } from "@/lib/conversations-mock";
