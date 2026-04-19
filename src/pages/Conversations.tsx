@@ -4,7 +4,7 @@ import { ConversationThreadPanel } from "@/components/conversations/Conversation
 import { ConversationContextPanel } from "@/components/conversations/ConversationContextPanel";
 import { QueueOverviewPanel } from "@/components/conversations/QueueOverviewPanel";
 import { Button } from "@/components/ui/button";
-import { mockConversationsList } from "@/lib/conversations-mock";
+import { useConversations } from "@/hooks/useConversations";
 import { mockQueueItems } from "@/lib/queue-mock";
 import { Inbox, Layers, MessageSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,8 @@ export default function ConversationsPage() {
   const [view, setView] = useState<View>("inbox");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [contextOpen, setContextOpen] = useState(false);
-  const selected = mockConversationsList.find((c) => c.id === selectedId) ?? null;
+  const { conversations } = useConversations();
+  const selected = conversations.find((c) => c.id === selectedId) ?? null;
 
   // On mobile: list visible until a chat is selected; then thread takes over.
   const showThreadMobile = !!selectedId && !contextOpen;
@@ -37,7 +38,7 @@ export default function ConversationsPage() {
         >
           <Inbox className="h-3.5 w-3.5" />
           Inbox
-          <Badge variant="secondary" className="h-4 text-[10px] px-1.5">{mockConversationsList.length}</Badge>
+          <Badge variant="secondary" className="h-4 text-[10px] px-1.5">{conversations.length}</Badge>
         </Button>
         <Button
           size="sm"
@@ -66,7 +67,7 @@ export default function ConversationsPage() {
             showListMobile ? "flex" : "hidden lg:flex",
           )}>
             <ConversationListPanel
-              conversations={mockConversationsList}
+              conversations={conversations}
               selectedId={selectedId}
               onSelect={(id) => { setSelectedId(id); setContextOpen(false); }}
             />

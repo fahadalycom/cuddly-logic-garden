@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import {
   ArrowLeft, MoreHorizontal, UserPlus, Tag, Flag, StickyNote, Ticket, User, Paperclip, Smile, Send, RefreshCw, AlertTriangle, Package, ArrowRightLeft, RotateCw,
 } from "lucide-react";
@@ -14,11 +14,13 @@ import { ConvStatusBadge, QueueBadge } from "./ConvStatusBadge";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { MessageStatusIndicator } from "./MessageStatusIndicator";
 import { ConversationReliabilityStrip } from "./ConversationReliabilityStrip";
-import { isFailedStatus, isPendingStatus, type DeliveryStatus } from "@/lib/message-status";
+import { isFailedStatus, isPendingStatus } from "@/lib/message-status";
 import { useSubmitGuard } from "@/hooks/useSubmitGuard";
-import { toast } from "sonner";
+import { useConversationMessages } from "@/hooks/useConversationMessages";
+import { useMessageRetry } from "@/hooks/useMessageRetry";
+import { isRealConversationId } from "@/lib/conversations-data";
 import {
-  mockMessagesByConv, mockNotesByConv, type MockConversation, type MockMessage, type MockInternalNote,
+  mockNotesByConv, type MockConversation, type MockMessage, type MockInternalNote,
 } from "@/lib/conversations-mock";
 import { cn } from "@/lib/utils";
 
@@ -38,10 +40,9 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
   const [ticketOpen, setTicketOpen] = useState(false);
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [handoffSuggestion, setHandoffSuggestion] = useState<{ queue: HandoffQueue; reason: string } | undefined>();
-  const [localMessages, setLocalMessages] = useState<MockMessage[]>([]);
-  const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
-  const idemRef = useRef<Map<string, string>>(new Map());
   const { submitting, run } = useSubmitGuard();
+  const { messages: liveMessages, sendMessage, isRealtime } = useConversationMessages(conversation?.id ?? null);
+  const { retry: retryRemote, isRetrying } = useMessageRetry();
 
   if (!conversation) {
     return (
@@ -56,49 +57,21 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
     );
   }
 
-  const baseMessages: MockMessage[] = mockMessagesByConv[conversation.id] || [];
-  const messages: MockMessage[] = [
-    ...baseMessages,
-    ...localMessages.filter((m) => m.conversationId === conversation.id),
-  ];
+  const messages: MockMessage[] = liveMessages;
   const notes: MockInternalNote[] = mockNotesByConv[conversation.id] || [];
+  const canSend = isRealConversationId(conversation.id);
 
-  // Demo send: simulate queued -> sending -> sent_to_api -> delivered transitions
   const handleSend = () => run(async () => {
     const text = draft.trim();
     if (!text) return;
-    const id = `local_${crypto.randomUUID()}`;
-    idemRef.current.set(id, crypto.randomUUID()); // idempotency_key per send
-    const now = new Date();
-    const time = `${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
-    const newMsg: MockMessage = {
-      id, conversationId: conversation.id, sender: "agent", senderName: "You",
-      text, time, direction: "outbound", status: "queued",
-    };
-    setLocalMessages((prev) => [...prev, newMsg]);
     setDraft("");
-    // Simulated transport pipeline
-    setTimeout(() => updateLocalStatus(id, "sending"), 200);
-    setTimeout(() => updateLocalStatus(id, "sent_to_api"), 700);
-    setTimeout(() => updateLocalStatus(id, "delivered"), 1500);
+    const result = await sendMessage(text);
+    if (!result.ok) setDraft(text); // restore draft on hard failure
   });
 
-  const updateLocalStatus = (id: string, status: DeliveryStatus, extra?: Partial<MockMessage>) => {
-    setLocalMessages((prev) => prev.map((m) => m.id === id ? { ...m, status, ...extra } : m));
-  };
-
   const handleRetry = async (m: MockMessage) => {
-    if (retryingIds.has(m.id) || isPendingStatus(m.status)) return;
-    setRetryingIds((prev) => new Set(prev).add(m.id));
-    updateLocalStatus(m.id, "retrying", { retryCount: (m.retryCount ?? 0) + 1 });
-    toast.success("Retrying message…");
-    // Simulated retry result
-    setTimeout(() => {
-      const success = Math.random() > 0.4;
-      updateLocalStatus(m.id, success ? "delivered" : "failed", success ? { errorMessage: undefined } : { errorMessage: m.errorMessage || "Retry failed" });
-      if (!success) toast.error("Retry failed");
-      setRetryingIds((prev) => { const n = new Set(prev); n.delete(m.id); return n; });
-    }, 1200);
+    if (isRetrying(m.id) || isPendingStatus(m.status)) return;
+    await retryRemote(m.id);
   };
 
   return (
@@ -215,7 +188,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
                 key={m.id}
                 m={m}
                 onRetry={() => handleRetry(m)}
-                isRetrying={retryingIds.has(m.id)}
+                isRetrying={isRetrying(m.id)}
               />
             ))}
             {messages.length === 0 && (
@@ -256,11 +229,12 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
             <Textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder={`Reply on ${conversation.channel}...`}
+              placeholder={canSend ? `Reply on ${conversation.channel}...` : `Demo channel — connect ${conversation.channel} to send`}
               className="min-h-[40px] max-h-[120px] text-sm resize-none bg-background/40 border-border/30 rounded-lg"
               rows={1}
+              disabled={!canSend}
             />
-            <Button size="icon" className="h-9 w-9 shrink-0" disabled={!draft.trim() || submitting} onClick={handleSend}>
+            <Button size="icon" className="h-9 w-9 shrink-0" disabled={!draft.trim() || submitting || !canSend} onClick={handleSend}>
               <Send className="h-4 w-4" />
             </Button>
           </div>
