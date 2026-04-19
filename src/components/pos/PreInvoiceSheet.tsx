@@ -74,17 +74,17 @@ export function PreInvoiceSheet({
             </div>
           </ScrollArea>
 
-          <div className="border-t border-border/40 p-3 grid grid-cols-3 gap-2 shrink-0 bg-background/95 backdrop-blur">
-            <Button variant="outline" onClick={() => onOpenChange(false)} className="text-xs">
+          <div className="border-t border-border/40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] grid grid-cols-3 gap-2 shrink-0 bg-background/95 backdrop-blur">
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="text-xs h-11">
               Back
             </Button>
-            <Button variant="outline" onClick={handleCopy} disabled={!engine.savedInvoice} className="gap-1 text-xs">
+            <Button variant="outline" onClick={handleCopy} disabled={!engine.savedInvoice} className="gap-1 text-xs h-11">
               <Copy className="h-3.5 w-3.5" /> Copy
             </Button>
             <Button
               onClick={() => setPlaceOpen(true)}
               disabled={!engine.savedInvoice}
-              className="gap-1 text-xs"
+              className="gap-1 text-xs h-11 font-semibold"
             >
               <ShoppingCart className="h-3.5 w-3.5" /> Place Order
             </Button>
