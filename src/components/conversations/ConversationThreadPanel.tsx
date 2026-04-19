@@ -174,6 +174,7 @@ export function ConversationThreadPanel({ conversation, onBack, onToggleContext 
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("whatsapp-media").getPublicUrl(path);
       setPendingAttachment({
+        storageKey: path,
         url: pub.publicUrl,
         mime: file.type,
         filename: file.name,
