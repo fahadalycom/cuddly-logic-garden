@@ -240,16 +240,33 @@ export function ChannelIntegrationCard({ channel }: Props) {
           </Alert>
         )}
 
-        {/* Webhook URL */}
-        <div>
-          <Label className="text-xs text-muted-foreground">Webhook callback URL</Label>
-          <div className="flex items-center gap-2 mt-1">
-            <Input value={webhookUrl} readOnly className="font-mono text-xs" />
-            <CopyButton text={webhookUrl} />
+        {/* Webhook URL + verify token (read-only copy) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs text-muted-foreground">Webhook callback URL</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Input value={webhookUrl} readOnly className="font-mono text-xs" />
+              <CopyButton text={webhookUrl} />
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Paste into Meta Dashboard → Webhooks for {meta.label}.
+            </p>
           </div>
-          <p className="text-[11px] text-muted-foreground mt-1">
-            Paste this into Meta App Dashboard → Webhooks for {meta.label}.
-          </p>
+          <div>
+            <Label className="text-xs text-muted-foreground">Verify token</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Input
+                value={integration?.verify_token ?? ""}
+                readOnly
+                placeholder="— not set —"
+                className="font-mono text-xs"
+              />
+              {integration?.verify_token && <CopyButton text={integration.verify_token} />}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Paste this exact value into Meta's webhook verify token field.
+            </p>
+          </div>
         </div>
 
         {/* Form */}
@@ -258,14 +275,22 @@ export function ChannelIntegrationCard({ channel }: Props) {
             {meta.fields.map((f) => {
               const isShown = !!shown[f.key];
               const isMasked = f.secret;
+              const missing = f.required && isFieldMissing(f.key, f.secret);
               const placeholder = isMasked && integration?.secrets_set?.[f.key]
                 ? "•••••••• (saved — leave blank to keep)"
                 : f.placeholder ?? "";
               return (
                 <div key={f.key} className="space-y-1.5">
-                  <Label htmlFor={`${channel}-${f.key}`} className="text-xs">
-                    {f.label}
-                    {f.required && <span className="text-destructive ml-0.5">*</span>}
+                  <Label htmlFor={`${channel}-${f.key}`} className="text-xs flex items-center gap-1.5">
+                    <span>
+                      {f.label}
+                      {f.required && <span className="text-destructive ml-0.5">*</span>}
+                    </span>
+                    {missing && (
+                      <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                        Missing
+                      </span>
+                    )}
                   </Label>
                   <div className="relative">
                     <Input
