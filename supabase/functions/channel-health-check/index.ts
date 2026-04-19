@@ -160,30 +160,14 @@ async function probeWhatsApp(supabase: any, config: any): Promise<ProbeResult> {
   if (!phoneId) return { ok: false, field: "phone_number_id", error: "Phone Number ID is not set.", hint: "Add the WhatsApp Phone Number ID and save.", checks };
   if (!token) return { ok: false, field: "access_token", error: "Access token is not configured.", hint: "Save the WhatsApp Access Token (or set META_WHATSAPP_TOKEN secret).", checks };
 
-  // Step 1: phone number profile + linked WABA
-  const phoneEp = `${GRAPH}/${phoneId}?fields=verified_name,quality_rating,display_phone_number,messaging_limit_tier,whatsapp_business_account`;
+  // Step 1: phone number profile (only universally-valid fields)
+  const phoneEp = `${GRAPH}/${phoneId}?fields=verified_name,quality_rating,display_phone_number,code_verification_status,platform_type`;
   const phoneRes = await probeGraph(phoneEp, token);
   if (!phoneRes.ok) {
     checks.push({ name: "Phone Number ID reachable", ok: false, detail: phoneRes.body?.error?.message });
     return failFromGraph(phoneRes.body, phoneRes.status, phoneEp, { object: "phone_number_id", token: "access_token" }, checks);
   }
-  checks.push({ name: "Phone Number ID reachable", ok: true, detail: phoneRes.body?.verified_name });
-
-  const linkedWaba = phoneRes.body?.whatsapp_business_account?.id ?? null;
-  if (wabaId && linkedWaba && wabaId !== linkedWaba) {
-    checks.push({ name: "Token ↔ WABA linkage", ok: false, detail: `Configured WABA ${wabaId} does not match token's WABA ${linkedWaba}` });
-    return {
-      ok: false,
-      field: "whatsapp_business_account_id",
-      error: `Configured WABA does not match the one this token belongs to (${linkedWaba}).`,
-      hint: "Update the WhatsApp Business Account ID to match the token, or generate a token from the correct WABA.",
-      info: phoneRes.body,
-      endpoint: phoneEp,
-      http_status: phoneRes.status,
-      checks,
-    };
-  }
-  checks.push({ name: "Token ↔ WABA linkage", ok: true, detail: linkedWaba ?? "implicit" });
+  checks.push({ name: "Phone Number ID reachable", ok: true, detail: phoneRes.body?.verified_name ?? phoneRes.body?.display_phone_number });
 
   // Step 2: confirm WABA exists (if provided)
   if (wabaId) {
