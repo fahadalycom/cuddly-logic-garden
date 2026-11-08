@@ -232,7 +232,7 @@ function buildOpusHead(channels: number, preSkip: number, sampleRate: number): U
 }
 
 function buildOpusTags(): Uint8Array {
-  const vendor = "Lovable";
+  const vendor = "ProSuite";
   const vendorBytes = new TextEncoder().encode(vendor);
   const tags = new Uint8Array(8 + 4 + vendorBytes.length + 4);
   const view = new DataView(tags.buffer);

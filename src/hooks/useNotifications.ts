@@ -48,7 +48,7 @@ export function useNotifications() {
       try {
         const notif = new Notification(title, {
           body,
-          icon: "/placeholder.svg",
+          icon: "/favicon.svg",
           tag: "wa-message",
           silent: true,
         } as NotificationOptions);

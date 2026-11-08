@@ -1,19 +1,20 @@
 // Hybrid AI assist: classify, summarize, rewrite-template, suggest-reply.
-// All prompts live server-side. Uses Lovable AI Gateway.
+// All prompts live server-side. Uses any OpenAI-compatible chat completions API
+// (configure AI_GATEWAY_URL and AI_API_KEY as function secrets).
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-3-flash-preview";
+const GATEWAY = Deno.env.get("AI_GATEWAY_URL") ?? "https://openrouter.ai/api/v1/chat/completions";
+const MODEL = Deno.env.get("AI_MODEL") ?? "google/gemini-3-flash-preview";
 
 type Msg = { role: "system" | "user" | "assistant"; content: string };
 
 async function callAI(messages: Msg[], tools?: unknown, tool_choice?: unknown) {
-  const key = Deno.env.get("LOVABLE_API_KEY");
-  if (!key) throw new Error("LOVABLE_API_KEY missing");
+  const key = Deno.env.get("AI_API_KEY");
+  if (!key) throw new Error("AI_API_KEY missing");
   const body: Record<string, unknown> = { model: MODEL, messages };
   if (tools) body.tools = tools;
   if (tool_choice) body.tool_choice = tool_choice;

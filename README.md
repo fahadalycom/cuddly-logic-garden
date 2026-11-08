@@ -41,12 +41,8 @@ npm install
 bun install
 
 # 3. Create environment file
-#    Create a .env file in the root directory with:
-cat > .env << 'EOF'
-VITE_SUPABASE_URL=https://your-project-ref.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-key-here
-VITE_SUPABASE_PROJECT_ID=your-project-ref
-EOF
+cp .env.example .env
+#    then fill in your Supabase values
 
 # 4. Start the development server
 npm run dev
@@ -64,6 +60,20 @@ npm run dev
 | `VITE_SUPABASE_PROJECT_ID` | Your backend project ID |
 
 > ⚠️ Never commit your `.env` file to version control. It is already in `.gitignore`.
+
+### AI Features (Edge Function Secrets)
+
+The AI assistant and WhatsApp auto-reply edge functions work with any OpenAI-compatible chat completions API (OpenRouter by default). Set these as Supabase function secrets:
+
+| Secret | Description |
+|--------|-------------|
+| `AI_API_KEY` | API key for your AI provider (required) |
+| `AI_GATEWAY_URL` | Chat completions endpoint (default: `https://openrouter.ai/api/v1/chat/completions`) |
+| `AI_MODEL` | Default model for the AI assistant (default: `google/gemini-3-flash-preview`) |
+
+```bash
+supabase secrets set AI_API_KEY=your-key
+```
 
 ---
 
@@ -496,4 +506,4 @@ Since you're coming from MySQL, here's a quick comparison:
 
 ## License
 
-Private — All rights reserved.
+This project is licensed under the [MIT License](LICENSE).
