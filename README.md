@@ -1,6 +1,6 @@
 # Pro Suite — AI Subscription Sharing Management System
 
-A comprehensive SaaS management platform for selling, delivering, and managing shared AI/software subscriptions. Built with React, TypeScript, Tailwind CSS, and Lovable Cloud (Supabase).
+A comprehensive SaaS management platform for selling, delivering, and managing shared AI/software subscriptions. Built with React, TypeScript, Tailwind CSS, and Supabase.
 
 ---
 
@@ -208,7 +208,7 @@ If you want to run this project **completely on your own PostgreSQL database** �
 
 | Component | Cloud (Current) | Self-Hosted |
 |-----------|-----------------|-------------|
-| Database | Lovable Cloud (managed) | Your own PostgreSQL 15+ |
+| Database | Supabase Cloud (managed) | Your own PostgreSQL 15+ |
 | Auth | Built-in Auth service | You'll handle auth yourself or use Supabase self-hosted |
 | Edge Functions | Auto-deployed | Run locally with Deno or convert to Node.js |
 | Frontend | Same | Same |
@@ -441,7 +441,7 @@ const data = await response.json();
 | 🟢 Want exact same features, locally | **Option A** (Self-hosted Supabase with Docker) |
 | 🟡 Already have PostgreSQL, okay with code changes | **Option B** (Direct PostgreSQL + custom API) |
 | 🟠 Want to host everything on Namecheap | **Option C** (cPanel PostgreSQL + PHP API) |
-| 🔵 Don't want to manage servers at all | **Keep using Lovable Cloud** (current setup) |
+| 🔵 Don't want to manage servers at all | **Keep using Supabase Cloud** (current setup) |
 
 > 💡 **Recommendation**: Option A is the easiest path to fully offline/self-hosted. You get the same API, same auth, same everything — just running on your own machine instead of the cloud.
 
@@ -488,7 +488,7 @@ Since you're coming from MySQL, here's a quick comparison:
 
 - **Frontend**: React 18, TypeScript, Vite 5
 - **Styling**: Tailwind CSS v3, shadcn/ui components
-- **Backend**: Lovable Cloud (Supabase) — PostgreSQL, Auth, Edge Functions
+- **Backend**: Supabase — PostgreSQL, Auth, Edge Functions
 - **Charts**: Recharts
 - **State**: TanStack React Query
 
